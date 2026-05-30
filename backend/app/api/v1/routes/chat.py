@@ -6,18 +6,11 @@ from app.api.schemas import (
     ChatResponseChunk,
     GenerateRequest,
     GenerateResponse,
-    HealthResponse,
 )
-from app.core.config import settings
 from app.services.gemini import generate_text
 from app.services.gemini_stream import gemini_stream
 
-router = APIRouter(prefix="/api")
-
-
-@router.get("/health", response_model=HealthResponse)
-async def api_health():
-    return HealthResponse(status="ok", app_name=settings.app_name)
+router = APIRouter()
 
 
 @router.post("/generate", response_model=GenerateResponse)

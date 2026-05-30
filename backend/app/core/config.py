@@ -8,6 +8,12 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
     ]
+    shared_app_password: str = "change-me"
+    database_url: str = "sqlite:///./app.db"
+    
+    secret_key: str = "change-me-super-secret"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 10080
 
     model_config = SettingsConfigDict(env_file=".env")
 

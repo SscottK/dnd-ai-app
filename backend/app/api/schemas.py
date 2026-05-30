@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 
 
@@ -25,3 +26,54 @@ class ChatResponseChunk(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     app_name: str
+
+
+class LoginRequest(BaseModel):
+    password: str = Field(min_length=1)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class AuthStatusResponse(BaseModel):
+    authenticated: bool
+
+
+
+class ConversationCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
+class ConversationRead(BaseModel):
+    id: int
+    title: str
+    created_at: datetime
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationRead]
+
+class MessageCreate(BaseModel):
+    content: str = Field(min_length=1)
+
+
+class MessageRead(BaseModel):
+    id: int
+    conversation_id: int
+    role: str
+    content: str
+    created_at: datetime
+
+
+class ConversationDetailResponse(BaseModel):
+    id: int
+    title: str
+    created_at: datetime
+    messages: list[MessageRead]
+
+
+class SendMessageResponse(BaseModel):
+    user_message: MessageRead
+    assistant_message: MessageRead
