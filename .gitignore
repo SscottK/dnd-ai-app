@@ -1,6 +1,19 @@
 
-.venv
-.env
+# Python virtual environments (Backend)
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+
+# Local environment variables (Backend & Frontend)
+**/.env
+**/.env.local
+
+# Node modules & builds (Frontend)
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/build/
 
 # Logs
 logs
@@ -10,11 +23,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
 
 # Editor directories and files
 .vscode
