@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
-        "https://dnd-ai-app.vercel.app",
+        "https://dnd-ai-app.vercel.app/",
 
     ]
     shared_app_password: str = "change-me"
