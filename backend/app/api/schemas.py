@@ -12,7 +12,7 @@ class GenerateResponse(BaseModel):
 
 class ChatMessage(BaseModel):
     role: str
-    text: str = Field(min_length=1, max_length=4000)
+    text: str = Field(default="")
 
 
 class ChatRequest(BaseModel):

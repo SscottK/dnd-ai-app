@@ -336,3 +336,42 @@ async def stream_message(
                 logger.exception(f"Failed committing fully assembled streaming reply in background context: {str(e)}")
 
     return StreamingResponse(sse_event_generator(), media_type="text/event-stream")
+
+@router.patch("/{conversation_id}", response_model=ConversationRead)
+def update_conversation_title(
+    conversation_id: int,
+    payload: ConversationCreate,  # Reuses ConversationCreate schema to validate 'title' securely
+    _: AuthDep,
+    session: SessionDep,
+):
+    try:
+        conversation = session.get(Conversation, conversation_id)
+    except Exception as e:
+        logger.exception(f"Error accessing conversation {conversation_id} during patch: {str(e)}")
+        raise DatabaseSessionError("Database transaction lookup failing.")
+
+    if conversation is None:
+        raise GeminiProxyException(
+            message="Conversation not found",
+            status_code=404,
+        )
+
+    # Validate incoming title value
+    new_title = payload.title.strip() if payload.title else ""
+    if not new_title:
+        raise GeminiProxyException(
+            message="A non-empty conversation title is required.",
+            status_code=400,
+        )
+
+    # Update database record
+    try:
+        conversation.title = new_title
+        session.add(conversation)
+        session.commit()
+        session.refresh(conversation)
+        return to_conversation_read(conversation)
+    except Exception as e:
+        session.rollback()
+        logger.exception(f"Failed to update title for conversation {conversation_id}: {str(e)}")
+        raise DatabaseSessionError("Could not update conversation thread title.")
