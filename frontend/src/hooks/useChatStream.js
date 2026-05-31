@@ -1,6 +1,8 @@
 import { useState } from "react";
 
-const API_BASE_URL = "/api/v1";
+const API_BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api/v1` 
+  : "/api/v1";
 
 export function useChatStream(token) {
   const [isStreaming, setIsStreaming] = useState(false);
