@@ -375,3 +375,32 @@ def update_conversation_title(
         session.rollback()
         logger.exception(f"Failed to update title for conversation {conversation_id}: {str(e)}")
         raise DatabaseSessionError("Could not update conversation thread title.")
+    
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_200_OK)
+def delete_conversation(
+    conversation_id: int,
+    _: AuthDep,
+    session: SessionDep,
+):
+    try:
+        conversation = session.get(Conversation, conversation_id)
+    except Exception as e:
+        logger.exception(f"Error accessing conversation {conversation_id} during delete: {str(e)}")
+        raise DatabaseSessionError("Database transaction lookup failing.")
+
+    if conversation is None:
+        raise GeminiProxyException(
+            message="Conversation not found",
+            status_code=404,
+        )
+
+    try:
+        # SQLite wipes all associated child messages automatically due to cascade relationship rules
+        session.delete(conversation)
+        session.commit()
+        return {"status": "ok", "message": f"Conversation {conversation_id} deleted successfully."}
+    except Exception as e:
+        session.rollback()
+        logger.exception(f"Failed to delete conversation {conversation_id}: {str(e)}")
+        raise DatabaseSessionError("Could not delete conversation thread.")
