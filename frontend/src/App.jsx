@@ -18,6 +18,10 @@ import {
   PinOff
 } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api/v1` 
+  : "/api/v1";
+
 export default function App() {
   const { token, isAuthenticated, login, logout, isValidating } = useAuth();
   const { streamMessage, isStreaming } = useChatStream(token);
@@ -48,7 +52,7 @@ export default function App() {
   // Load sidebar conversation registry list
   useEffect(() => {
     if (isAuthenticated && token) {
-      fetch("/api/v1/conversations", {
+      fetch(`${API_BASE_URL}/conversations`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
@@ -60,7 +64,7 @@ export default function App() {
   // Load chat logs when a conversation is chosen
   useEffect(() => {
     if (activeConvId && token) {
-      fetch(`/api/v1/conversations/${activeConvId}`, {
+      fetch(`${API_BASE_URL}/conversations/${activeConvId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
@@ -84,7 +88,7 @@ export default function App() {
   const handleCreateConversation = async () => {
     if (!token) return;
     try {
-      const response = await fetch("/api/v1/conversations", {
+      const response = await fetch(`${API_BASE_URL}/conversations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -115,7 +119,7 @@ export default function App() {
     if (!editTitleVal.trim() || !token) return;
 
     try {
-      const response = await fetch(`/api/v1/conversations/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/conversations/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -147,7 +151,7 @@ export default function App() {
     if (!window.confirm("ARE YOU SURE YOU WANT TO WIPE THIS TAPE? DATA WILL BE LOST PERMANENTLY.")) return;
 
     try {
-      const response = await fetch(`/api/v1/conversations/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/conversations/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
