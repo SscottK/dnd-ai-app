@@ -49,3 +49,18 @@ def get_campaign_member_for_user(
             CampaignMember.user_id == user_id,
         )
     ).first()
+
+
+def get_campaign_for_member_or_owner(
+    campaign_id: int,
+    user: User,
+    session: Session,
+) -> tuple[Campaign, bool]:
+    campaign = get_owned_campaign(campaign_id, session)
+    is_owner = campaign.owner_id == user.id
+    if not is_owner and get_campaign_member_for_user(campaign_id, user.id, session) is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this campaign",
+        )
+    return campaign, is_owner

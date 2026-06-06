@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "D&D AI App"
+    app_name: str = "Quest Terminal"
     gemini_api_key: str = ""
     cors_origins: list[str] = [
         "http://localhost:3000",

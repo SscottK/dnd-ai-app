@@ -8,12 +8,13 @@ import httpx
 from app.api.schemas import ChatMessage
 from app.core.config import settings
 from app.core.exceptions import UpstreamAPIError
+from app.services.conversations import RULES_SYSTEM_PROMPT
 
 logger = logging.getLogger("app.services.gemini_stream")
 
 
 def build_prompt_from_messages(messages: list[ChatMessage]) -> str:
-    lines = []
+    lines = [RULES_SYSTEM_PROMPT.strip()]
     for message in messages:
         role = "User" if message.role == "user" else "Assistant"
         lines.append(f"{role}: {message.text}")

@@ -109,8 +109,23 @@ class CampaignRead(BaseModel):
     is_owner: bool
     invite_code: str | None = None
     my_character_name: str | None = None
+    my_character_id: int | None = None
+    session_active: bool = False
     member_count: int | None = None
     created_at: datetime
+
+
+class CampaignSessionUpdate(BaseModel):
+    session_active: bool
+
+
+class CampaignSessionStatus(BaseModel):
+    campaign_id: int
+    campaign_name: str
+    session_active: bool
+    is_owner: bool
+    character_id: int | None = None
+    character_name: str | None = None
 
 
 class CampaignListResponse(BaseModel):
@@ -142,6 +157,7 @@ class CharacterCreate(BaseModel):
     hp: int | None = Field(default=None, ge=0)
     max_hp: int | None = Field(default=None, ge=0)
     skills: str | None = None
+    sheet_json: str | None = None
     dnd_beyond_url: str | None = Field(default=None, max_length=500)
     pdf_stored_name: str | None = Field(default=None, max_length=200)
 
@@ -154,6 +170,11 @@ class CharacterUpdate(BaseModel):
     hp: int | None = Field(default=None, ge=0)
     max_hp: int | None = Field(default=None, ge=0)
     skills: str | None = None
+    inventory: str | None = None
+    features: str | None = None
+    notes: str | None = None
+    layout_json: str | None = None
+    sheet_json: str | None = None
     dnd_beyond_url: str | None = Field(default=None, max_length=500)
 
 
@@ -166,11 +187,54 @@ class CharacterRead(BaseModel):
     hp: int | None
     max_hp: int | None
     skills: str | None
+    inventory: str | None = None
+    features: str | None = None
+    notes: str | None = None
+    layout_json: str | None = None
+    sheet_json: str | None = None
     campaign_id: int | None
     campaign_name: str | None
     pdf_url: str | None
     dnd_beyond_url: str | None
     created_at: datetime
+
+
+class EncounterCombatant(BaseModel):
+    id: str
+    name: str
+    initiative: int = 0
+    is_pc: bool = False
+    character_id: int | None = None
+    hp: int | None = None
+    max_hp: int | None = None
+    ac: int | None = None
+    conditions: str | None = None
+
+
+class EncounterState(BaseModel):
+    round: int = 1
+    active_index: int = 0
+    active_combatant_id: str | None = None
+    combatants: list[EncounterCombatant] = Field(default_factory=list)
+
+
+class EncounterUpdate(BaseModel):
+    round: int | None = Field(default=None, ge=1)
+    active_index: int | None = Field(default=None, ge=0)
+    active_combatant_id: str | None = None
+    combatants: list[EncounterCombatant] | None = None
+
+
+class InitiativeSubmitRequest(BaseModel):
+    initiative: int | None = Field(default=None, ge=-20, le=50)
+    auto_roll: bool = False
+
+
+class InitiativeSubmitResponse(BaseModel):
+    encounter: EncounterState
+    total: int
+    d20_roll: int | None = None
+    bonus: int | None = None
 
 
 class CharacterListResponse(BaseModel):
@@ -185,5 +249,6 @@ class CharacterDraft(BaseModel):
     hp: int | None = None
     max_hp: int | None = None
     skills: str | None = None
+    sheet_json: str | None = None
     pdf_stored_name: str | None = None
     parse_warning: str | None = None

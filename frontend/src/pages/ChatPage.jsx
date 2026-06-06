@@ -176,19 +176,19 @@ export function ChatPage() {
         onClick={() => setActiveConvId(c.id)}
         className={`group w-full flex items-center justify-between px-3 py-2.5 text-xs transition cursor-pointer border-l-4 font-mono uppercase tracking-tight ${
           isActive
-            ? "bg-[#ff007f]/10 text-[#fffb00] border-[#ff007f]"
+            ? "bg-neon-magenta/10 text-starlight border-neon-magenta"
             : "text-zinc-400 border-transparent hover:text-white hover:bg-zinc-900/80"
         }`}
       >
         <div className="flex items-center gap-2.5 truncate w-full pr-2">
-          <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-[#ff007f]" : "text-zinc-600"}`} />
+          <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-neon-magenta" : "text-zinc-600"}`} />
           {editingConvId === c.id ? (
             <input
               type="text"
               value={editTitleVal}
               onChange={(e) => setEditTitleVal(e.target.value)}
               onClick={(e) => e.stopPropagation()}
-              className="w-full bg-black text-[#00ffff] text-xs px-2 py-0.5 border-2 border-[#00ffff] outline-none"
+              className="w-full bg-black text-neon-cyan text-xs px-2 py-0.5 border-2 border-neon-cyan outline-none"
               autoFocus
             />
           ) : (
@@ -207,13 +207,13 @@ export function ChatPage() {
             </>
           ) : (
             <>
-              <button onClick={(e) => handleTogglePinThread(e, c.id)} className="p-0.5 text-zinc-500 hover:text-[#ff007f]">
+              <button onClick={(e) => handleTogglePinThread(e, c.id)} className="p-0.5 text-zinc-500 hover:text-neon-magenta">
                 {isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
               </button>
-              <button onClick={(e) => handleStartRename(e, c.id, c.title)} className="text-zinc-500 hover:text-[#00ffff] p-0.5">
+              <button onClick={(e) => handleStartRename(e, c.id, c.title)} className="text-zinc-500 hover:text-neon-cyan p-0.5">
                 <Pencil className="w-3.5 h-3.5" />
               </button>
-              <button onClick={(e) => handleDeleteConversation(e, c.id)} className="text-zinc-500 hover:text-[#ff003c] p-0.5">
+              <button onClick={(e) => handleDeleteConversation(e, c.id)} className="text-zinc-500 hover:text-danger p-0.5">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </>
@@ -224,12 +224,12 @@ export function ChatPage() {
   };
 
   return (
-    <div className="flex h-full bg-black text-[#00ffff] overflow-hidden">
-      <aside className="w-72 border-r-2 border-[#ff007f]/50 bg-zinc-950 flex flex-col">
-        <div className="p-3 border-b border-[#ff007f]/30">
+    <div className="flex h-full bg-black text-neon-cyan overflow-hidden">
+      <aside className="w-72 border-r-2 border-neon-magenta/50 bg-zinc-950 flex flex-col">
+        <div className="p-3 border-b border-neon-magenta/30">
           <button
             onClick={handleCreateConversation}
-            className="w-full py-2 bg-black hover:bg-[#ff007f] text-[#ff007f] hover:text-black border-2 border-[#ff007f] font-black text-xs flex items-center justify-center gap-2 uppercase tracking-widest"
+            className="w-full py-2 bg-black hover:bg-neon-magenta text-neon-magenta hover:text-black border-2 border-neon-magenta font-black text-xs flex items-center justify-center gap-2 uppercase tracking-widest"
           >
             <Plus className="w-4 h-4" /> New Thread
           </button>
@@ -237,12 +237,12 @@ export function ChatPage() {
         <div className="flex-1 overflow-y-auto px-1 py-2 space-y-3">
           {pinnedThreads.length > 0 && (
             <div className="space-y-0.5">
-              <div className="px-3 text-[10px] font-black text-[#fffb00] uppercase tracking-widest">Pinned</div>
+              <div className="px-3 text-[10px] font-black text-starlight uppercase tracking-widest">Pinned</div>
               {pinnedThreads.map(renderConversationItem)}
             </div>
           )}
           <div className="space-y-0.5">
-            <div className="px-3 text-[10px] font-black text-[#00ffff] uppercase tracking-widest">Threads</div>
+            <div className="px-3 text-[10px] font-black text-neon-cyan uppercase tracking-widest">Threads</div>
             {generalThreads.length > 0 ? (
               generalThreads.map(renderConversationItem)
             ) : (
@@ -263,11 +263,11 @@ export function ChatPage() {
                   <div
                     className={`max-w-2xl p-4 text-sm border-2 font-mono ${
                       m.role === "user"
-                        ? "bg-[#00ffff] text-black border-white"
-                        : "bg-zinc-950 text-white border-[#ff007f]"
+                        ? "bg-neon-cyan text-black border-white"
+                        : "bg-zinc-950 text-white border-neon-magenta"
                     }`}
                   >
-                    <div className={`text-[9px] font-black tracking-widest mb-1.5 uppercase ${m.role === "user" ? "text-zinc-800" : "text-[#fffb00]"}`}>
+                    <div className={`text-[9px] font-black tracking-widest mb-1.5 uppercase ${m.role === "user" ? "text-zinc-800" : "text-starlight"}`}>
                       {m.role === "user" ? "You" : "Rules Assistant"}
                     </div>
                     {m.role === "user" ? m.content : <MarkdownRenderer content={m.content} />}
@@ -276,14 +276,14 @@ export function ChatPage() {
               ))}
               {streamedReply && (
                 <div className="flex justify-start">
-                  <div className="max-w-2xl p-4 bg-zinc-950 text-white border-2 border-[#fffb00] text-sm font-mono">
+                  <div className="max-w-2xl p-4 bg-zinc-950 text-white border-2 border-starlight text-sm font-mono">
                     <MarkdownRenderer content={streamedReply} />
-                    <span className="inline-block w-2.5 h-4 ml-1 bg-[#ff007f] animate-ping align-middle" />
+                    <span className="inline-block w-2.5 h-4 ml-1 bg-neon-magenta animate-ping align-middle" />
                   </div>
                 </div>
               )}
             </div>
-            <div className="p-4 border-t-2 border-[#ff007f] bg-black/95">
+            <div className="p-4 border-t-2 border-neon-magenta bg-black/95">
               <form onSubmit={handleSendMessage} className="flex gap-2 max-w-3xl mx-auto font-mono">
                 <input
                   type="text"
@@ -291,12 +291,12 @@ export function ChatPage() {
                   onChange={(e) => setInputVal(e.target.value)}
                   placeholder="Ask about a rule, spell, or monster..."
                   disabled={isStreaming}
-                  className="flex-1 px-4 py-3 border-2 border-[#00ffff] bg-zinc-950 text-[#fffb00] focus:outline-none focus:border-[#fffb00] text-sm"
+                  className="flex-1 px-4 py-3 border-2 border-neon-cyan bg-zinc-950 text-starlight focus:outline-none focus:border-starlight text-sm"
                 />
                 <button
                   type="submit"
                   disabled={isStreaming || !inputVal.trim()}
-                  className="px-6 bg-[#ff007f] text-black font-black border-2 border-black hover:bg-[#fffb00] disabled:opacity-40 flex items-center gap-2 text-xs uppercase"
+                  className="px-6 bg-neon-magenta text-black font-black border-2 border-black hover:bg-starlight disabled:opacity-40 flex items-center gap-2 text-xs uppercase"
                 >
                   <Send className="w-4 h-4" /> Send
                 </button>
@@ -304,11 +304,11 @@ export function ChatPage() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#040008]">
-            <BookOpen className="w-16 h-16 text-[#ff007f] mb-4 animate-pulse" />
-            <h3 className="text-xl font-black text-[#fffb00] uppercase tracking-wider">Rules AI Chat</h3>
-            <p className="text-xs text-[#00ffff] mt-2 max-w-xs font-mono">
-              Select a thread or create a new one to look up D&amp;D 5e rules.
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-void">
+            <BookOpen className="w-16 h-16 text-neon-magenta mb-4 animate-pulse" />
+            <h3 className="text-xl font-black text-starlight uppercase tracking-wider">Rules AI Chat</h3>
+            <p className="text-xs text-neon-cyan mt-2 max-w-xs font-mono">
+              Select a thread or create a new one to look up D&amp;D 5.5e rules.
             </p>
           </div>
         )}

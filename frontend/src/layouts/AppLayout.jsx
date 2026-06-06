@@ -1,55 +1,61 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { BookOpen, LayoutDashboard, LogOut, MessageSquare } from "lucide-react";
+import { LayoutDashboard, LogOut, MessageSquare, Scroll } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { APP_NAME, APP_TAGLINE } from "../constants/branding";
 
 const navLinkClass = ({ isActive }) =>
-  `flex items-center gap-2 px-3 py-2 text-xs font-black uppercase tracking-widest border-l-4 transition ${
+  `flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border-b-2 transition ${
     isActive
-      ? "border-[#ff007f] text-[#fffb00] bg-[#ff007f]/10"
-      : "border-transparent text-zinc-400 hover:text-white hover:bg-zinc-900/80"
+      ? "border-neon-magenta text-starlight"
+      : "border-transparent text-ink-muted hover:text-ink"
   }`;
 
 export function AppLayout() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex h-screen bg-[#030005] text-[#00ffff] overflow-hidden font-sans">
-      <aside className="w-64 border-r-4 border-[#ff007f] bg-black flex flex-col">
-        <div className="p-4 border-b-2 border-[#ff007f]/50 flex items-center gap-2 bg-zinc-950">
-          <BookOpen className="w-5 h-5 text-[#00ffff]" />
-          <div>
-            <h2 className="font-black text-sm text-[#ff007f] tracking-widest italic uppercase">
-              D&amp;D AI
-            </h2>
-            <p className="text-[9px] text-zinc-500 truncate max-w-[140px]">
-              {user?.username}
-            </p>
-          </div>
+    <div className="flex h-screen w-full min-w-0 flex-col overflow-hidden bg-void font-sans text-ink">
+      <header className="shrink-0 flex items-center justify-between gap-4 px-4 py-2 border-b-4 border-neon-magenta bg-void-deep">
+        <div className="flex items-center gap-4 min-w-0">
+          <NavLink to="/dashboard" className="flex items-center gap-2 shrink-0 group">
+            <Scroll className="w-5 h-5 text-neon-cyan group-hover:text-starlight" />
+            <div className="hidden sm:block">
+              <span className="font-black text-sm text-neon-magenta tracking-widest italic uppercase block leading-none">
+                {APP_NAME}
+              </span>
+              <span className="text-[8px] text-nebula font-mono uppercase tracking-[0.2em]">
+                {APP_TAGLINE}
+              </span>
+            </div>
+          </NavLink>
+
+          <nav className="flex items-center gap-1">
+            <NavLink to="/dashboard" className={navLinkClass} end>
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              Campaigns
+            </NavLink>
+            <NavLink to="/chat" className={navLinkClass}>
+              <MessageSquare className="w-3.5 h-3.5" />
+              Rules
+            </NavLink>
+          </nav>
         </div>
 
-        <nav className="flex-1 p-2 space-y-1">
-          <NavLink to="/dashboard" className={navLinkClass} end>
-            <LayoutDashboard className="w-4 h-4" />
-            Dashboard
-          </NavLink>
-          <NavLink to="/chat" className={navLinkClass}>
-            <MessageSquare className="w-4 h-4" />
-            Rules AI Chat
-          </NavLink>
-        </nav>
-
-        <div className="p-3 border-t-2 border-[#ff007f]/50">
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-[9px] text-zinc-600 font-mono truncate max-w-[120px] hidden md:inline">
+            {user?.username}
+          </span>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-[#ff003c] transition"
+            className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-danger transition"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
             Sign Out
           </button>
         </div>
-      </aside>
+      </header>
 
-      <main className="flex-1 overflow-hidden">
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <Outlet />
       </main>
     </div>

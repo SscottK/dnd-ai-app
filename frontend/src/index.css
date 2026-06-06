@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+/* Neon Odyssey — readable void-space UI; neon reserved for accents, not body copy */
+@theme {
+  --color-void: #0c0a14;
+  --color-void-deep: #07050e;
+  --color-void-panel: #15121f;
+  --color-ink: #d8d0e8;
+  --color-ink-muted: #9a92b0;
+  --color-ink-faint: #6b6480;
+  --color-neon-magenta: #d9468f;
+  --color-neon-cyan: #5eb8c9;
+  --color-accent: #c77dff;
+  --color-starlight: #e8c547;
+  --color-nebula: #8b6cb0;
+  --color-border: #2e2842;
+  --color-border-bright: #4a3f6b;
+  --color-plasma: #a855c8;
+  --color-danger: #e85d75;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full w-full overflow-hidden;
+  }
+
+  body {
+    @apply bg-void text-ink antialiased;
+  }
+}

@@ -6,6 +6,13 @@ from app.core.exceptions import GeminiProxyException
 
 logger = logging.getLogger("app.services.conversations")
 
+RULES_SYSTEM_PROMPT = """You are a Dungeons & Dragons 5.5e (2024 rules revision) rules assistant.
+Answer concisely with accurate 5.5e mechanics. Cite rule names when helpful.
+If unsure, say so. Do not invent homebrew unless asked.
+Stay focused on rules lookups — not running a live campaign narrative.
+
+"""
+
 def build_prompt_from_db_messages(messages: List[Message]) -> str:
     """
     Transforms list of DB message models into a system-formatted prompt 
@@ -26,10 +33,7 @@ def build_prompt_from_db_messages(messages: List[Message]) -> str:
             role_label = "User" if role == "user" else "Assistant"
             formatted_turns.append(f"{role_label}: {content}")
         
-        # Assemble string prompt with clear double-newline separators
-        prompt = "\n\n".join(formatted_turns)
-        
-        # Append a trailing helper to encourage the model to continue the conversation
+        prompt = RULES_SYSTEM_PROMPT + "\n\n".join(formatted_turns)
         prompt += "\n\nAssistant:"
         return prompt
 

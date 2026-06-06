@@ -16,6 +16,8 @@ from app.api.schemas import (
 from app.db.models import Campaign, Character
 from app.db.session import BACKEND_DIR
 from app.services.character_pdf import parse_character_from_pdf
+from app.services.character_sheet import parse_sheet_json, sheet_to_json, skills_summary
+from app.services.encounter_sync import sync_character_combat_stats
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 
@@ -51,6 +53,11 @@ def to_character_read(character: Character, session: SessionDep) -> CharacterRea
         hp=character.hp,
         max_hp=character.max_hp,
         skills=character.skills,
+        inventory=character.inventory,
+        features=character.features,
+        notes=character.notes,
+        layout_json=character.layout_json,
+        sheet_json=character.sheet_json,
         campaign_id=character.campaign_id,
         campaign_name=campaign_name,
         pdf_url=pdf_download_url(character),
@@ -64,6 +71,14 @@ def get_owned_character(character_id: int, current_user: CurrentUser, session: S
     if character is None or character.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
     return character
+
+
+def apply_parsed_to_character(character: Character, parsed: dict) -> None:
+    for field in ("name", "class_name", "level", "ac", "hp", "max_hp", "skills"):
+        if parsed.get(field) is not None:
+            setattr(character, field, parsed[field])
+    if parsed.get("sheet_json"):
+        character.sheet_json = parsed["sheet_json"]
 
 
 @router.get("", response_model=CharacterListResponse)
@@ -136,6 +151,63 @@ def download_character_pdf(user_id: int, filename: str, current_user: CurrentUse
     return FileResponse(path, media_type="application/pdf", filename=filename)
 
 
+@router.get("/{character_id}", response_model=CharacterRead)
+def get_character(character_id: int, current_user: CurrentUser, session: SessionDep):
+    character = get_owned_character(character_id, current_user, session)
+    return to_character_read(character, session)
+
+
+@router.post("/{character_id}/refresh-from-pdf", response_model=CharacterRead)
+async def refresh_character_from_pdf(
+    character_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    if not character.pdf_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No PDF on file for this character",
+        )
+
+    pdf_file = UPLOADS_DIR / character.pdf_path
+    if not pdf_file.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Stored PDF not found. Please re-upload.",
+        )
+
+    try:
+        parsed = await parse_character_from_pdf(pdf_file)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not re-parse character sheet from PDF",
+        ) from exc
+
+    parsed.pop("parse_warning", None)
+    apply_parsed_to_character(character, parsed)
+    session.add(character)
+    session.commit()
+    session.refresh(character)
+
+    if character.campaign_id:
+        sync_character_combat_stats(
+            session,
+            character.campaign_id,
+            character.id,
+            hp=character.hp,
+            max_hp=character.max_hp,
+            ac=character.ac,
+        )
+        session.commit()
+        session.refresh(character)
+
+    return to_character_read(character, session)
+
+
 @router.post("", response_model=CharacterRead, status_code=status.HTTP_201_CREATED)
 def create_character(data: CharacterCreate, current_user: CurrentUser, session: SessionDep):
     pdf_path = None
@@ -157,6 +229,7 @@ def create_character(data: CharacterCreate, current_user: CurrentUser, session: 
         hp=data.hp,
         max_hp=data.max_hp,
         skills=data.skills,
+        sheet_json=data.sheet_json or "{}",
         pdf_path=pdf_path,
         dnd_beyond_url=data.dnd_beyond_url,
     )
@@ -179,10 +252,29 @@ def update_character(
     if "name" in updates and updates["name"] is not None:
         updates["name"] = updates["name"].strip()
 
+    if "sheet_json" in updates and updates["sheet_json"] is not None:
+        sheet = parse_sheet_json(updates["sheet_json"])
+        updates["sheet_json"] = sheet_to_json(sheet)
+        if "skills" not in updates:
+            updates["skills"] = skills_summary(sheet)
+
+    combat_changed = any(key in updates for key in ("hp", "max_hp", "ac"))
+
     for field, value in updates.items():
         setattr(character, field, value)
 
     session.add(character)
+
+    if combat_changed and character.campaign_id:
+        sync_character_combat_stats(
+            session,
+            character.campaign_id,
+            character.id,
+            hp=character.hp,
+            max_hp=character.max_hp,
+            ac=character.ac,
+        )
+
     session.commit()
     session.refresh(character)
     return to_character_read(character, session)
