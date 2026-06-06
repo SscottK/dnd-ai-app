@@ -186,3 +186,4 @@ class CharacterDraft(BaseModel):
     max_hp: int | None = None
     skills: str | None = None
     pdf_stored_name: str | None = None
+    parse_warning: str | None = None

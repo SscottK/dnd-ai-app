@@ -34,6 +34,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [parsingPdf, setParsingPdf] = useState(false);
+  const [parseWarning, setParseWarning] = useState("");
 
   const [newCampaignName, setNewCampaignName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -178,8 +179,9 @@ export function DashboardPage() {
         throw new Error(err.detail || "PDF parse failed");
       }
       const draft = await response.json();
+      setParseWarning(draft.parse_warning || "");
       setCharacterForm({
-        name: draft.name || "",
+        name: draft.name && draft.name !== "Unknown Hero" ? draft.name : "",
         class_name: draft.class_name || "",
         level: String(draft.level ?? 1),
         ac: draft.ac != null ? String(draft.ac) : "",
@@ -226,6 +228,7 @@ export function DashboardPage() {
     }
 
     setCharacterForm(emptyCharacterForm);
+    setParseWarning("");
     setShowCharacterForm(false);
     await loadDashboard();
   };
@@ -457,6 +460,11 @@ export function DashboardPage() {
               {characterForm.pdf_stored_name && (
                 <p className="text-[10px] text-[#fffb00] font-mono">
                   PDF loaded — review the fields below, then save.
+                </p>
+              )}
+              {parseWarning && (
+                <p className="text-[10px] text-[#fffb00] font-mono border-l-2 border-[#fffb00] pl-2">
+                  {parseWarning}
                 </p>
               )}
               <div className="grid gap-3 sm:grid-cols-2">

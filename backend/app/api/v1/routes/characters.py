@@ -115,7 +115,13 @@ async def parse_pdf_upload(
             detail="Could not parse character sheet from PDF",
         ) from exc
 
-    return CharacterDraft(**parsed, pdf_stored_name=stored_name)
+    warning = parsed.pop("parse_warning", None)
+    if not parsed.get("name"):
+        parsed["name"] = "Unknown Hero"
+    if parsed.get("level") is None:
+        parsed["level"] = 1
+
+    return CharacterDraft(**parsed, pdf_stored_name=stored_name, parse_warning=warning)
 
 
 @router.get("/files/{user_id}/{filename}")
