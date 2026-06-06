@@ -99,6 +99,7 @@ class CampaignCreate(BaseModel):
 
 class CampaignJoin(BaseModel):
     invite_code: str = Field(min_length=4, max_length=12)
+    character_id: int
 
 
 class CampaignRead(BaseModel):
@@ -107,11 +108,30 @@ class CampaignRead(BaseModel):
     owner_username: str
     is_owner: bool
     invite_code: str | None = None
+    my_character_name: str | None = None
+    member_count: int | None = None
     created_at: datetime
 
 
 class CampaignListResponse(BaseModel):
     campaigns: list[CampaignRead]
+
+
+class CampaignMemberRead(BaseModel):
+    member_id: int
+    username: str
+    character_id: int
+    character_name: str
+    class_name: str | None
+    level: int | None
+    ac: int | None
+    hp: int | None
+    max_hp: int | None
+
+
+class CampaignRosterResponse(BaseModel):
+    campaign_id: int
+    members: list[CampaignMemberRead]
 
 
 class CharacterCreate(BaseModel):
@@ -122,8 +142,8 @@ class CharacterCreate(BaseModel):
     hp: int | None = Field(default=None, ge=0)
     max_hp: int | None = Field(default=None, ge=0)
     skills: str | None = None
-    pdf_url: str | None = Field(default=None, max_length=500)
     dnd_beyond_url: str | None = Field(default=None, max_length=500)
+    pdf_stored_name: str | None = Field(default=None, max_length=200)
 
 
 class CharacterUpdate(BaseModel):
@@ -134,7 +154,6 @@ class CharacterUpdate(BaseModel):
     hp: int | None = Field(default=None, ge=0)
     max_hp: int | None = Field(default=None, ge=0)
     skills: str | None = None
-    pdf_url: str | None = Field(default=None, max_length=500)
     dnd_beyond_url: str | None = Field(default=None, max_length=500)
 
 
@@ -147,6 +166,8 @@ class CharacterRead(BaseModel):
     hp: int | None
     max_hp: int | None
     skills: str | None
+    campaign_id: int | None
+    campaign_name: str | None
     pdf_url: str | None
     dnd_beyond_url: str | None
     created_at: datetime
@@ -154,3 +175,14 @@ class CharacterRead(BaseModel):
 
 class CharacterListResponse(BaseModel):
     characters: list[CharacterRead]
+
+
+class CharacterDraft(BaseModel):
+    name: str
+    class_name: str | None = None
+    level: int | None = 1
+    ac: int | None = None
+    hp: int | None = None
+    max_hp: int | None = None
+    skills: str | None = None
+    pdf_stored_name: str | None = None

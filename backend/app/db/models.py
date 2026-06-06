@@ -55,6 +55,7 @@ class Campaign(SQLModel, table=True):
         back_populates="campaign",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+    characters: list["Character"] = Relationship(back_populates="campaign")
     historical_encounters: list["HistoricalEncounter"] = Relationship(
         back_populates="campaign",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
@@ -65,15 +66,18 @@ class CampaignMember(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     campaign_id: int = Field(foreign_key="campaign.id", index=True)
     user_id: int = Field(foreign_key="user.id", index=True)
+    character_id: int = Field(foreign_key="character.id", index=True)
     joined_at: datetime = Field(default_factory=utc_now)
 
     campaign: Optional[Campaign] = Relationship(back_populates="members")
     user: Optional[User] = Relationship(back_populates="campaign_memberships")
+    character: Optional["Character"] = Relationship(back_populates="membership")
 
 
 class Character(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
+    campaign_id: Optional[int] = Field(default=None, foreign_key="campaign.id", index=True)
     name: str = Field(max_length=100)
     class_name: Optional[str] = Field(default=None, max_length=50)
     level: Optional[int] = Field(default=1)
@@ -81,11 +85,16 @@ class Character(SQLModel, table=True):
     hp: Optional[int] = Field(default=None)
     max_hp: Optional[int] = Field(default=None)
     skills: Optional[str] = Field(default=None)
-    pdf_url: Optional[str] = Field(default=None, max_length=500)
+    pdf_path: Optional[str] = Field(default=None, max_length=500)
     dnd_beyond_url: Optional[str] = Field(default=None, max_length=500)
     created_at: datetime = Field(default_factory=utc_now)
 
     user: Optional[User] = Relationship(back_populates="characters")
+    campaign: Optional[Campaign] = Relationship(back_populates="characters")
+    membership: Optional[CampaignMember] = Relationship(
+        back_populates="character",
+        sa_relationship_kwargs={"uselist": False},
+    )
 
 
 class HistoricalEncounter(SQLModel, table=True):

@@ -19,3 +19,23 @@ export async function apiFetch(path, { token, method = "GET", body } = {}) {
 
   return response;
 }
+
+export function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
+export async function apiUpload(path, { token, file }) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+}

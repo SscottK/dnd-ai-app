@@ -5,6 +5,7 @@
 **/__pycache__/
 **/*.pyc
 **/*.db
+backend/uploads/
 
 # Local environment variables (Backend & Frontend)
 **/.env
