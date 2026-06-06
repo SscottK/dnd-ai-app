@@ -25,6 +25,7 @@ from app.services.character_ac import compute_sheet_ac, enrich_sheet_ac
 from app.services.character_pdf import parse_character_from_pdf
 from app.services.character_sheet import (
     merge_sheet_on_resync,
+    normalize_sheet,
     parse_sheet_json,
     sheet_to_json,
     skills_summary,
@@ -100,7 +101,13 @@ def to_character_read(character: Character, session: SessionDep) -> CharacterRea
         features=character.features,
         notes=character.notes,
         layout_json=character.layout_json,
-        sheet_json=character.sheet_json,
+        sheet_json=sheet_to_json(
+            parse_sheet_json(
+                character.sheet_json,
+                class_name=character.class_name,
+                level=character.level,
+            )
+        ),
         campaign_id=character.campaign_id,
         campaign_name=campaign_name,
         pdf_url=pdf_download_url(character),
@@ -135,7 +142,14 @@ def apply_parsed_to_character(character: Character, parsed: dict) -> None:
 
         merged_sheet = merge_sheet_on_resync(old_sheet, new_sheet)
         parsed_ac = int(parsed["ac"]) if parsed.get("ac") is not None else None
-        enriched_sheet = enrich_sheet_ac(merged_sheet, parsed_ac)
+        enriched_sheet = normalize_sheet(
+            {
+                "sheet": merged_sheet,
+                "class_name": parsed.get("class_name") or character.class_name,
+                "level": parsed.get("level") if parsed.get("level") is not None else character.level,
+            }
+        )
+        enriched_sheet = enrich_sheet_ac(enriched_sheet, parsed_ac)
         character.sheet_json = json.dumps(enriched_sheet)
         computed_ac = compute_sheet_ac(enriched_sheet, parsed_ac)
         if computed_ac is not None:
@@ -445,7 +459,11 @@ def update_character(
         updates["name"] = updates["name"].strip()
 
     if "sheet_json" in updates and updates["sheet_json"] is not None:
-        sheet = parse_sheet_json(updates["sheet_json"])
+        sheet = parse_sheet_json(
+            updates["sheet_json"],
+            class_name=updates.get("class_name") or character.class_name,
+            level=updates.get("level") if updates.get("level") is not None else character.level,
+        )
         parsed_ac = sheet.get("authoritative_ac")
         enriched = enrich_sheet_ac(sheet, parsed_ac)
         updates["sheet_json"] = sheet_to_json(enriched)

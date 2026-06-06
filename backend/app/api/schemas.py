@@ -154,6 +154,7 @@ class CampaignMemberRead(BaseModel):
     ac: int | None
     hp: int | None
     max_hp: int | None
+    speed: int | None = None
     portrait_url: str | None = None
 
 
@@ -264,6 +265,7 @@ class EncounterCombatant(BaseModel):
     hp: int | None = None
     max_hp: int | None = None
     ac: int | None = None
+    speed: int | None = None
     conditions: list[str] = Field(default_factory=list)
     combat_actions: list[CombatActionEntry] = Field(default_factory=list)
 
@@ -300,7 +302,7 @@ class UseActionRequest(BaseModel):
     action_type: str = Field(min_length=1, max_length=32)
     targeting: str = Field(min_length=1, max_length=32)
     target_ids: list[str] = Field(default_factory=list)
-    detail: str | None = Field(default=None, max_length=200)
+    detail: str | None = Field(default=None, max_length=500)
 
 
 class UseActionResponse(BaseModel):

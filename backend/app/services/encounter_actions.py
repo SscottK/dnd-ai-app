@@ -9,6 +9,7 @@ from app.api.schemas import CombatLogEntry, EncounterCombatant, EncounterState
 from app.db.models import Campaign, CampaignMember, Character
 from app.services.conditions import sanitize_conditions_list
 from app.services.encounter_sync import parse_encounter
+from app.services.character_sheet import speed_from_character
 from app.services.monster_catalog import apply_monster_catalog_to_combatant
 
 
@@ -128,9 +129,15 @@ def upsert_pc_combatant(state: EncounterState, character: Character, initiative:
             combatant.initiative = initiative
             combatant.name = character.name
             combatant.is_pc = True
-            combatant.hp = character.hp
-            combatant.max_hp = character.max_hp
-            combatant.ac = character.ac
+            if character.hp is not None:
+                combatant.hp = character.hp
+            if character.max_hp is not None:
+                combatant.max_hp = character.max_hp
+            if combatant.hp is None and combatant.max_hp is not None:
+                combatant.hp = combatant.max_hp
+            if character.ac is not None:
+                combatant.ac = character.ac
+            combatant.speed = speed_from_character(character)
             return
 
     state.combatants.append(
@@ -143,6 +150,7 @@ def upsert_pc_combatant(state: EncounterState, character: Character, initiative:
             hp=character.hp,
             max_hp=character.max_hp,
             ac=character.ac,
+            speed=speed_from_character(character),
             conditions=[],
         )
     )

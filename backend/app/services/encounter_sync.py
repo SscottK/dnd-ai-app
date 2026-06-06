@@ -6,7 +6,8 @@ from sqlmodel import Session
 from app.api.schemas import EncounterCombatant, EncounterState
 from app.db.models import Campaign, Character
 from app.services.character_assets import portrait_download_url
-from app.services.character_sheet import parse_sheet_json, sheet_to_json
+from app.services.character_sheet import parse_sheet_json, sheet_to_json, speed_from_character
+from app.services.monster_catalog import lookup_monster, monster_walk_speed
 from app.services.conditions import normalize_conditions, sanitize_conditions_list
 
 logger = logging.getLogger("app.encounter_sync")
@@ -30,6 +31,47 @@ def enrich_encounter_portraits(session: Session, state: EncounterState) -> Encou
         combatant.portrait_url = (
             portrait_download_url(character, session) if character is not None else None
         )
+    return enriched
+
+
+def enrich_encounter_pc_stats(session: Session, state: EncounterState) -> EncounterState:
+    """Fill missing PC combatant HP/AC from linked character records."""
+    enriched = state.model_copy(deep=True)
+    for combatant in enriched.combatants:
+        if combatant.character_id is None:
+            continue
+        character = session.get(Character, combatant.character_id)
+        if character is None:
+            continue
+        if combatant.hp is None and character.hp is not None:
+            combatant.hp = character.hp
+        if combatant.max_hp is None and character.max_hp is not None:
+            combatant.max_hp = character.max_hp
+        if combatant.hp is None and combatant.max_hp is not None:
+            combatant.hp = combatant.max_hp
+        if combatant.ac is None and character.ac is not None:
+            combatant.ac = character.ac
+    return enriched
+
+
+def enrich_encounter_movement(session: Session, state: EncounterState) -> EncounterState:
+    enriched = state.model_copy(deep=True)
+    for combatant in enriched.combatants:
+        if combatant.character_id is not None:
+            character = session.get(Character, combatant.character_id)
+            if character is not None:
+                speed = speed_from_character(character)
+                if speed is not None:
+                    combatant.speed = speed
+            continue
+        if combatant.speed is not None:
+            continue
+        monster = lookup_monster(combatant.name)
+        if monster is None:
+            continue
+        walk = monster_walk_speed(monster)
+        if walk is not None:
+            combatant.speed = walk
     return enriched
 
 
@@ -123,7 +165,11 @@ def sync_encounter_combatants_to_characters(
         if combatant.ac is not None:
             character.ac = combatant.ac
 
-        sheet = parse_sheet_json(character.sheet_json)
+        sheet = parse_sheet_json(
+            character.sheet_json,
+            class_name=character.class_name,
+            level=character.level,
+        )
         sheet["conditions"] = sanitize_conditions_list(combatant.conditions)
         character.sheet_json = sheet_to_json(sheet)
         session.add(character)

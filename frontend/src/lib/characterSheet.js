@@ -99,6 +99,9 @@ export function emptySheet() {
     attacks: [],
     spells: [],
     combat_actions: [],
+    resources: [],
+    classes: [],
+    wild_shapes: [],
     ac_bonuses: [],
     ac_breakdown: [],
     authoritative_ac: null,
@@ -159,6 +162,9 @@ export function parseSheetJson(text) {
     base.attacks = Array.isArray(raw.attacks) ? raw.attacks : [];
     base.spells = Array.isArray(raw.spells) ? raw.spells : [];
     base.combat_actions = Array.isArray(raw.combat_actions) ? raw.combat_actions : [];
+    base.resources = Array.isArray(raw.resources) ? raw.resources : [];
+    base.classes = Array.isArray(raw.classes) ? raw.classes : [];
+    base.wild_shapes = Array.isArray(raw.wild_shapes) ? raw.wild_shapes : [];
     base.ac_bonuses = Array.isArray(raw.ac_bonuses)
       ? raw.ac_bonuses.map((entry) => ({
           name: entry.name || "AC bonus",

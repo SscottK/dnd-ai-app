@@ -2,6 +2,8 @@ import json
 import re
 from typing import Any
 
+from app.services.sheet_enrichment import enrich_sheet_pipeline
+
 ABILITY_KEYS = ("str", "dex", "con", "int", "wis", "cha")
 
 SKILL_NAMES = [
@@ -65,6 +67,9 @@ def empty_sheet() -> dict[str, Any]:
         "attacks": [],
         "spells": [],
         "combat_actions": [],
+        "resources": [],
+        "classes": [],
+        "wild_shapes": [],
         "ac_bonuses": [],
         "ac_breakdown": [],
         "authoritative_ac": None,
@@ -140,12 +145,19 @@ def _ensure_item_ids(items: list[dict]) -> list[dict]:
     return result
 
 
-def normalize_sheet(raw: dict | None) -> dict[str, Any]:
+def normalize_sheet(
+    raw: dict | None,
+    *,
+    class_name: str | None = None,
+    level: int | None = None,
+) -> dict[str, Any]:
     base = empty_sheet()
     if not raw:
         return base
 
     sheet = raw.get("sheet") if isinstance(raw.get("sheet"), dict) else raw
+    top_class = class_name or raw.get("class_name")
+    top_level = level if level is not None else raw.get("level")
 
     if isinstance(sheet.get("abilities"), dict):
         for key in ABILITY_KEYS:
@@ -247,8 +259,52 @@ def normalize_sheet(raw: dict | None) -> dict[str, Any]:
                 "description": str(entry.get("description") or ""),
                 "attack_bonus": entry.get("attack_bonus"),
                 "damage_dice": entry.get("damage_dice"),
+                "resource_cost": entry.get("resource_cost"),
+                "source": entry.get("source"),
+                "display": entry.get("display"),
+                "requires_option": entry.get("requires_option"),
+                "option_source": entry.get("option_source"),
+                "options": entry.get("options"),
             }
             for index, entry in enumerate(sheet["combat_actions"])
+            if isinstance(entry, dict) and entry.get("name")
+        ]
+
+    if isinstance(sheet.get("wild_shapes"), list):
+        base["wild_shapes"] = [
+            {
+                "id": str(entry.get("id") or f"wild-shape-{index}"),
+                "name": str(entry.get("name") or "Beast form"),
+                "cr": entry.get("cr"),
+                "notes": str(entry.get("notes") or ""),
+            }
+            for index, entry in enumerate(sheet["wild_shapes"])
+            if isinstance(entry, dict) and entry.get("name")
+        ]
+
+    if isinstance(sheet.get("resources"), list):
+        base["resources"] = [
+            {
+                "id": str(entry.get("id") or f"resource-{index}"),
+                "name": str(entry.get("name") or "Resource"),
+                "current": entry.get("current"),
+                "max": entry.get("max"),
+                "recharge": str(entry.get("recharge") or "long_rest"),
+                "source_class": entry.get("source_class"),
+                "display": entry.get("display") or ["combat_pane"],
+            }
+            for index, entry in enumerate(sheet["resources"])
+            if isinstance(entry, dict) and entry.get("name")
+        ]
+
+    if isinstance(sheet.get("classes"), list):
+        base["classes"] = [
+            {
+                "name": str(entry.get("name") or ""),
+                "level": int(entry.get("level") or 0),
+                "subclass": entry.get("subclass"),
+            }
+            for entry in sheet["classes"]
             if isinstance(entry, dict) and entry.get("name")
         ]
 
@@ -284,20 +340,49 @@ def normalize_sheet(raw: dict | None) -> dict[str, Any]:
     if isinstance(sheet.get("conditions"), list):
         base["conditions"] = list(sheet["conditions"])
 
-    return apply_equipped_overrides(base)
+    equipped = apply_equipped_overrides(base)
+    enriched = enrich_sheet_pipeline(
+        equipped,
+        class_name=str(top_class).strip() if top_class else None,
+        level=int(top_level) if top_level is not None else None,
+    )
+    return enriched
 
 
 def sheet_to_json(sheet: dict) -> str:
     return json.dumps(normalize_sheet(sheet))
 
 
-def parse_sheet_json(text: str | None) -> dict[str, Any]:
+def parse_sheet_json(
+    text: str | None,
+    *,
+    class_name: str | None = None,
+    level: int | None = None,
+) -> dict[str, Any]:
     if not text:
         return empty_sheet()
     try:
-        return normalize_sheet(json.loads(text))
+        return normalize_sheet(
+            json.loads(text),
+            class_name=class_name,
+            level=level,
+        )
     except (json.JSONDecodeError, TypeError, ValueError):
         return empty_sheet()
+
+
+def effective_speed_from_sheet(sheet: dict[str, Any]) -> int | None:
+    raw = sheet.get("speed")
+    if raw is None:
+        return None
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def speed_from_character(character: Any) -> int | None:
+    return effective_speed_from_sheet(parse_sheet_json(character.sheet_json))
 
 
 def skills_summary(sheet: dict) -> str | None:

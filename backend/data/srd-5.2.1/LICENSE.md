@@ -1,6 +1,11 @@
-# SRD 5.2.1 Monster Data
+# SRD 5.2.1 Rules Data
 
-`monsters.json` is from [cocoajamworld/srd-5.2.1](https://github.com/cocoajamworld/srd-5.2.1).
+| File | Source |
+| --- | --- |
+| `monsters.json` | [cocoajamworld/srd-5.2.1](https://github.com/cocoajamworld/srd-5.2.1) |
+| `conditions.json` | [cocoajamworld/srd-5.2.1](https://github.com/cocoajamworld/srd-5.2.1) |
+| `combat_actions.json` | Built from Open5e `wotc-srd` classes + standard 2024 actions (`backend/scripts/build_srd_rules_data.py`) |
+| `spells.json` | Built from Open5e `wotc-srd` spells (`backend/scripts/build_srd_rules_data.py`) |
 
 **Source:** D&D System Reference Document v5.2.1, © Wizards of the Coast LLC.
 

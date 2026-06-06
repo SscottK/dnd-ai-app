@@ -859,6 +859,7 @@ export function SessionPlayPage() {
             character={character}
             sheet={sheet}
             onCombatChange={onCombatChange}
+            onSheetChange={onSheetChange}
             onShowDetail={showDetail}
           />
         ) : (

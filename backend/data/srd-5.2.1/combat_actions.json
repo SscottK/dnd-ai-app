@@ -1,0 +1,420 @@
+{
+  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0. Re-published via the Open5e API (https://api.open5e.com/, document slug: wotc-srd), also under CC-BY 4.0.",
+  "standard_actions": [
+    {
+      "name": "Attack",
+      "action_type": "action",
+      "targeting": "one_enemy",
+      "category": "standard",
+      "description": "Make one attack roll with a weapon or an Unarmed Strike."
+    },
+    {
+      "name": "Dash",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard",
+      "description": "Gain extra movement equal to your Speed."
+    },
+    {
+      "name": "Disengage",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard"
+    },
+    {
+      "name": "Dodge",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard"
+    },
+    {
+      "name": "Help",
+      "action_type": "action",
+      "targeting": "one_ally_or_self",
+      "category": "standard"
+    },
+    {
+      "name": "Hide",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard"
+    },
+    {
+      "name": "Ready",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard"
+    },
+    {
+      "name": "Search",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard"
+    },
+    {
+      "name": "Study",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard"
+    },
+    {
+      "name": "Utilize",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "standard"
+    },
+    {
+      "name": "Influence",
+      "action_type": "action",
+      "targeting": "one_creature",
+      "category": "standard"
+    }
+  ],
+  "class_features": [
+    {
+      "name": "Action Surge",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "Starting at 2nd level, you can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action. \n \nOnce you use this feature, you must finish a short or long rest before you can use it again. Starting at 17th level, you can use it twice before a rest, but only once on the same turn."
+    },
+    {
+      "name": "Bardic Inspiration",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Bard",
+      "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. \n \nOnce within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but mu"
+    },
+    {
+      "name": "Bards of the College of Lore know something about most things, collecting bits of knowledge from sources as diverse as scholarly tomes and peasant tales. Whether singing folk ballads in taverns or elaborate compositions in royal courts, these bards use their gifts to hold audiences spellbound. When the applause dies down, the audience members might find themselves questioning everything they held to be true, from their faith in the priesthood of the local temple to their loyalty to the king.",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Bard (College of Lore)",
+      "description": "The loyalty of these bards lies in the pursuit of beauty and truth, not in fealty to a monarch or following the tenets of a deity. A noble who keeps such a bard as a herald or advisor knows that the bard would rather be honest than politic. \n \nThe college's members gather in libraries and sometimes in actual colleges, complete with classrooms and dormitories, to share their lore with one another. They also meet at festivals or affairs of state, where they can expose corruption, unravel lies, and",
+      "source_subclass": "College of Lore"
+    },
+    {
+      "name": "Channel Divinity",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Cleric",
+      "description": "At 2nd level, you gain the ability to channel divine energy directly from your deity, using that energy to fuel magical effects. You start with two such effects: Turn Undead and an effect determined by your domain. Some domains grant you additional effects as you advance in levels, as noted in the domain description. \n \nWhen you use your Channel Divinity, you choose which effect to create. You must then finish a short or long rest to use your Channel Divinity again. \n \nSome Channel Divinity effe"
+    },
+    {
+      "name": "Cleansing Touch",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Paladin",
+      "description": "Beginning at 14th level, you can use your action to end one spell on yourself or on one willing creature that you touch. \n \nYou can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain expended uses when you finish a long rest."
+    },
+    {
+      "name": "Countercharm",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Bard",
+      "description": "At 6th level, you gain the ability to use musical notes or words of power to disrupt mind-influencing effects. As an action, you can start a performance that lasts until the end of your next turn. During that time, you and any friendly creatures within 30 feet of you have advantage on saving throws against being frightened or charmed. A creature must be able to hear you to gain this benefit. The performance ends early if you are incapacitated or silenced or if you voluntarily end it (no action r"
+    },
+    {
+      "name": "Cunning Action",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Rogue",
+      "description": "Starting at 2nd level, your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns in combat. This action can be used only to take the Dash, Disengage, or Hide action."
+    },
+    {
+      "name": "Deflect Missiles",
+      "action_type": "reaction",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Starting at 3rd level, you can use your reaction to deflect or catch the missile when you are hit by a ranged weapon attack. When you do so, the damage you take from the attack is reduced by 1d10 + your Dexterity modifier + your monk level. \n \nIf you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in one hand and you have at least one hand free. If you catch a missile in this way, you can spend 1 ki point to make a ranged attack with the weapon or piece of"
+    },
+    {
+      "name": "Divine Intervention",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Cleric",
+      "description": "Beginning at 10th level, you can call on your deity to intervene on your behalf when your need is great. \n \nImploring your deity's aid requires you to use your action. Describe the assistance you seek, and roll percentile dice. If you roll a number equal to or lower than your cleric level, your deity intervenes. The GM chooses the nature of the intervention; the effect of any cleric spell or cleric domain spell would be appropriate. \n \nIf your deity intervenes, you can't use this feature again f"
+    },
+    {
+      "name": "Divine Sense",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Paladin",
+      "description": "The presence of strong evil registers on your senses like a noxious odor, and powerful good rings like heavenly music in your ears. As an action, you can open your awareness to detect such forces. Until the end of your next turn, you know the location of any celestial, fiend, or undead within 60 feet of you that is not behind total cover. You know the type (celestial, fiend, or undead) of any being whose presence you sense, but not its identity (the vampire \n \nCount Strahd von Zarovich, for inst"
+    },
+    {
+      "name": "Eldritch Invocations",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Warlock",
+      "description": "If an eldritch invocation has prerequisites, you must meet them to learn it. You can learn the invocation at the same time that you meet its prerequisites. A level prerequisite refers to your level in this class. \n \n#### Agonizing Blast \n \n*Prerequisite:* eldritch blast *cantrip* \n \nWhen you cast *eldritch blast*, add your Charisma modifier to the damage it deals on a hit. \n \n#### Armor of Shadows \n \nYou can cast *mage armor* on yourself at will, without expending a spell slot or material compon"
+    },
+    {
+      "name": "Empty Body",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Beginning at 18th level, you can use your action to spend 4 ki points to become invisible for 1 minute. During that time, you also have resistance to all damage but force damage. \n \nAdditionally, you can spend 8 ki points to cast the *astral projection* spell, without needing material components. When you do so, you can't take any other creatures with you."
+    },
+    {
+      "name": "Emulating the Hunter archetype means accepting your place as a bulwark between civilization and the terrors of the wilderness. As you walk the Hunter's path, you learn specialized techniques for fighting the threats you face, from rampaging ogres and hordes of orcs to towering giants and terrifying dragons.",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Ranger (Hunter)",
+      "description": "##### Hunter's Prey \n \nAt 3rd level, you gain one of the following features of your choice. \n \n**_Colossus Slayer._** Your tenacity can wear down the most potent foes. When you hit a creature with a weapon attack, the creature takes an extra 1d8 damage if it's below its hit point maximum. You can deal this extra damage only once per turn. \n \n**_Giant Killer._** When a Large or larger creature within 5 feet of you hits or misses you with an attack, you can use your reaction to attack that creatur",
+      "source_subclass": "Hunter"
+    },
+    {
+      "name": "Extra Attack",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Barbarian",
+      "description": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn."
+    },
+    {
+      "name": "Fighting Style",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "You adopt a particular style of fighting as your specialty. Choose one of the following options. You can't take a Fighting Style option more than once, even if you later get to choose again. \n \n#### Archery \n \nYou gain a +2 bonus to attack rolls you make with ranged weapons. \n \n#### Defense \n \nWhile you are wearing armor, you gain a +1 bonus to AC. \n \n#### Dueling \n \nWhen you are wielding a melee weapon in one hand and no other weapons, you gain a +2 bonus to damage rolls with that weapon. \n \n##"
+    },
+    {
+      "name": "Font of Magic",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Sorcerer",
+      "description": "At 2nd level, you tap into a deep wellspring of magic within yourself. This wellspring is represented by sorcery points, which allow you to create a variety of magical effects. \n \n#### Sorcery Points \n \nYou have 2 sorcery points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer table. You can never have more sorcery points than shown on the table for your level. You regain all spent sorcery points when you finish a long rest. \n \n#### Flexible Ca"
+    },
+    {
+      "name": "For some barbarians, rage is a means to an end- that end being violence. The Path of the Berserker is a path of untrammeled fury, slick with blood. As you enter the berserker's rage, you thrill in the chaos of battle, heedless of your own health or well-being.",
+      "action_type": "bonus_action",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Barbarian (Path of the Berserker)",
+      "description": "##### Frenzy \n \nStarting when you choose this path at 3rd level, you can go into a frenzy when you rage. If you do so, for the duration of your rage you can make a single melee weapon attack as a bonus action on each of your turns after this one. When your rage ends, you suffer one level of exhaustion (as described in appendix A). \n \n##### Mindless Rage \n \nBeginning at 6th level, you can't be charmed or frightened while raging. If you are charmed or frightened when you enter your rage, the effec",
+      "source_subclass": "Path of the Berserker"
+    },
+    {
+      "name": "Hide in Plain Sight",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Ranger",
+      "description": "Starting at 10th level, you can spend 1 minute creating camouflage for yourself. You must have access to fresh mud, dirt, plants, soot, and other naturally occurring materials with which to create your camouflage. \n \nOnce you are camouflaged in this way, you can try to hide by pressing yourself up against a solid surface, such as a tree or wall, that is at least as tall and wide as you are. You gain a +10 bonus to Dexterity (Stealth) checks as long as you remain there without moving or taking ac"
+    },
+    {
+      "name": "Flurry of Blows",
+      "action_type": "bonus_action",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "resource_cost": { "resource_id": "ki", "amount": 1 },
+      "description": "Immediately after you take the Attack action on your turn, you can spend 1 ki point to make two unarmed strikes as a bonus action."
+    },
+    {
+      "name": "Patient Defense",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "resource_cost": { "resource_id": "ki", "amount": 1 },
+      "description": "You can spend 1 ki point to take the Dodge action as a bonus action on your turn."
+    },
+    {
+      "name": "Step of the Wind",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "resource_cost": { "resource_id": "ki", "amount": 1 },
+      "description": "You can spend 1 ki point to take the Disengage or Dash action as a bonus action on your turn, and your jump distance is doubled for the turn."
+    },
+    {
+      "name": "Stunning Strike",
+      "action_type": "free",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "resource_cost": { "resource_id": "ki", "amount": 1 },
+      "description": "When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike."
+    },
+    {
+      "name": "Ki",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Starting at 2nd level, your training allows you to harness the mystic energy of ki. Your access to this energy is represented by a number of ki points. Your monk level determines the number of points you have, as shown in the Ki Points column of the Monk table. \n \nYou can spend these points to fuel various ki features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind. You learn more ki features as you gain levels in this class. \n \nWhen you spend a ki "
+    },
+    {
+      "name": "Lay on Hands",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Paladin",
+      "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you take a long rest. With that pool, you can restore a total number of hit points equal to your paladin level × 5. \n \nAs an action, you can touch a creature and draw power from the pool to restore a number of hit points to that creature, up to the maximum amount remaining in your pool. \n \nAlternatively, you can expend 5 hit points from your pool of healing to cure the target of one disease or neutralize o"
+    },
+    {
+      "name": "Martial Arts",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "At 1st level, your practice of martial arts gives you mastery of combat styles that use unarmed strikes and monk weapons, which are shortswords and any simple melee weapons that don't have the two- handed or heavy property. \n \nYou gain the following benefits while you are unarmed or wielding only monk weapons and you aren't wearing armor or wielding a shield: \n \n* You can use Dexterity instead of Strength for the attack and damage rolls of your unarmed strikes and monk weapons. \n* You can roll a"
+    },
+    {
+      "name": "Metamagic",
+      "action_type": "bonus_action",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Sorcerer",
+      "description": "At 3rd level, you gain the ability to twist your spells to suit your needs. You gain two of the following Metamagic options of your choice. You gain another one at 10th and 17th level. \n \nYou can use only one Metamagic option on a spell when you cast it, unless otherwise noted. \n \n#### Careful Spell \n \nWhen you cast a spell that forces other creatures to make a saving throw, you can protect some of those creatures from the spell's full force. To do so, you spend 1 sorcery point and choose a numb"
+    },
+    {
+      "name": "Monks of the Way of the Open Hand are the ultimate masters of martial arts combat, whether armed or unarmed. They learn techniques to push and trip their opponents, manipulate ki to heal damage to their bodies, and practice advanced meditation that can protect them from harm.",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk (Way of the Open Hand)",
+      "description": "##### Open Hand Technique \n \nStarting when you choose this tradition at 3rd level, you can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target: \n* It must succeed on a Dexterity saving throw or be knocked prone. \n* It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you. \n* It can't take reactions until the end of",
+      "source_subclass": "Way of the Open Hand"
+    },
+    {
+      "name": "Pact Boon",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Warlock",
+      "description": "At 3rd level, your otherworldly patron bestows a gift upon you for your loyal service. You gain one of the following features of your choice. \n \n#### Pact of the Chain \n \nYou learn the *find familiar* spell and can cast it as a ritual. The spell doesn't count against your number of spells known. \n \nWhen you cast the spell, you can choose one of the normal forms for your familiar or one of the following special forms: imp, pseudodragon, quasit, or sprite. \n \nAdditionally, when you take the Attack"
+    },
+    {
+      "name": "Primeval Awareness",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Ranger",
+      "description": "Beginning at 3rd level, you can use your action and expend one ranger spell slot to focus your awareness on the region around you. For 1 minute per level of the spell slot you expend, you can sense whether the following types of creatures are present within 1 mile of you (or within up to 6 miles if you are in your favored terrain): aberrations, celestials, dragons, elementals, fey, fiends, and undead. This feature doesn't reveal the creatures' location or number."
+    },
+    {
+      "name": "Rage",
+      "action_type": "bonus_action",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Barbarian",
+      "description": "In battle, you fight with primal ferocity. On your turn, you can enter a rage as a bonus action. \n \nWhile raging, you gain the following benefits if you aren't wearing heavy armor: \n \n* You have advantage on Strength checks and Strength saving throws. \n* When you make a melee weapon attack using Strength, you gain a bonus to the damage roll that increases as you gain levels as a barbarian, as shown in the Rage Damage column of the Barbarian table. \n* You have resistance to bludgeoning, piercing,"
+    },
+    {
+      "name": "Second Wind",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "You have a limited well of stamina that you can draw on to protect yourself from harm. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once you use this feature, you must finish a short or long rest before you can use it again.",
+      "healing_dice": "1d10+yourfighterlevel"
+    },
+    {
+      "name": "Slow Fall",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Beginning at 4th level, you can use your reaction when you fall to reduce any falling damage you take by an amount equal to five times your monk level."
+    },
+    {
+      "name": "Stillness of Mind",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Starting at 7th level, you can use your action to end one effect on yourself that is causing you to be charmed or frightened."
+    },
+    {
+      "name": "The Life domain focuses on the vibrant positive energy-one of the fundamental forces of the universe-that sustains all life. The gods of life promote vitality and health through healing the sick and wounded, caring for those in need, and driving away the forces of death and undeath. Almost any non-evil deity can claim influence over this domain, particularly agricultural deities (such as Chauntea, Arawai, and Demeter), sun gods (such as Lathander, Pelor, and Re-Horakhty), gods of healing or endurance (such as Ilmater, Mishakal, Apollo, and Diancecht), and gods of home and community (such as Hestia, Hathor, and Boldrei).",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Cleric (Life Domain)",
+      "description": "**Life Domain Spells (table)** \n \n| Cleric Level | Spells                               | \n|--------------|--------------------------------------| \n| 1st          | bless, cure wounds                   | \n| 3rd          | lesser restoration, spiritual weapon | \n| 5th          | beacon of hope, revivify             | \n| 7th          | death ward, guardian of faith        | \n| 9th          | mass cure wounds, raise dead         | \n \n##### Bonus Proficiency \n \nWhen you choose this domain at 1st lev",
+      "source_subclass": "Life Domain"
+    },
+    {
+      "name": "The Oath of Devotion binds a paladin to the loftiest ideals of justice, virtue, and order. Sometimes called cavaliers, white knights, or holy warriors, these paladins meet the ideal of the knight in shining armor, acting with honor in pursuit of justice and the greater good. They hold themselves to the highest standards of conduct, and some, for better or worse, hold the rest of the world to the same standards. Many who swear this oath are devoted to gods of law and good and use their gods' tenets as the measure of their devotion. They hold angels-the perfect servants of good-as their ideals, and incorporate images of angelic wings into their helmets or coats of arms.",
+      "action_type": "reaction",
+      "targeting": "one_ally",
+      "category": "class_feature",
+      "source_class": "Paladin (Oath of Devotion)",
+      "description": "##### Tenets of Devotion \n \nThough the exact words and strictures of the Oath of Devotion vary, paladins of this oath share these tenets. \n \n**_Honesty._** Don't lie or cheat. Let your word be your promise. \n \n**_Courage._** Never fear to act, though caution is wise. \n \n**_Compassion._** Aid others, protect the weak, and punish those who threaten them. Show mercy to your foes, but temper it with wisdom. \n \n**_Honor._** Treat others with fairness, and let your honorable deeds be an example to the",
+      "source_subclass": "Oath of Devotion"
+    },
+    {
+      "name": "Uncanny Dodge",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Rogue",
+      "description": "Starting at 5th level, when an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you."
+    },
+    {
+      "name": "Vanish",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Ranger",
+      "description": "Starting at 14th level, you can use the Hide action as a bonus action on your turn. Also, you can't be tracked by nonmagical means, unless you choose to leave a trail."
+    },
+    {
+      "name": "Wild Shape",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Druid",
+      "requires_option": true,
+      "option_source": "wild_shapes",
+      "description": "Starting at 2nd level, you can use your action to magically assume the shape of a beast that you have seen before. You can use this feature twice. You regain expended uses when you finish a short or long rest."
+    },
+    {
+      "name": "Combat Wild Shape",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Druid (Circle of the Moon)",
+      "requires_option": true,
+      "option_source": "wild_shapes",
+      "description": "When you choose this circle at 2nd level, you can use Wild Shape as a bonus action, and you can transform into a beast with a challenge rating as high as 1 (3 at 6th level, 2 at 9th, 3 at 12th, 4 at 15th, 5 at 18th)."
+    },
+    {
+      "name": "You hone your skills in the larcenous arts. Burglars, bandits, cutpurses, and other criminals typically follow this archetype, but so do rogues who prefer to think of themselves as professional treasure seekers, explorers, delvers, and investigators. In addition to improving your agility and stealth, you learn skills useful for delving into ancient ruins, reading unfamiliar languages, and using magic items you normally couldn't employ.",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Rogue (Thief)",
+      "description": "##### Fast Hands \n \nStarting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action. \n \n##### Second-Story Work \n \nWhen you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement. \n \nIn addition, when you make a running jump, the distance you cover increases by a number ",
+      "source_subclass": "Thief"
+    },
+    {
+      "name": "Your innate magic comes from draconic magic that was mingled with your blood or that of your ancestors. Most often, sorcerers with this origin trace their descent back to a mighty sorcerer of ancient times who made a bargain with a dragon or who might even have claimed a dragon parent. Some of these bloodlines are well established in the world, but most are obscure. Any given sorcerer could be the first of a new bloodline, as a result of a pact or some other exceptional circumstance.",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Sorcerer (Draconic Bloodline)",
+      "description": "##### Dragon Ancestor \n \nAt 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later. \n \n**Draconic Ancestry (table)** \n \n| Dragon | Damage Type | \n|--------|-------------| \n| Black  | Acid        | \n| Blue   | Lightning   | \n| Brass  | Fire        | \n| Bronze | Lightning   | \n| Copper | Acid        | \n| Gold   | Fire        | \n| Green  | Poison      | \n| Red    | Fire        | \n| Silver | Cold        | \n| White  | ",
+      "source_subclass": "Draconic Bloodline"
+    }
+  ]
+}

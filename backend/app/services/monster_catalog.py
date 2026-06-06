@@ -79,19 +79,9 @@ def search_monsters(query: str, *, limit: int = 12) -> list[dict]:
 
 
 def _infer_targeting(description: str, name: str) -> str:
-    text = f"{name} {description}".lower()
-    if "one ally" in text or "friendly creature" in text:
-        return "one_ally"
-    if "yourself" in text or "the " in text and " regains " in text and "one target" not in text:
-        if "self" in text and "one target" not in text and "attack" not in text:
-            return "self"
-    if "each creature" in text or "all creatures" in text or "in a " in text and "radius" in text:
-        return "one_creature"
-    if "one target" in text or "melee weapon attack" in text or "ranged weapon attack" in text:
-        return "one_enemy"
-    if "multiattack" in name.lower():
-        return "one_enemy"
-    return "one_enemy"
+    from app.services.action_rules import infer_targeting
+
+    return infer_targeting(name, description, category="attack")
 
 
 def _format_damage(action: dict) -> str | None:
@@ -206,6 +196,17 @@ def monster_to_combat_actions(monster: dict) -> list[CombatActionEntry]:
     return entries
 
 
+def monster_walk_speed(monster: dict) -> int | None:
+    speed = (monster.get("stat_block_json") or {}).get("speed")
+    if isinstance(speed, dict):
+        walk = speed.get("walk")
+        if walk is not None:
+            return int(walk)
+    if isinstance(speed, (int, float)):
+        return int(speed)
+    return None
+
+
 def monster_default_initiative(monster: dict) -> int:
     modifier = monster.get("initiative_modifier")
     if modifier is None:
@@ -235,5 +236,9 @@ def apply_monster_catalog_to_combatant(combatant: EncounterCombatant) -> Encount
         updated.ac = int(monster["armor_class"])
     if updated.initiative == 0:
         updated.initiative = monster_default_initiative(monster)
+    if updated.speed is None:
+        walk = monster_walk_speed(monster)
+        if walk is not None:
+            updated.speed = walk
 
     return updated

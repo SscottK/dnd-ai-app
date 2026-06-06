@@ -13,6 +13,7 @@ from app.db.models import Character
 from app.services.character_sheet import parse_sheet_json
 from app.services.combat_dice import format_roll_detail, roll_d20, roll_dice_expression
 from app.services.combat_log import append_log
+from app.services.action_rules import lookup_combat_action, lookup_spell, parse_healing_dice
 from app.services.monster_catalog import lookup_monster
 from app.services.weapon_attacks import (
     clean_action_label,
@@ -21,7 +22,11 @@ from app.services.weapon_attacks import (
     weapon_profile_from_item,
 )
 
-_ATTACK_ID_PREFIXES = ("weapon-", "attack-", "action-", "std-attack", "npc-attack", "spell-")
+_DIRECT_ATTACK_PREFIXES = ("weapon-", "attack-", "std-attack", "npc-attack")
+_SPELL_ATTACK_PREFIX = "spell-"
+_MULTI_ATTACK_ACTIONS = {"flurry of blows": 2}
+_ON_HIT_RIDERS = frozenset({"stunning strike"})
+_MELEE_ATTACK_HINTS = ("unarmed", "talon", "fist", "claw", "bite", "slam", "kick")
 _TO_HIT_RE = re.compile(r"\+(\d+)\s+to\s+hit", re.IGNORECASE)
 _DAMAGE_DICE_RE = re.compile(r"(\d+d\d+(?:[+-]\d+)?)", re.IGNORECASE)
 
@@ -72,6 +77,26 @@ def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
                 if profile.damage_dice is None:
                     profile.damage_dice = damage_dice
             return profile
+    return AttackProfile()
+
+
+def _delegate_melee_attack_profile(sheet: dict) -> AttackProfile:
+    attacks = [row for row in sheet.get("attacks") or [] if isinstance(row, dict)]
+    for hint in _MELEE_ATTACK_HINTS:
+        for attack in attacks:
+            name = str(attack.get("name") or "").casefold()
+            if hint not in name:
+                continue
+            damage = extract_damage_dice(attack.get("damage"))
+            bonus = attack.get("to_hit")
+            if bonus is not None or damage:
+                return AttackProfile(attack_bonus=bonus, damage_dice=damage)
+    if attacks:
+        first = attacks[0]
+        return AttackProfile(
+            attack_bonus=first.get("to_hit"),
+            damage_dice=extract_damage_dice(first.get("damage")),
+        )
     return AttackProfile()
 
 
@@ -135,11 +160,15 @@ def resolve_attack_profile(
     if actor.character_id and profile.attack_bonus is None and profile.damage_dice is None:
         character = session.get(Character, actor.character_id)
         if character is not None and character.campaign_id == campaign_id:
-            profile = _sheet_action_profile(
-                parse_sheet_json(character.sheet_json),
-                action_id,
-                clean_name,
+            sheet = parse_sheet_json(
+                character.sheet_json,
+                class_name=character.class_name,
+                level=character.level,
             )
+            if clean_name.casefold() in _MULTI_ATTACK_ACTIONS:
+                profile = _delegate_melee_attack_profile(sheet)
+            else:
+                profile = _sheet_action_profile(sheet, action_id, clean_name)
 
     if profile.attack_bonus is None and profile.damage_dice is None:
         profile = _parse_detail_stats(detail)
@@ -162,13 +191,20 @@ def is_resolved_attack(
         return False
     if targeting != "one_enemy":
         return False
-    if "multiattack" in action_name.casefold():
+    clean_name = clean_action_label(action_name).casefold()
+    if "multiattack" in clean_name:
         return False
+    if clean_name in _ON_HIT_RIDERS:
+        return False
+    if clean_name in _MULTI_ATTACK_ACTIONS:
+        return profile.attack_bonus is not None or bool(profile.damage_dice)
     if profile.attack_bonus is not None or profile.damage_dice:
         return True
-    if action_id.startswith(_ATTACK_ID_PREFIXES):
+    if action_id.startswith(_DIRECT_ATTACK_PREFIXES):
         return True
-    return "attack" in action_name.casefold()
+    if action_id.startswith(_SPELL_ATTACK_PREFIX):
+        return True
+    return False
 
 
 def _find_combatant(state: EncounterState, combatant_id: str) -> EncounterCombatant | None:
@@ -187,6 +223,97 @@ def _apply_damage(combatant: EncounterCombatant, amount: int) -> int | None:
     before = combatant.hp
     combatant.hp = max(0, combatant.hp - amount)
     return before
+
+
+def _normalize_healing_expression(expression: str, actor_level: int | None) -> str | None:
+    if not expression:
+        return None
+    level = actor_level or 1
+    normalized = re.sub(r"your\w*level", str(level), expression, flags=re.IGNORECASE)
+    normalized = re.sub(r"your\s+\w+\s+level", str(level), normalized, flags=re.IGNORECASE)
+    normalized = normalized.replace(" ", "")
+    if not re.fullmatch(r"\d+d\d+(?:[+-]\d+)?", normalized, flags=re.IGNORECASE):
+        match = re.search(r"(\d+d\d+)", normalized, flags=re.IGNORECASE)
+        if not match:
+            return None
+        dice = match.group(1)
+        modifier_match = re.search(rf"{re.escape(dice)}([+-]\d+)", normalized, flags=re.IGNORECASE)
+        if modifier_match:
+            return f"{dice}{modifier_match.group(1)}"
+        return f"{dice}+{level}" if "level" in expression.lower() else dice
+    return normalized
+
+
+def _apply_healing(combatant: EncounterCombatant, amount: int) -> int | None:
+    _ensure_hp_initialized(combatant)
+    if combatant.hp is None:
+        return None
+    before = combatant.hp
+    ceiling = combatant.max_hp if combatant.max_hp is not None else combatant.hp + amount
+    combatant.hp = min(ceiling, combatant.hp + amount)
+    return before
+
+
+def resolve_self_heal(
+    session: Session,
+    campaign_id: int,
+    state: EncounterState,
+    *,
+    actor: EncounterCombatant,
+    data: UseActionRequest,
+) -> list[str]:
+    if data.targeting != "self":
+        return []
+
+    catalog = lookup_combat_action(data.action_name) or lookup_spell(data.action_name)
+    healing_expr = None
+    if catalog:
+        healing_expr = catalog.get("healing_dice")
+    if not healing_expr:
+        healing_expr = parse_healing_dice(data.detail or "")
+
+    if not healing_expr:
+        return []
+
+    actor_level = None
+    if actor.character_id:
+        character = session.get(Character, actor.character_id)
+        if character is not None and character.campaign_id == campaign_id:
+            actor_level = character.level
+
+    normalized = _normalize_healing_expression(str(healing_expr), actor_level)
+    if not normalized:
+        return []
+
+    total, rolls, modifier, normalized_dice = roll_dice_expression(normalized)
+    before = _apply_healing(actor, total)
+    clean_name = clean_action_label(data.action_name)
+    roll_message = format_roll_detail(
+        dice_label=f"{actor.name} uses {clean_name} — healing",
+        rolls=rolls,
+        modifier=modifier,
+        total=total,
+    )
+    messages = [roll_message]
+    append_log(
+        state,
+        roll_message,
+        kind="roll",
+        actor=actor.name,
+        roller_name=actor.name,
+        dice=normalized_dice,
+        result=sum(rolls),
+        bonus=modifier,
+        total=total,
+    )
+
+    if before is None:
+        hp_message = f"{actor.name} regains {total} hit points."
+    else:
+        hp_message = f"{actor.name} regains {total} HP ({before} → {actor.hp})"
+    messages.append(hp_message)
+    append_log(state, hp_message, kind="hp", actor=actor.name)
+    return messages
 
 
 def resolve_attack(
@@ -228,13 +355,45 @@ def resolve_attack(
         append_log(state, message, kind="action", actor=actor.name)
         return messages
 
+    strike_count = _MULTI_ATTACK_ACTIONS.get(clean_name.casefold(), 1)
+    for strike_index in range(strike_count):
+        strike_messages = _resolve_attack_strike(
+            state,
+            actor=actor,
+            target=target,
+            clean_name=clean_name,
+            profile=profile,
+            strike_index=strike_index,
+            strike_count=strike_count,
+        )
+        messages.extend(strike_messages)
+    return messages
+
+
+def _resolve_attack_strike(
+    state: EncounterState,
+    *,
+    actor: EncounterCombatant,
+    target: EncounterCombatant,
+    clean_name: str,
+    profile: AttackProfile,
+    strike_index: int,
+    strike_count: int,
+) -> list[str]:
+    messages: list[str] = []
+    strike_label = (
+        clean_name
+        if strike_count == 1
+        else f"{clean_name} ({strike_index + 1}/{strike_count})"
+    )
+
     attack_roll = roll_d20()
     attack_total = attack_roll + int(profile.attack_bonus)
     target_ac = target.ac
 
     roll_message = (
         format_roll_detail(
-            dice_label=f"{actor.name} attacks {target.name} with {clean_name} — d20",
+            dice_label=f"{actor.name} attacks {target.name} with {strike_label} — d20",
             rolls=[attack_roll],
             modifier=int(profile.attack_bonus),
             total=attack_total,
@@ -263,7 +422,7 @@ def resolve_attack(
         messages.append(message)
         append_log(
             state,
-            f"Miss! {actor.name}'s {clean_name} misses {target.name} (natural 1).",
+            f"Miss! {actor.name}'s {strike_label} misses {target.name} (natural 1).",
             kind="action",
             actor=actor.name,
         )
@@ -274,18 +433,18 @@ def resolve_attack(
         messages.append(message)
         append_log(
             state,
-            f"Miss! {actor.name}'s {clean_name} misses {target.name}.",
+            f"Miss! {actor.name}'s {strike_label} misses {target.name}.",
             kind="action",
             actor=actor.name,
         )
         return messages
 
     if not profile.damage_dice:
-        message = f"Hit! No damage dice on file for {clean_name}."
+        message = f"Hit! No damage dice on file for {strike_label}."
         messages.append(message)
         append_log(
             state,
-            f"Hit! {actor.name}'s {clean_name} hits {target.name}, but no damage dice are on file.",
+            f"Hit! {actor.name}'s {strike_label} hits {target.name}, but no damage dice are on file.",
             kind="action",
             actor=actor.name,
         )

@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
+import { loadActionRulesCatalog } from "../../lib/actionRules";
 import { impliesIncapacitated } from "../../lib/conditions";
 import {
   ACTION_TYPES,
+  EQUIP_META_ACTION,
+  UNEQUIP_META_ACTION,
+  actionHasOptions,
   actionNeedsTarget,
   buildAvailableActions,
+  equipItemAction,
+  resolveOptionAction,
   filterTargetCandidates,
   formatApiErrorDetail,
+  getEquippableItems,
+  getUnequippableItems,
+  isEquipmentMetaAction,
   targetLabel,
+  unequipItemAction,
   validateTargetSelection,
 } from "../../lib/combatActions";
 
@@ -67,11 +77,23 @@ export function TurnActionsPanel({
   const [targetId, setTargetId] = useState("");
   const [busy, setBusy] = useState(false);
   const [lastOutcome, setLastOutcome] = useState("");
+  const [rulesReady, setRulesReady] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    void loadActionRulesCatalog(token).then(() => {
+      if (!cancelled) setRulesReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const catalogSheet = actionSheet !== undefined ? actionSheet : sheet;
   const available = useMemo(
     () => buildAvailableActions(catalogSheet || {}, { mode: actionCatalogMode }),
-    [catalogSheet, actionCatalogMode]
+    [catalogSheet, actionCatalogMode, rulesReady]
   );
   const economy = economyForCombatant(encounter, actorCombatant?.id);
   const incapacitated = impliesIncapacitated(actorCombatant?.conditions);
@@ -104,13 +126,15 @@ export function TurnActionsPanel({
     onError?.("");
     setLastOutcome("");
     try {
+      const rawDetail = action.detail || null;
       const body = {
         action_id: action.id,
         action_name: cleanActionName(action.name),
         action_type: action.actionType,
         targeting: action.targeting,
         target_ids: targets,
-        detail: action.detail || action.description || null,
+        detail:
+          rawDetail && rawDetail.length > 200 ? rawDetail.slice(0, 200) : rawDetail,
       };
       if (isDmProxy) {
         body.combatant_id = actorCombatant.id;
@@ -146,8 +170,43 @@ export function TurnActionsPanel({
     setStep("pick_action");
   };
 
+  const equipmentItemChoices = useMemo(() => {
+    if (!pickedAction || !isEquipmentMetaAction(pickedAction)) return [];
+    if (pickedAction.id === EQUIP_META_ACTION.id) {
+      return getEquippableItems(catalogSheet || {});
+    }
+    if (pickedAction.id === UNEQUIP_META_ACTION.id) {
+      return getUnequippableItems(catalogSheet || {});
+    }
+    return [];
+  }, [pickedAction, catalogSheet]);
+
   const handlePickAction = (action) => {
     setPickedAction(action);
+    if (actionHasOptions(action)) {
+      setStep("pick_option");
+      return;
+    }
+    if (action.requiresOption) {
+      onError?.(`No beast forms on file for ${action.name}. Re-sync from PDF or add wild shapes to the sheet.`);
+      return;
+    }
+    if (isEquipmentMetaAction(action)) {
+      const items =
+        action.id === EQUIP_META_ACTION.id
+          ? getEquippableItems(catalogSheet || {})
+          : getUnequippableItems(catalogSheet || {});
+      if (items.length === 0) {
+        onError?.(
+          action.id === EQUIP_META_ACTION.id
+            ? "Nothing in your inventory can be equipped."
+            : "Nothing is currently equipped."
+        );
+        return;
+      }
+      setStep("pick_equipment");
+      return;
+    }
     if (actionNeedsTarget(action)) {
       const candidates = filterTargetCandidates(
         encounter.combatants,
@@ -178,6 +237,38 @@ export function TurnActionsPanel({
       return;
     }
     void submitAction(pickedAction, [targetId]);
+  };
+
+  const handlePickOption = (option) => {
+    if (!pickedAction) return;
+    const resolved = resolveOptionAction(pickedAction, option);
+    if (!resolved) return;
+    if (actionNeedsTarget(resolved)) {
+      const candidates = filterTargetCandidates(
+        encounter.combatants,
+        actorCombatant.id,
+        resolved.targeting
+      );
+      if (candidates.length === 0) {
+        onError?.(`No valid targets for ${resolved.name} (${targetLabel(resolved.targeting)}).`);
+        return;
+      }
+      setPickedAction(resolved);
+      setStep("pick_target");
+      setTargetId("");
+      return;
+    }
+    void submitAction(resolved, []);
+  };
+
+  const handlePickEquipmentItem = (item) => {
+    if (!pickedAction) return;
+    const slotType = pickedAction.actionType || pickedType;
+    const resolved =
+      pickedAction.id === EQUIP_META_ACTION.id
+        ? equipItemAction(item, slotType)
+        : unequipItemAction(item, slotType);
+    void submitAction(resolved, []);
   };
 
   if (!actorCombatant) return null;
@@ -320,6 +411,82 @@ export function TurnActionsPanel({
           <button
             type="button"
             onClick={resetFlow}
+            className="text-[8px] font-black uppercase text-ink-faint hover:text-starlight"
+          >
+            Back
+          </button>
+        </div>
+      )}
+
+      {step === "pick_option" && pickedAction && (
+        <div className="space-y-1">
+          <p className="text-[8px] font-mono uppercase text-ink-faint">
+            {pickedAction.name} — choose form
+          </p>
+          <div className="max-h-40 space-y-1 overflow-y-auto">
+            {(pickedAction.options || []).map((option, index) => (
+              <button
+                key={option.id || option.name || index}
+                type="button"
+                disabled={busy}
+                onClick={() => handlePickOption(option)}
+                className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
+              >
+                <span className="text-[9px] font-black uppercase text-starlight">{option.name}</span>
+                {(option.notes || option.cr) && (
+                  <span className="text-[8px] font-mono text-ink-faint line-clamp-2">
+                    {[option.cr ? `CR ${option.cr}` : null, option.notes].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setStep("pick_action");
+              setPickedAction(null);
+            }}
+            className="text-[8px] font-black uppercase text-ink-faint hover:text-starlight"
+          >
+            Back
+          </button>
+        </div>
+      )}
+
+      {step === "pick_equipment" && pickedAction && (
+        <div className="space-y-1">
+          <p className="text-[8px] font-mono uppercase text-ink-faint">
+            {pickedAction.id === EQUIP_META_ACTION.id ? "Equip" : "Unequip"} — choose item
+          </p>
+          <div className="max-h-40 space-y-1 overflow-y-auto">
+            {equipmentItemChoices.length === 0 ? (
+              <p className="text-[9px] font-mono text-ink-faint">No items available.</p>
+            ) : (
+              equipmentItemChoices.map((item, index) => (
+                <button
+                  key={item.id || item.name || index}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handlePickEquipmentItem(item)}
+                  className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
+                >
+                  <span className="text-[9px] font-black uppercase text-starlight">{item.name}</span>
+                  {(item.damage || item.notes) && (
+                    <span className="text-[8px] font-mono text-ink-faint line-clamp-2">
+                      {[item.damage, item.notes].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setStep("pick_action");
+              setPickedAction(null);
+            }}
             className="text-[8px] font-black uppercase text-ink-faint hover:text-starlight"
           >
             Back

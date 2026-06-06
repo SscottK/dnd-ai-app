@@ -1,0 +1,159 @@
+{
+  "_license": "Game mechanics derived from SRD 5.2.1 (CC-BY 4.0). Level tables are programmatic approximations for enrichment.",
+  "classes": {
+    "Monk": {
+      "resources": [
+        {
+          "id": "ki",
+          "name": "Ki Points",
+          "min_level": 2,
+          "max_formula": "level",
+          "recharge": "short_rest",
+          "aliases": ["ki", "ki points", "ki point"]
+        }
+      ],
+      "actions_by_level": {
+        "2": ["Flurry of Blows", "Patient Defense", "Step of the Wind"],
+        "5": ["Stunning Strike"],
+        "6": ["Ki-Empowered Strikes"]
+      }
+    },
+    "Fighter": {
+      "resources": [],
+      "actions_by_level": {
+        "1": ["Second Wind"],
+        "2": ["Action Surge"]
+      },
+      "limited_uses": [
+        {
+          "id": "second-wind",
+          "name": "Second Wind",
+          "min_level": 1,
+          "max": 1,
+          "recharge": "short_rest"
+        },
+        {
+          "id": "action-surge",
+          "name": "Action Surge",
+          "min_level": 2,
+          "max": 1,
+          "recharge": "short_rest",
+          "max_at_level": { "17": 2 }
+        }
+      ]
+    },
+    "Barbarian": {
+      "resources": [
+        {
+          "id": "rage",
+          "name": "Rage",
+          "min_level": 1,
+          "max_by_level": { "1": 2, "3": 3, "6": 4, "12": 5, "17": 6, "20": 6 },
+          "recharge": "long_rest"
+        }
+      ],
+      "actions_by_level": {
+        "1": ["Rage"]
+      }
+    },
+    "Cleric": {
+      "resources": [
+        {
+          "id": "channel-divinity",
+          "name": "Channel Divinity",
+          "min_level": 2,
+          "max_by_level": { "2": 1, "6": 2, "18": 3 },
+          "recharge": "short_rest"
+        }
+      ],
+      "actions_by_level": {
+        "2": ["Channel Divinity"]
+      }
+    },
+    "Paladin": {
+      "resources": [
+        {
+          "id": "lay-on-hands",
+          "name": "Lay on Hands",
+          "min_level": 1,
+          "max_formula": "level_times_5",
+          "recharge": "long_rest"
+        },
+        {
+          "id": "channel-divinity",
+          "name": "Channel Divinity",
+          "min_level": 3,
+          "max": 1,
+          "recharge": "short_rest"
+        }
+      ],
+      "actions_by_level": {
+        "2": ["Lay on Hands"],
+        "3": ["Channel Divinity"]
+      }
+    },
+    "Ranger": {
+      "actions_by_level": {}
+    },
+    "Rogue": {
+      "actions_by_level": {
+        "2": ["Cunning Action"]
+      }
+    },
+    "Bard": {
+      "resources": [
+        {
+          "id": "bardic-inspiration",
+          "name": "Bardic Inspiration",
+          "min_level": 1,
+          "max_formula": "charisma_modifier",
+          "recharge": "long_rest"
+        }
+      ],
+      "actions_by_level": {
+        "1": ["Bardic Inspiration"]
+      }
+    },
+    "Sorcerer": {
+      "resources": [
+        {
+          "id": "sorcery-points",
+          "name": "Sorcery Points",
+          "min_level": 2,
+          "max_by_level": { "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "11": 11, "12": 12, "13": 13, "14": 14, "15": 15, "16": 16, "17": 17, "18": 18, "19": 19, "20": 20 },
+          "recharge": "long_rest"
+        }
+      ],
+      "actions_by_level": {}
+    },
+    "Warlock": {
+      "resources": [
+        {
+          "id": "pact-slots",
+          "name": "Pact Magic Slots",
+          "min_level": 1,
+          "max_formula": "warlock_pact_slots",
+          "recharge": "short_rest"
+        }
+      ],
+      "actions_by_level": {}
+    },
+    "Wizard": {
+      "actions_by_level": {}
+    },
+    "Druid": {
+      "resources": [
+        {
+          "id": "wild-shape",
+          "name": "Wild Shape",
+          "min_level": 2,
+          "max_by_level": { "2": 2, "4": 2, "8": 2, "10": 2, "12": 2, "16": 2, "20": 2 },
+          "recharge": "short_rest"
+        }
+      ],
+      "actions_by_level": {
+        "2": ["Wild Shape"]
+      }
+    }
+  }
+}

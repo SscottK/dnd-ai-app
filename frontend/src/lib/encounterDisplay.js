@@ -50,3 +50,30 @@ export function formatCombatantAc(combatant, isDmView) {
   if (!shouldShowCombatantAc(combatant, isDmView) || combatant.ac == null) return "";
   return ` · AC ${combatant.ac}`;
 }
+
+export function formatCombatantSpeed(speed) {
+  if (speed == null) return "";
+  return ` · ${speed} ft`;
+}
+
+export function formatSpeedLabel(speed) {
+  return speed != null ? `${speed} ft` : "—";
+}
+
+export function combatantHpText(combatant) {
+  if (combatant?.hp != null && combatant?.max_hp != null) {
+    return `${combatant.hp}/${combatant.max_hp}`;
+  }
+  if (combatant?.hp != null) return String(combatant.hp);
+  if (combatant?.max_hp != null) return `—/${combatant.max_hp}`;
+  return null;
+}
+
+export function combatantAcText(combatant, isDmView) {
+  if (!shouldShowCombatantAc(combatant, isDmView) || combatant?.ac == null) return null;
+  return String(combatant.ac);
+}
+
+export function combatantMoveText(combatant) {
+  return combatant?.speed != null ? `${combatant.speed} ft` : null;
+}

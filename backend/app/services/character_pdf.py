@@ -52,8 +52,17 @@ Return ONLY valid JSON (no markdown, no commentary) with this shape:
     "spells": [
       { "name": "Fire Bolt", "level": 0, "action_type": "action", "targeting": "one_enemy", "prepared": true, "description": "Ranged spell attack" }
     ],
+    "classes": [
+      { "name": "Monk", "level": 5, "subclass": "Way of the Open Hand" }
+    ],
+    "resources": [
+      { "id": "ki", "name": "Ki Points", "current": 5, "max": 5, "recharge": "short_rest", "source_class": "Monk" }
+    ],
+    "wild_shapes": [
+      { "name": "Wolf", "cr": "1/4", "notes": "" }
+    ],
     "combat_actions": [
-      { "name": "Second Wind", "action_type": "bonus_action", "targeting": "self", "description": "Regain hit points" }
+      { "name": "Flurry of Blows", "action_type": "bonus_action", "targeting": "one_enemy", "description": "Two unarmed strikes", "resource_cost": { "resource_id": "ki", "amount": 1 } }
     ],
     "ac_breakdown": [
       { "label": "Chain Mail", "value": 16, "kind": "armor" },
@@ -80,11 +89,14 @@ Rules:
 - Do NOT put armor base, shield, DEX, unarmored "Base" (10), or ability modifiers in ac_bonuses — only true extras like Defense, magic bonuses, or feats.
 - ac_breakdown kinds must be: armor, shield, dex, base, ability, or bonus. Only kind "bonus" rows belong in ac_bonuses.
 - Parse character notes/backstory from NOTES, CHARACTER BACKSTORY, and ADDITIONAL NOTES sections into sheet.notes.
-- Features: class/race/background features with short descriptions.
-- attacks: every weapon attack from ACTIONS or ATTACKS sections with name, to_hit bonus, damage dice, action_type (usually action), targeting (usually one_enemy).
+- classes: every class on the sheet with name, level, and subclass (if shown). Multiclass = multiple entries.
+- resources: every spendable pool or use tracker visible on the sheet (Ki Points, Sorcery Points, Rage, Channel Divinity, Bardic Inspiration, Lay on Hands pool, spell slots as level/current/max rows, Heroic Inspiration, etc.) with id (slug), name, current, max, recharge (short_rest|long_rest|turn), source_class.
+- Features: passive or narrative class/race/background features (Unarmored Defense, Martial Arts rules text). Do NOT put spendable ki options only in features — also list them in combat_actions.
+- attacks: every weapon/unarmed attack from WEAPON ATTACKS & CANTRIPS or ACTIONS with name, to_hit bonus, damage dice, action_type (usually action), targeting (usually one_enemy).
 - spells: prepared/known spells with name, level (0 for cantrips), action_type, targeting, prepared boolean, short description.
-- combat_actions: class features and abilities that cost an Action, Bonus Action, or Reaction (Second Wind, Action Surge, Channel Divinity, etc.) with action_type and targeting.
-- For features that clearly use a Bonus Action or Reaction in their text, duplicate them in combat_actions with the correct action_type.
+- wild_shapes: every beast form listed on the sheet for Wild Shape (or similar transform features) with name, cr if shown, and notes.
+- combat_actions: any ability that uses Action, Bonus Action, or Reaction in combat. Use the PRIMARY activation cost (e.g. Wild Shape = action, Combat Wild Shape = bonus_action). Include resource_cost when the sheet shows a point cost. Do not duplicate Wild Shape in features if it is already here.
+- For features whose description says Bonus Action or Reaction, also add a matching combat_actions entry.
 - Use null only when a value truly cannot be found.
 - ability keys must be lowercase: str, dex, con, int, wis, cha.
 """

@@ -2,6 +2,9 @@
  * D&D 5.5e turn actions — sheet-derived attacks, spells, features, and NPC stat-block actions.
  */
 
+import { enrichRawAction, inferTargeting, overrideActionType } from "./actionRules";
+import { inferPrimaryActionType } from "./actionTypeInference";
+
 export const ACTION_TYPES = {
   action: "action",
   bonus_action: "bonus_action",
@@ -16,10 +19,6 @@ export const TARGETING = {
   one_ally_or_self: "one_ally_or_self",
 };
 
-const SELF_TARGET_HINTS =
-  /self only|on yourself|you gain|you have advantage on|teleport|heal yourself|restore hit points to yourself/i;
-const ALLY_TARGET_HINTS = /ally|friendly creature|creature you can see within/i;
-const AREA_HINTS = /each creature|creatures within|in a \d+-foot|radius|cone|line|cube|sphere/i;
 
 /** Minimal fallback when a combatant has no parsed actions (NPCs). */
 export const NPC_FALLBACK_ACTIONS = [
@@ -61,6 +60,54 @@ export const STANDARD_ACTIONS = [
   { id: "std-influence", name: "Influence", actionType: ACTION_TYPES.action, targeting: TARGETING.one_creature, category: "standard" },
 ];
 
+/** Abilities that modify other actions — not standalone turn choices. */
+const PASSIVE_TURN_ACTIONS = new Set([
+  "extra-attack",
+  "martial-arts",
+  "unarmored-defense",
+  "unarmored-movement",
+  "ki-empowered-strikes",
+  "open-hand-technique",
+  "slow-fall",
+  "deflect-missiles",
+  "stillness-of-mind",
+  "purity-of-body",
+]);
+
+function cleanActionName(name) {
+  return String(name || "")
+    .replace(/\s*★\s*$/, "")
+    .split("(")[0]
+    .trim();
+}
+
+function actionNameKey(name) {
+  return slug(cleanActionName(name));
+}
+
+function isPassiveTurnAction(action) {
+  return PASSIVE_TURN_ACTIONS.has(actionNameKey(action?.name));
+}
+
+/** On-hit modifiers — not standalone turn menu choices. */
+const ON_HIT_RIDERS = new Set(["stunning-strike"]);
+
+/** Routed via combat_actions catalog — skip duplicate feature inference. */
+const CATALOG_MANAGED_ACTIONS = new Set(["wild-shape", "combat-wild-shape"]);
+
+/** Class features the server resolves using sheet attack stats (e.g. Talons). */
+const DELEGATED_ATTACK_ACTIONS = new Set(["flurry-of-blows"]);
+
+export function canSelectTurnAction(action) {
+  if (!action || isPassiveTurnAction(action)) return false;
+  if (ON_HIT_RIDERS.has(actionNameKey(action.name))) return false;
+  if (!actionNeedsTarget(action)) return true;
+  if (action.attackBonus != null || action.damageDice) return true;
+  if (["weapon", "attack", "spell"].includes(action.category)) return true;
+  if (DELEGATED_ATTACK_ACTIONS.has(actionNameKey(action.name))) return true;
+  return false;
+}
+
 const WEAPON_PATTERN =
   /sword|axe|bow|crossbow|dagger|mace|hammer|spear|staff|whip|sling|javelin|rapier|scimitar|halberd|glaive|lance|club|flail|trident|warhammer|handaxe|light hammer|maul|pike|sickle|greatsword|longbow|shortbow|longsword|shortsword|war pick|morningstar|net/i;
 const ARMOR_PATTERN =
@@ -80,19 +127,18 @@ function normalizeActionType(value) {
   return ACTION_TYPES.action;
 }
 
-function normalizeTargeting(value, hintText = "") {
-  if (value && Object.values(TARGETING).includes(value)) return value;
-  const text = String(hintText || "");
-  if (SELF_TARGET_HINTS.test(text) && !AREA_HINTS.test(text)) return TARGETING.self;
-  if (AREA_HINTS.test(text)) return TARGETING.one_creature;
-  if (ALLY_TARGET_HINTS.test(text)) return TARGETING.one_ally_or_self;
-  return TARGETING.one_enemy;
+function normalizeTargeting(value, hintText = "", category = "action") {
+  if (value && Object.values(TARGETING).includes(value)) {
+    return value;
+  }
+  return inferTargeting("", hintText, { category });
 }
 
 export function normalizeCombatAction(raw, index = 0, category = "action") {
   if (!raw?.name) return null;
-  const description = raw.description || raw.notes || "";
-  const detailParts = [raw.damage, raw.to_hit != null ? `+${raw.to_hit} to hit` : null, description]
+  const enriched = enrichRawAction(raw, category);
+  const description = enriched.description || enriched.notes || "";
+  const detailParts = [enriched.damage, enriched.to_hit != null ? `+${enriched.to_hit} to hit` : null]
     .filter(Boolean)
     .join(" · ");
   const damageDice = raw.damage_dice || raw.damageDice || null;
@@ -100,16 +146,48 @@ export function normalizeCombatAction(raw, index = 0, category = "action") {
     damageDice ||
     (typeof raw.damage === "string" ? raw.damage.replace(/\s+/g, "") : null);
 
+  const resourceCost = enriched.resource_cost || enriched.resourceCost || null;
+  const costLabel =
+    resourceCost?.amount != null && resourceCost?.resource_id
+      ? ` · ${resourceCost.amount} ${resourceCost.resource_id}`
+      : null;
+
+  const typeOverride = overrideActionType(enriched.name);
   return {
-    id: raw.id || `${category}-${index}-${slug(raw.name)}`,
-    name: String(raw.name).trim(),
-    actionType: normalizeActionType(raw.action_type || raw.actionType),
-    targeting: normalizeTargeting(raw.targeting, `${raw.name} ${description}`),
+    id: enriched.id || `${category}-${index}-${slug(enriched.name)}`,
+    name: String(enriched.name).trim(),
+    actionType: normalizeActionType(
+      typeOverride || enriched.action_type || enriched.actionType
+    ),
+    targeting: normalizeTargeting(
+      enriched.targeting,
+      `${enriched.name} ${description}`,
+      category
+    ),
     category,
     description: description || undefined,
-    detail: raw.detail || (detailParts || undefined),
-    attackBonus: raw.attack_bonus ?? raw.attackBonus ?? raw.to_hit ?? null,
+    detail: enriched.detail || (detailParts ? `${detailParts}${costLabel || ""}` : costLabel || undefined),
+    attackBonus: enriched.attack_bonus ?? enriched.attackBonus ?? enriched.to_hit ?? null,
     damageDice: parsedDamage,
+    resourceCost: resourceCost || undefined,
+    requiresOption: Boolean(enriched.requires_option || enriched.requiresOption),
+    optionSource: enriched.option_source || enriched.optionSource || null,
+    options: Array.isArray(enriched.options) ? enriched.options : undefined,
+  };
+}
+
+export function actionHasOptions(action) {
+  return Array.isArray(action?.options) && action.options.length > 0;
+}
+
+export function resolveOptionAction(parentAction, option) {
+  if (!parentAction || !option?.name) return null;
+  const suffix = slug(option.name);
+  return {
+    ...parentAction,
+    id: `${parentAction.id}-${suffix}`,
+    name: `${parentAction.name}: ${option.name}`,
+    detail: [option.notes, option.cr ? `CR ${option.cr}` : null].filter(Boolean).join(" · ") || option.name,
   };
 }
 
@@ -146,41 +224,66 @@ function inventoryWeaponActions(sheet) {
     .filter(Boolean);
 }
 
-function equipmentActions(sheet) {
-  return (sheet?.inventory || [])
-    .filter((item) => item?.name)
-    .flatMap((item, index) => {
-      const itemId = item.id || item.name;
-      if (item.equipped) {
-        return [
-          normalizeCombatAction(
-            {
-              id: `unequip-${itemId}`,
-              name: `Unequip ${item.name}`,
-              action_type: ACTION_TYPES.action,
-              targeting: TARGETING.self,
-              category: "equipment",
-            },
-            index,
-            "equipment"
-          ),
-        ];
-      }
-      return [
-        normalizeCombatAction(
-          {
-            id: `equip-${itemId}`,
-            name: `Equip ${item.name}`,
-            action_type: ACTION_TYPES.bonus_action,
-            targeting: TARGETING.self,
-            category: "equipment",
-          },
-          index,
-          "equipment"
-        ),
-      ];
-    })
-    .filter(Boolean);
+/** Single menu entry — item picked in a follow-up submenu. Slot type is set per menu. */
+export const EQUIP_META_ACTION = {
+  id: "equip-item",
+  name: "Equip",
+  targeting: TARGETING.self,
+  category: "equipment",
+};
+
+export const UNEQUIP_META_ACTION = {
+  id: "unequip-item",
+  name: "Unequip",
+  targeting: TARGETING.self,
+  category: "equipment",
+};
+
+export function equipmentMetaForSlot(kind, slotType) {
+  const base = kind === "equip" ? EQUIP_META_ACTION : UNEQUIP_META_ACTION;
+  return { ...base, actionType: slotType };
+}
+
+export function isEquipmentMetaAction(action) {
+  return action?.id === EQUIP_META_ACTION.id || action?.id === UNEQUIP_META_ACTION.id;
+}
+
+export function getEquippableItems(sheet) {
+  return (sheet?.inventory || []).filter((item) => item?.name && !item.equipped);
+}
+
+export function getUnequippableItems(sheet) {
+  return (sheet?.inventory || []).filter((item) => item?.name && item.equipped);
+}
+
+export function equipItemAction(item, slotType = ACTION_TYPES.action) {
+  const itemId = item.id || item.name;
+  return normalizeCombatAction(
+    {
+      id: `equip-${itemId}`,
+      name: item.name,
+      action_type: slotType,
+      targeting: TARGETING.self,
+      category: "equipment",
+    },
+    0,
+    "equipment"
+  );
+}
+
+export function unequipItemAction(item, slotType = ACTION_TYPES.action) {
+  const itemId = item.id || item.name;
+  return normalizeCombatAction(
+    {
+      id: `unequip-${itemId}`,
+      name: item.name,
+      action_type: slotType,
+      targeting: TARGETING.self,
+      category: "equipment",
+    },
+    0,
+    "equipment"
+  );
 }
 
 function attackRowActions(sheet) {
@@ -221,16 +324,18 @@ function spellActions(sheet) {
 }
 
 function inferActionTypeFromText(name, description = "") {
-  const text = `${name} ${description}`;
-  if (/bonus action/i.test(text)) return ACTION_TYPES.bonus_action;
-  if (/reaction/i.test(text)) return ACTION_TYPES.reaction;
-  if (/\baction\b/i.test(text)) return ACTION_TYPES.action;
-  return null;
+  const inferred = inferPrimaryActionType(name, description);
+  if (!inferred) return null;
+  if (inferred === ACTION_TYPES.bonus_action) return ACTION_TYPES.bonus_action;
+  if (inferred === ACTION_TYPES.reaction) return ACTION_TYPES.reaction;
+  return ACTION_TYPES.action;
 }
 
 function inferredFeatureActions(sheet) {
   const results = [];
   for (const feat of sheet?.features || []) {
+    if (isPassiveTurnAction(feat)) continue;
+    if (CATALOG_MANAGED_ACTIONS.has(actionNameKey(feat?.name))) continue;
     if (feat?.action_type && feat?.targeting) continue;
     const inferredType = inferActionTypeFromText(feat?.name, feat?.description);
     if (!inferredType) continue;
@@ -252,18 +357,33 @@ function inferredFeatureActions(sheet) {
 
 function inferFeatureTargeting(feat) {
   const text = `${feat?.name || ""} ${feat?.description || ""}`;
-  return normalizeTargeting(feat?.targeting, text);
+  return normalizeTargeting(feat?.targeting, text, "feature");
+}
+
+function npcActionCategory(action) {
+  const id = String(action?.id || "");
+  if (/^(action|bonus|reaction|legendary|npc|attack)-/.test(id)) return "attack";
+  if (action?.attack_bonus != null || action?.attackBonus != null || action?.damage_dice) {
+    return "attack";
+  }
+  return action?.category || "combat";
 }
 
 function explicitSheetActions(sheet) {
   return (sheet?.combat_actions || [])
-    .map((action, index) => normalizeCombatAction(action, index, action.category || "combat"))
+    .map((action, index) => normalizeCombatAction(action, index, npcActionCategory(action)))
     .filter(Boolean);
 }
 
 function featureActions(sheet) {
   return (sheet?.features || [])
-    .filter((feat) => feat?.action_type && feat?.targeting)
+    .filter(
+      (feat) =>
+        feat?.action_type &&
+        feat?.targeting &&
+        !isPassiveTurnAction(feat) &&
+        !CATALOG_MANAGED_ACTIONS.has(actionNameKey(feat?.name))
+    )
     .map((feat, index) =>
       normalizeCombatAction(
         {
@@ -280,16 +400,34 @@ function featureActions(sheet) {
     .filter(Boolean);
 }
 
+function attachWildShapeOptions(sheet, actions) {
+  const forms = sheet?.wild_shapes || [];
+  if (!forms.length) return actions;
+  return actions.map((action) => {
+    const key = actionNameKey(action.name);
+    if (key !== "wild-shape" && key !== "combat-wild-shape") return action;
+    return {
+      ...action,
+      requiresOption: true,
+      options: forms.map((form, index) => ({
+        id: form.id || `wild-shape-${index}`,
+        name: form.name,
+        notes: form.notes || "",
+        cr: form.cr,
+      })),
+    };
+  });
+}
+
 function collectSheetDerivedActions(sheet) {
-  return [
+  return attachWildShapeOptions(sheet, [
     ...attackRowActions(sheet),
     ...inventoryWeaponActions(sheet),
-    ...equipmentActions(sheet),
     ...spellActions(sheet),
     ...explicitSheetActions(sheet),
     ...featureActions(sheet),
     ...inferredFeatureActions(sheet),
-  ];
+  ]);
 }
 
 /**
@@ -306,8 +444,8 @@ export function buildAvailableActions(sheet, options = {}) {
 
   const seen = new Set();
   const add = (action) => {
-    if (!action) return;
-    const key = `${action.actionType}:${action.id}`;
+    if (!canSelectTurnAction(action)) return;
+    const key = `${action.actionType}:${actionNameKey(action.name)}`;
     if (seen.has(key)) return;
     seen.add(key);
     if (byType[action.actionType]) byType[action.actionType].push(action);
@@ -337,6 +475,13 @@ export function buildAvailableActions(sheet, options = {}) {
     standards
       .filter((action) => action.targeting === TARGETING.self)
       .forEach(add);
+  }
+
+  const canEquip = getEquippableItems(sheet).length > 0;
+  const canUnequip = getUnequippableItems(sheet).length > 0;
+  for (const slot of [ACTION_TYPES.action, ACTION_TYPES.bonus_action]) {
+    if (canEquip) add(equipmentMetaForSlot("equip", slot));
+    if (canUnequip) add(equipmentMetaForSlot("unequip", slot));
   }
 
   return byType;

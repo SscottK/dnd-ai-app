@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, Columns3, Dices, ImagePlus, RefreshCw, Rows3, Trash2 } from "lucide-react";
+import { ChevronRight, Columns3, Dices, ImagePlus, RefreshCw, Rows3, Trash2, X } from "lucide-react";
 import { apiFetch, apiUpload } from "../../lib/api";
 import { AuthenticatedImage } from "./AuthenticatedImage";
 import { formatConditionsList } from "../../lib/conditions";
 import {
-  formatCombatantAc,
+  combatantAcText,
+  combatantHpText,
+  combatantMoveText,
   isDefeatedEnemy,
   parseEncounterPatchResponse,
   sortCombatantsForDisplay,
@@ -47,6 +49,7 @@ function mergePartyWithEncounter(members, combatants) {
       hp: combatant.hp ?? member.hp,
       max_hp: combatant.max_hp ?? member.max_hp,
       ac: combatant.ac ?? member.ac,
+      speed: combatant.speed ?? member.speed,
     };
   });
 }
@@ -59,6 +62,7 @@ function PartyMemberRow({ member, isYou, token }) {
         ? String(member.hp)
         : "—";
   const acLabel = member.ac != null ? String(member.ac) : "—";
+  const speedLabel = member.speed != null ? `${member.speed} ft` : "—";
   const subtitle = [member.class_name, member.level != null ? `Lv ${member.level}` : null]
     .filter(Boolean)
     .join(" · ");
@@ -88,6 +92,10 @@ function PartyMemberRow({ member, isYou, token }) {
           <span>
             <span className="text-ink-faint">HP </span>
             <span className="font-black text-starlight">{hpLabel}</span>
+          </span>
+          <span>
+            <span className="text-ink-faint">Move </span>
+            <span className="font-black text-starlight">{speedLabel}</span>
           </span>
         </div>
       </div>
@@ -241,8 +249,24 @@ function ClickableRow({ label, value, sub, onClick }) {
   );
 }
 
-export function CombatWidget({ character, sheet, onCombatChange, onShowDetail }) {
+function rechargeLabel(value) {
+  if (value === "short_rest") return "Short rest";
+  if (value === "long_rest") return "Long rest";
+  if (value === "turn") return "Per turn";
+  return null;
+}
+
+export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, onSheetChange }) {
   const combat = resolveCombatStats(character, sheet);
+  const resources = sheet.resources || [];
+
+  const updateResource = (index, current) => {
+    if (!onSheetChange) return;
+    const next = (sheet.resources || []).map((entry, i) =>
+      i === index ? { ...entry, current } : entry
+    );
+    onSheetChange({ ...sheet, resources: next }, { immediate: true });
+  };
 
   return (
     <div className="space-y-3">
@@ -320,6 +344,54 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail })
         <span>Speed: {combat.speed != null ? `${combat.speed} ft` : "—"}</span>
         <span>PP: {resolvePassivePerception(sheet) ?? "—"}</span>
       </div>
+      {resources.length > 0 && (
+        <div className="border border-neon-cyan/40 p-2 space-y-1.5">
+          <p className="text-[9px] text-zinc-500 uppercase">Class Resources</p>
+          {resources.map((resource, index) => (
+            <div key={resource.id || index} className="flex items-center justify-between gap-2 text-[10px]">
+              <button
+                type="button"
+                onClick={() =>
+                  onShowDetail({
+                    title: resource.name,
+                    subtitle: resource.source_class || character.class_name,
+                    body: (
+                      <div className="space-y-1 text-xs">
+                        <p>
+                          {resource.current ?? "—"} / {resource.max ?? "—"}
+                        </p>
+                        {rechargeLabel(resource.recharge) && (
+                          <p className="text-ink-faint">Recharges on {rechargeLabel(resource.recharge)}</p>
+                        )}
+                      </div>
+                    ),
+                  })
+                }
+                className="min-w-0 flex-1 text-left text-neon-cyan hover:text-starlight truncate"
+              >
+                {resource.name}
+              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <input
+                  type="number"
+                  min="0"
+                  max={resource.max ?? undefined}
+                  value={resource.current ?? ""}
+                  onChange={(e) =>
+                    updateResource(
+                      index,
+                      e.target.value === "" ? null : parseInt(e.target.value, 10)
+                    )
+                  }
+                  className="w-10 bg-black text-starlight text-center border border-zinc-700 text-xs"
+                />
+                <span className="text-zinc-600">/</span>
+                <span className="w-6 text-center text-zinc-400">{resource.max ?? "—"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {sheet.conditions?.length > 0 && (
         <p className="text-[10px] text-neon-magenta">{sheet.conditions.join(", ")}</p>
       )}
@@ -842,6 +914,74 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
   );
 }
 
+function InitiativeLabeledStat({ label, value, valueClassName = "text-starlight" }) {
+  if (value == null || value === "") return null;
+  return (
+    <div className="flex w-full items-baseline justify-between gap-1 leading-tight">
+      <span className="shrink-0 text-[8px] font-black uppercase tracking-wider text-ink-faint">
+        {label}
+      </span>
+      <span className={`truncate text-right text-[10px] font-mono font-black ${valueClassName}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function InitiativeTurnBadge({ index, compact = false }) {
+  return (
+    <div
+      className={`flex items-center justify-center rounded-sm border border-border/50 bg-void-deep/50 ${
+        compact ? "px-1.5 py-1" : "w-full px-2 py-1"
+      }`}
+    >
+      <span
+        className={`font-black leading-none text-starlight ${compact ? "text-xl" : "text-2xl"}`}
+      >
+        {index + 1}
+      </span>
+    </div>
+  );
+}
+
+function InitiativeStatusBadges({ combatant, isYou, isDefeated }) {
+  const badges = [];
+  if (isDefeated) badges.push({ key: "defeated", label: "Defeated", className: "text-ink-faint" });
+  if (isYou) badges.push({ key: "you", label: "You", className: "text-neon-cyan" });
+  else if (combatant.is_pc) badges.push({ key: "pc", label: "PC", className: "text-ink-faint" });
+  else if (combatant.is_ally) badges.push({ key: "ally", label: "Ally", className: "text-neon-cyan" });
+
+  if (!badges.length) return null;
+
+  return (
+    <div className="flex w-full flex-wrap justify-center gap-1">
+      {badges.map((badge) => (
+        <span
+          key={badge.key}
+          className={`rounded-sm border border-border/50 px-1 py-0.5 text-[7px] font-black uppercase ${badge.className}`}
+        >
+          {badge.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function InitiativeCombatantStats({ combatant, isDmView }) {
+  const conditions = formatConditionsList(combatant.conditions);
+  return (
+    <div className="flex w-full flex-col gap-0.5">
+      <InitiativeLabeledStat label="Init" value={combatant.initiative} />
+      <InitiativeLabeledStat label="HP" value={combatantHpText(combatant)} />
+      <InitiativeLabeledStat label="AC" value={combatantAcText(combatant, isDmView)} />
+      <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant)} />
+      {conditions ? (
+        <InitiativeLabeledStat label="Cond" value={conditions} valueClassName="text-neon-magenta" />
+      ) : null}
+    </div>
+  );
+}
+
 function initiativeCardClass(isActive, isYou, isSelected = false, isDefeated = false) {
   if (isDefeated) return "border-border/30 bg-void-deep/25 opacity-45";
   if (isSelected) return "border-starlight bg-starlight/10";
@@ -879,7 +1019,7 @@ function HpStepButtons({ combatant, disabled, onAdjust }) {
   );
 }
 
-function DmCombatantEditor({ combatant, saving, onPatch, onRemove }) {
+function DmCombatantEditor({ combatant, saving, onPatch, onRemove, onClose }) {
   const defeated = combatant.hp != null && combatant.hp <= 0;
   const isEnemy = !combatant.is_pc && !combatant.is_ally;
 
@@ -894,10 +1034,26 @@ function DmCombatantEditor({ combatant, saving, onPatch, onRemove }) {
         defeated ? "border-danger/40 bg-danger/5" : "border-border bg-void-deep/40"
       }`}
     >
-      <p className="mb-2 text-[9px] font-black uppercase text-starlight">
-        {combatant.name}
-        {defeated && <span className="ml-1 text-danger">· Defeated</span>}
-      </p>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">
+            Health &amp; status
+          </p>
+          <p className="truncate text-[9px] font-black uppercase text-starlight">
+            {combatant.name}
+            {defeated && <span className="ml-1 text-danger">· Defeated</span>}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded p-1 text-ink-faint hover:bg-border/40 hover:text-starlight"
+          title="Close"
+          aria-label="Close health and status panel"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-[8px] font-mono uppercase text-ink-faint">Init</span>
@@ -1008,32 +1164,16 @@ function InitiativeCombatantRow({
         selectable ? "cursor-pointer" : ""
       } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
     >
-      <span className="w-6 shrink-0 text-center text-[10px] font-mono text-ink-faint">{index + 1}</span>
+      <InitiativeTurnBadge index={index} compact />
       <CombatantAvatar portraitUrl={combatant.portrait_url} token={token} name={combatant.name} />
-      <span className="w-10 shrink-0 text-center text-lg font-black text-starlight">{combatant.initiative}</span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-black uppercase text-ink">
+        <p className="truncate text-xs font-black uppercase text-starlight" title={combatant.name}>
           {combatant.name}
-          {isDefeated && <span className="ml-1.5 text-[9px] text-ink-faint">DEFEATED</span>}
-          {isYou && <span className="ml-1.5 text-[9px] text-neon-cyan">YOU</span>}
-          {combatant.is_pc && !isYou && <span className="ml-1.5 text-[9px] text-ink-faint">PC</span>}
-          {combatant.is_ally && !combatant.is_pc && (
-            <span className="ml-1.5 text-[9px] text-neon-cyan">ALLY</span>
-          )}
         </p>
-        {(combatant.hp != null ||
-          formatCombatantAc(combatant, isDmView) ||
-          formatConditionsList(combatant.conditions)) && (
-          <p className="truncate text-[10px] font-mono text-ink-faint">
-            {combatant.hp != null && combatant.max_hp != null
-              ? `HP ${combatant.hp}/${combatant.max_hp}`
-              : ""}
-            {formatCombatantAc(combatant, isDmView)}
-            {formatConditionsList(combatant.conditions)
-              ? ` · ${formatConditionsList(combatant.conditions)}`
-              : ""}
-          </p>
-        )}
+        <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
+        <div className="mt-1 max-w-[220px]">
+          <InitiativeCombatantStats combatant={combatant} isDmView={isDmView} />
+        </div>
       </div>
     </li>
   );
@@ -1054,40 +1194,27 @@ function InitiativeCombatantCard({
   return (
     <div
       onClick={selectable ? () => onSelect(combatant.id) : undefined}
-      className={`flex min-w-[80px] max-w-[128px] flex-1 flex-col items-center gap-1 border-2 p-2 text-center ${
+      className={`flex min-w-[112px] max-w-[140px] flex-1 flex-col items-stretch gap-1.5 border-2 p-2 ${
         selectable ? "cursor-pointer" : ""
       } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
     >
-      <span className="text-[9px] font-mono text-ink-faint">{index + 1}</span>
-      <CombatantAvatar
-        portraitUrl={combatant.portrait_url}
-        token={token}
-        name={combatant.name}
-        size="lg"
-      />
-      <span className="text-xl font-black leading-none text-starlight">{combatant.initiative}</span>
-      <p className="w-full truncate text-[10px] font-black uppercase text-ink">
+      <InitiativeTurnBadge index={index} />
+      <div className="flex justify-center">
+        <CombatantAvatar
+          portraitUrl={combatant.portrait_url}
+          token={token}
+          name={combatant.name}
+          size="lg"
+        />
+      </div>
+      <p
+        className="line-clamp-2 min-h-[2rem] text-center text-[9px] font-black uppercase leading-tight text-starlight"
+        title={combatant.name}
+      >
         {combatant.name}
-        {isDefeated && <span className="block text-[8px] text-ink-faint">DEFEATED</span>}
-        {isYou && <span className="block text-[8px] text-neon-cyan">YOU</span>}
       </p>
-      {(combatant.hp != null || formatCombatantAc(combatant, isDmView)) && (
-        <p className="w-full truncate text-[9px] font-mono text-ink-faint">
-          {combatant.hp != null && combatant.max_hp != null
-            ? `HP ${combatant.hp}/${combatant.max_hp}`
-            : ""}
-          {formatCombatantAc(combatant, isDmView)}
-        </p>
-      )}
-      {formatConditionsList(combatant.conditions) && (
-        <p className="w-full truncate text-[8px] font-mono text-ink-faint">
-          {formatConditionsList(combatant.conditions)}
-        </p>
-      )}
-      {combatant.is_pc && !isYou && <span className="text-[8px] text-ink-faint">PC</span>}
-      {combatant.is_ally && !combatant.is_pc && (
-        <span className="text-[8px] text-neon-cyan">ALLY</span>
-      )}
+      <InitiativeCombatantStats combatant={combatant} isDmView={isDmView} />
+      <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
     </div>
   );
 }
@@ -1325,6 +1452,10 @@ export function InitiativeWidget({
   const selectedCombatant = displaySorted.find((c) => c.id === selectedId) || null;
   const dmBusy = submitting || saving;
 
+  const handleSelectCombatant = (id) => {
+    setSelectedId((prev) => (prev === id ? null : id));
+  };
+
   if (loading) {
     return <p className="text-[10px] font-mono text-ink-faint">Loading initiative...</p>;
   }
@@ -1515,7 +1646,7 @@ export function InitiativeWidget({
                 isDmView={isOwner}
                 isSelected={isOwner && selectedId === combatant.id}
                 isDefeated={defeated}
-                onSelect={isOwner ? setSelectedId : undefined}
+                onSelect={isOwner ? handleSelectCombatant : undefined}
                 token={token}
               />
             );
@@ -1535,7 +1666,7 @@ export function InitiativeWidget({
                 isDmView={isOwner}
                 isSelected={isOwner && selectedId === combatant.id}
                 isDefeated={defeated}
-                onSelect={isOwner ? setSelectedId : undefined}
+                onSelect={isOwner ? handleSelectCombatant : undefined}
                 token={token}
               />
             );
@@ -1550,6 +1681,7 @@ export function InitiativeWidget({
             saving={saving}
             onPatch={(patch) => updateCombatant(selectedCombatant.id, patch)}
             onRemove={() => removeCombatant(selectedCombatant.id)}
+            onClose={() => setSelectedId(null)}
           />
         </div>
       )}

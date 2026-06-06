@@ -63,8 +63,11 @@ from app.services.encounter_actions import (
 )
 from app.services.character_assets import portrait_download_url
 from app.services.character_sheet import parse_sheet_json
+from app.services.character_sheet import speed_from_character
 from app.services.encounter_sync import (
     encounter_for_viewer,
+    enrich_encounter_movement,
+    enrich_encounter_pc_stats,
     enrich_encounter_portraits,
     sync_encounter_combatants_to_characters,
 )
@@ -73,7 +76,13 @@ from app.services.monster_catalog import (
     monster_to_combat_actions,
     search_monsters,
 )
-from app.services.combat_resolution import is_resolved_attack, resolve_attack, resolve_attack_profile
+from app.services.action_rules import resolve_rules_for_use
+from app.services.combat_resolution import (
+    is_resolved_attack,
+    resolve_attack,
+    resolve_attack_profile,
+    resolve_self_heal,
+)
 from app.services.equipment_actions import is_equipment_action, resolve_equipment_action
 from app.services.turn_actions import ensure_turn_economy, use_combat_action
 from app.services.invite_codes import generate_invite_code
@@ -293,6 +302,7 @@ def get_campaign_roster(campaign_id: int, current_user: CurrentUser, session: Se
                 ac=character.ac,
                 hp=character.hp,
                 max_hp=character.max_hp,
+                speed=speed_from_character(character),
                 portrait_url=portrait_download_url(character, session),
             )
         )
@@ -365,11 +375,21 @@ def build_encounter_response(
     is_owner: bool,
     fix_active: bool = False,
 ) -> EncounterState:
-    state = enrich_encounter_portraits(session, parse_encounter(campaign))
+    state = enrich_encounter_pc_stats(
+        session,
+        enrich_encounter_movement(
+            session, enrich_encounter_portraits(session, parse_encounter(campaign))
+        ),
+    )
     if fix_active and ensure_active_combatant(state):
         persist_encounter(session, campaign, state)
         session.refresh(campaign)
-        state = enrich_encounter_portraits(session, parse_encounter(campaign))
+        state = enrich_encounter_pc_stats(
+            session,
+            enrich_encounter_movement(
+                session, enrich_encounter_portraits(session, parse_encounter(campaign))
+            ),
+        )
     ensure_turn_economy(state)
     return encounter_for_viewer(state, is_owner=is_owner)
 
@@ -443,7 +463,13 @@ def get_combatant_action_sheet(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Character not found for this combatant",
         )
-    return CombatantActionSheetResponse(sheet=parse_sheet_json(character.sheet_json))
+    return CombatantActionSheetResponse(
+        sheet=parse_sheet_json(
+            character.sheet_json,
+            class_name=character.class_name,
+            level=character.level,
+        )
+    )
 
 
 @router.patch("/{campaign_id}/encounter", response_model=EncounterPatchResponse)
@@ -677,17 +703,28 @@ def use_encounter_action(
     before = state.model_copy(deep=True)
     action_messages: list[str] = []
 
+    resolved_type, resolved_targeting, rules_catalog = resolve_rules_for_use(
+        action_id=data.action_id,
+        action_name=data.action_name,
+        action_type=data.action_type,
+        targeting=data.targeting,
+        detail=data.detail,
+    )
+    resolved_data = data.model_copy(
+        update={"action_type": resolved_type, "targeting": resolved_targeting}
+    )
+
     try:
         if is_equipment_action(data.action_id):
             use_combat_action(
                 state,
                 actor=actor,
-                action_id=data.action_id,
-                action_name=data.action_name,
-                action_type=data.action_type,
-                targeting=data.targeting,
-                target_ids=data.target_ids,
-                detail=data.detail,
+                action_id=resolved_data.action_id,
+                action_name=resolved_data.action_name,
+                action_type=resolved_data.action_type,
+                targeting=resolved_data.targeting,
+                target_ids=resolved_data.target_ids,
+                detail=resolved_data.detail,
                 log_usage=False,
             )
             action_messages = resolve_equipment_action(
@@ -695,23 +732,23 @@ def use_encounter_action(
                 campaign_id,
                 state,
                 actor=actor,
-                data=data,
+                data=resolved_data,
             )
         else:
             profile = resolve_attack_profile(
                 session,
                 campaign_id,
                 actor,
-                action_id=data.action_id,
-                action_name=data.action_name,
-                detail=data.detail,
+                action_id=resolved_data.action_id,
+                action_name=resolved_data.action_name,
+                detail=resolved_data.detail,
             )
             will_resolve_attack = bool(
-                data.target_ids
+                resolved_data.target_ids
                 and is_resolved_attack(
-                    action_id=data.action_id,
-                    action_name=data.action_name,
-                    targeting=data.targeting,
+                    action_id=resolved_data.action_id,
+                    action_name=resolved_data.action_name,
+                    targeting=resolved_data.targeting,
                     profile=profile,
                 )
             )
@@ -720,12 +757,12 @@ def use_encounter_action(
             use_combat_action(
                 state,
                 actor=actor,
-                action_id=data.action_id,
-                action_name=data.action_name,
-                action_type=data.action_type,
-                targeting=data.targeting,
-                target_ids=data.target_ids,
-                detail=data.detail,
+                action_id=resolved_data.action_id,
+                action_name=resolved_data.action_name,
+                action_type=resolved_data.action_type,
+                targeting=resolved_data.targeting,
+                target_ids=resolved_data.target_ids,
+                detail=resolved_data.detail,
                 log_usage=not will_resolve_attack,
             )
             if will_resolve_attack:
@@ -734,14 +771,22 @@ def use_encounter_action(
                     campaign_id,
                     state,
                     actor=actor,
-                    data=data,
+                    data=resolved_data,
                 )
             else:
-                action_messages = [
-                    entry.message for entry in state.combat_log[log_before:] if entry.message
-                ]
+                action_messages = resolve_self_heal(
+                    session,
+                    campaign_id,
+                    state,
+                    actor=actor,
+                    data=resolved_data,
+                )
                 if not action_messages:
-                    action_messages = [f"{actor.name} uses {data.action_name}."]
+                    action_messages = [
+                        entry.message for entry in state.combat_log[log_before:] if entry.message
+                    ]
+                if not action_messages:
+                    action_messages = [f"{actor.name} uses {resolved_data.action_name}."]
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

@@ -15,6 +15,7 @@ import { ConditionsEditor } from "../components/sheet/ConditionsEditor";
 import { formatConditionsList } from "../lib/conditions";
 import {
   formatCombatantAc,
+  formatCombatantSpeed,
   isDefeatedEnemy,
   parseEncounterPatchResponse,
   sortCombatantsForDisplay,
@@ -476,12 +477,15 @@ export function InitiativePage() {
                           <span className="ml-2 text-[9px] text-neon-cyan">ALLY</span>
                         )}
                       </p>
-                      {(combatant.hp != null || formatCombatantAc(combatant, isOwner)) && (
+                      {(combatant.hp != null ||
+                        combatant.speed != null ||
+                        formatCombatantAc(combatant, isOwner)) && (
                         <p className="text-[10px] font-mono text-zinc-500">
                           {combatant.hp != null && combatant.max_hp != null
                             ? `HP ${combatant.hp}/${combatant.max_hp}`
                             : ""}
                           {formatCombatantAc(combatant, isOwner)}
+                          {formatCombatantSpeed(combatant.speed)}
                         </p>
                       )}
                     </div>
