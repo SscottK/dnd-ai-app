@@ -8,6 +8,7 @@ import { DetailSlideOver } from "../components/sheet/DetailSlideOver";
 import { FullSheetModal } from "../components/sheet/FullSheetModal";
 import {
   DmGeneratorsWidget,
+  DmNotesWidget,
   DmRulesChatWidget,
   DmToolboxWidget,
 } from "../components/sheet/DmToolWidgets";
@@ -17,14 +18,20 @@ import {
   CombatWidget,
   SheetDataGuard,
   InitiativeWidget,
+  PlayerNotesWidget,
   SkillsSavesWidget,
   VttZoneWidget,
 } from "../components/sheet/SessionSheetWidgets";
+import {
+  encounterTabTitle,
+  formatEncounterNotesContent,
+} from "../lib/encounterGen";
 import {
   DEFAULT_ZOOM,
   MIN_PANE_HEIGHT,
   paneOptionsForSession,
   SINGLETON_WIDGET_TYPES,
+  appendEncounterDmNotesTab,
   clampWidget,
   buildDefaultLayout,
   buildDmDefaultLayout,
@@ -34,6 +41,7 @@ import {
   defaultViewport,
   hydrateLayout,
   INITIATIVE_ORIENTATION_HORIZONTAL,
+  migrateLegacyNotesIntoLayout,
   parseLayout,
   readStoredDmLayout,
   reflowWidgetsOnResize,
@@ -127,57 +135,37 @@ export function SessionPlayPage() {
 
   const hydrateCharacter = useCallback((data, { applyLayout = true } = {}) => {
     const sheetData = parseSheetJson(data.sheet_json);
+    const legacyNotes = [sheetData.notes, data.notes]
+      .filter((value) => value && String(value).trim())
+      .join("\n\n");
+    if (legacyNotes) {
+      sheetData.notes = "";
+    }
+
+    const nextCharacter = applyEquipmentToCharacter(data, sheetData);
     setSheet(sheetData);
-    setCharacter(applyEquipmentToCharacter(data, sheetData));
-    if (!applyLayout) return;
+    setCharacter(nextCharacter);
+    sheetRef.current = sheetData;
+    characterRef.current = nextCharacter;
+
+    if (!applyLayout) return false;
 
     const { width, height } = canvasBoundsRef.current;
-    setLayout(parseLayout(data.layout_json, width || 1280, height || 800));
-  }, []);
+    const canvasW = width || 1280;
+    const canvasH = height || 800;
+    let nextLayout = parseLayout(data.layout_json, canvasW, canvasH);
+    let migrated = false;
 
-  const loadSession = useCallback(async () => {
-    if (!token || !campaignId) return;
-    setLoading(true);
-    setError("");
-    try {
-      const sessionRes = await apiFetch(`/campaigns/${campaignId}/session`, { token });
-      if (!sessionRes.ok) throw new Error("Session not available");
-      const status = await sessionRes.json();
-      setSessionStatus(status);
-
-      if (!status.session_active) {
-        setCharacter(null);
-        return;
-      }
-
-      if (status.character_id) {
-        const charRes = await apiFetch(`/characters/${status.character_id}`, { token });
-        if (!charRes.ok) throw new Error("Character not found");
-        hydrateCharacter(await charRes.json());
-        return;
-      }
-
-      if (status.is_owner) {
-        setCharacter(null);
-        setSheet(parseSheetJson(null));
-        const stored = readStoredDmLayout(campaignId);
-        const hydrated = stored ? hydrateLayout(stored, 1280, 800) : null;
-        setLayout(hydrated || { widgets: [], viewport: defaultViewport() });
-        return;
-      }
-
-      setCharacter(null);
-    } catch (err) {
-      console.error(err);
-      setError("Could not load live session.");
-    } finally {
-      setLoading(false);
+    if (legacyNotes) {
+      const result = migrateLegacyNotesIntoLayout(nextLayout, legacyNotes, canvasW, canvasH);
+      nextLayout = result.layout;
+      migrated = result.migrated;
     }
-  }, [token, campaignId, hydrateCharacter]);
 
-  useEffect(() => {
-    loadSession();
-  }, [loadSession]);
+    layoutRef.current = nextLayout;
+    setLayout(nextLayout);
+    return migrated;
+  }, []);
 
   useLayoutEffect(() => {
     if (!sessionStatus?.session_active) {
@@ -280,13 +268,77 @@ export function SessionPlayPage() {
 
   const buildPatch = useCallback(
     (nextCharacter, nextSheet, nextLayout) => ({
-      hp: nextCharacter.hp,
-      max_hp: nextCharacter.max_hp,
-      ac: nextCharacter.ac,
+      hp: nextCharacter?.hp,
+      max_hp: nextCharacter?.max_hp,
+      ac: nextCharacter?.ac,
       sheet_json: sheetToJson(nextSheet),
       layout_json: JSON.stringify(nextLayout),
     }),
     []
+  );
+
+  const loadSession = useCallback(async () => {
+    if (!token || !campaignId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const sessionRes = await apiFetch(`/campaigns/${campaignId}/session`, { token });
+      if (!sessionRes.ok) throw new Error("Session not available");
+      const status = await sessionRes.json();
+      setSessionStatus(status);
+
+      if (!status.session_active) {
+        setCharacter(null);
+        return;
+      }
+
+      if (status.character_id) {
+        const charRes = await apiFetch(`/characters/${status.character_id}`, { token });
+        if (!charRes.ok) throw new Error("Character not found");
+        const migrated = hydrateCharacter(await charRes.json());
+        if (migrated) {
+          scheduleSave({
+            ...buildPatch(characterRef.current, sheetRef.current, layoutRef.current),
+            notes: "",
+          });
+        }
+        return;
+      }
+
+      if (status.is_owner) {
+        setCharacter(null);
+        setSheet(parseSheetJson(null));
+        const stored = readStoredDmLayout(campaignId);
+        const hydrated = stored ? hydrateLayout(stored, 1280, 800) : null;
+        setLayout(hydrated || { widgets: [], viewport: defaultViewport() });
+        return;
+      }
+
+      setCharacter(null);
+    } catch (err) {
+      console.error(err);
+      setError("Could not load live session.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, campaignId, hydrateCharacter, scheduleSave, buildPatch]);
+
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
+
+  const saveLayoutSnapshot = useCallback(
+    (nextLayout) => {
+      layoutRef.current = nextLayout;
+      const status = sessionStatusRef.current;
+      if (status?.is_owner && !status?.character_id) {
+        writeStoredDmLayout(campaignId, nextLayout);
+        return;
+      }
+      if (!characterRef.current) return;
+      scheduleSave(buildPatch(characterRef.current, sheetRef.current, nextLayout));
+    },
+    [campaignId, scheduleSave, buildPatch]
   );
 
   useEffect(() => {
@@ -320,7 +372,7 @@ export function SessionPlayPage() {
         layoutRef.current = next;
         if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
         resizeSaveTimer.current = setTimeout(() => {
-          scheduleSave(buildPatch(characterRef.current, sheetRef.current, layoutRef.current));
+          saveLayoutSnapshot(layoutRef.current);
         }, 500);
         return next;
       });
@@ -346,8 +398,7 @@ export function SessionPlayPage() {
     sessionStatus?.is_owner,
     sessionStatus?.character_id,
     character?.id,
-    scheduleSave,
-    buildPatch,
+    saveLayoutSnapshot,
   ]);
 
   const onCombatChange = (patch) => {
@@ -387,9 +438,9 @@ export function SessionPlayPage() {
       };
       layoutRef.current = next;
       setLayout(next);
-      scheduleSave(buildPatch(characterRef.current, sheetRef.current, next));
+      saveLayoutSnapshot(next);
     },
-    [scheduleSave, buildPatch]
+    [saveLayoutSnapshot]
   );
 
   const updateWidgetMeta = useCallback(
@@ -397,15 +448,24 @@ export function SessionPlayPage() {
       const prev = layoutRef.current;
       const nextWidgets = prev.widgets.map((w) => (w.id === widgetId ? { ...w, ...patch } : w));
       const nextLayout = { ...prev, widgets: nextWidgets };
+      setLayout(nextLayout);
+      saveLayoutSnapshot(nextLayout);
+    },
+    [saveLayoutSnapshot]
+  );
+
+  const addEncounterToDmNotes = useCallback(
+    (encounter) => {
+      const { width, height } = canvasBoundsRef.current;
+      const prev = layoutRef.current;
+      const title = encounterTabTitle(encounter);
+      const content = formatEncounterNotesContent(encounter);
+      const nextLayout = appendEncounterDmNotesTab(prev, { title, content }, width, height);
       layoutRef.current = nextLayout;
       setLayout(nextLayout);
-      if (isDmSession) {
-        writeStoredDmLayout(campaignId, nextLayout);
-      } else {
-        scheduleSave(buildPatch(characterRef.current, sheetRef.current, nextLayout));
-      }
+      saveLayoutSnapshot(nextLayout);
     },
-    [campaignId, isDmSession, scheduleSave, buildPatch]
+    [saveLayoutSnapshot]
   );
 
   const setInitiativeOrientation = useCallback(
@@ -424,11 +484,10 @@ export function SessionPlayPage() {
         return clampWidget(next, canvasW, canvasH);
       });
       const nextLayout = { ...prev, widgets: nextWidgets };
-      layoutRef.current = nextLayout;
       setLayout(nextLayout);
-      scheduleSave(buildPatch(characterRef.current, sheetRef.current, nextLayout));
+      saveLayoutSnapshot(nextLayout);
     },
-    [scheduleSave, buildPatch]
+    [saveLayoutSnapshot]
   );
 
   const togglePin = (id) => {
@@ -439,7 +498,7 @@ export function SessionPlayPage() {
       ),
     };
     setLayout(nextLayout);
-    scheduleSave(buildPatch(character, sheet, nextLayout));
+    saveLayoutSnapshot(nextLayout);
   };
 
   const toggleMinimize = (id) => {
@@ -455,7 +514,7 @@ export function SessionPlayPage() {
       }),
     };
     setLayout(nextLayout);
-    scheduleSave(buildPatch(character, sheet, nextLayout));
+    saveLayoutSnapshot(nextLayout);
   };
 
   const removeWidget = (id) => {
@@ -464,7 +523,7 @@ export function SessionPlayPage() {
       widgets: layout.widgets.filter((w) => w.id !== id),
     };
     setLayout(nextLayout);
-    scheduleSave(buildPatch(character, sheet, nextLayout));
+    saveLayoutSnapshot(nextLayout);
   };
 
   const addWidget = (type) => {
@@ -480,7 +539,7 @@ export function SessionPlayPage() {
       ],
     };
     setLayout(nextLayout);
-    scheduleSave(buildPatch(character, sheet, nextLayout));
+    saveLayoutSnapshot(nextLayout);
     setPaneMenuOpen(false);
   };
 
@@ -488,7 +547,7 @@ export function SessionPlayPage() {
     const nextLayout = { ...layout, viewport };
     setLayout(nextLayout);
     if (save) {
-      scheduleSave(buildPatch(character, sheet, nextLayout));
+      saveLayoutSnapshot(nextLayout);
     }
   };
 
@@ -594,6 +653,14 @@ export function SessionPlayPage() {
         return guard(
           <CharacterTabsWidget sheet={sheet} onSheetChange={onSheetChange} onShowDetail={showDetail} />
         );
+      case "player_notes":
+        return (
+          <PlayerNotesWidget
+            tabs={widget.playerNotesTabs || []}
+            activeTabId={widget.activeNotesTabId}
+            onChange={(patch) => updateWidgetMeta(widget.id, patch)}
+          />
+        );
       case "vtt_zone":
         return <VttZoneWidget />;
       case "initiative":
@@ -621,9 +688,19 @@ export function SessionPlayPage() {
       case "dm_generators":
         return (
           <DmGeneratorsWidget
+            campaignId={campaignId}
             token={token}
             activeTab={widget.dmGeneratorsTab}
             onTabChange={(tab) => updateWidgetMeta(widget.id, { dmGeneratorsTab: tab })}
+            onEncounterGenerated={addEncounterToDmNotes}
+          />
+        );
+      case "dm_notes":
+        return (
+          <DmNotesWidget
+            tabs={widget.dmNotesTabs || []}
+            activeTabId={widget.activeNotesTabId}
+            onChange={(patch) => updateWidgetMeta(widget.id, patch)}
           />
         );
       case "dm_toolbox":

@@ -15,6 +15,7 @@ from app.api.schemas import (
     CampaignSessionUpdate,
     EncounterState,
     EncounterUpdate,
+    AddEncounterEnemiesRequest,
     InitiativeSubmitRequest,
     InitiativeSubmitResponse,
 )
@@ -27,6 +28,7 @@ from app.services.campaign_membership import (
     release_member,
 )
 from app.services.encounter_actions import (
+    add_enemies_to_encounter,
     add_roster_to_encounter,
     advance_turn,
     get_member_character,
@@ -36,6 +38,7 @@ from app.services.encounter_actions import (
     sorted_combatants,
     upsert_pc_combatant,
 )
+from app.services.encounter_sync import encounter_for_viewer
 from app.services.invite_codes import generate_invite_code
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -300,8 +303,8 @@ def parse_encounter(campaign: Campaign) -> EncounterState:
 
 @router.get("/{campaign_id}/encounter", response_model=EncounterState)
 def get_encounter(campaign_id: int, current_user: CurrentUser, session: SessionDep):
-    campaign, _ = get_campaign_for_member_or_owner(campaign_id, current_user, session)
-    return parse_encounter(campaign)
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    return encounter_for_viewer(parse_encounter(campaign), is_owner=is_owner)
 
 
 @router.patch("/{campaign_id}/encounter", response_model=EncounterState)
@@ -343,7 +346,7 @@ def submit_initiative(
     current_user: CurrentUser,
     session: SessionDep,
 ):
-    campaign, _ = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
     try:
         _, character = get_member_character(session, campaign_id, current_user.id)
     except ValueError as exc:
@@ -374,7 +377,7 @@ def submit_initiative(
     upsert_pc_combatant(state, character, total)
     state = persist_encounter(session, campaign, state)
     return InitiativeSubmitResponse(
-        encounter=state,
+        encounter=encounter_for_viewer(state, is_owner=is_owner),
         total=total,
         d20_roll=d20_roll,
         bonus=bonus,
@@ -408,7 +411,8 @@ def next_encounter_turn(campaign_id: int, current_user: CurrentUser, session: Se
             )
 
     advance_turn(state)
-    return persist_encounter(session, campaign, state)
+    state = persist_encounter(session, campaign, state)
+    return encounter_for_viewer(state, is_owner=is_owner)
 
 
 @router.post("/{campaign_id}/encounter/add-roster", response_model=EncounterState)
@@ -420,6 +424,22 @@ def add_roster_to_tracker(campaign_id: int, current_user: CurrentUser, session: 
             detail="Only the campaign owner can add roster to the tracker",
         )
     return add_roster_to_encounter(session, campaign)
+
+
+@router.post("/{campaign_id}/encounter/add-enemies", response_model=EncounterState)
+def add_enemies_to_tracker(
+    campaign_id: int,
+    data: AddEncounterEnemiesRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can add enemies to the tracker",
+        )
+    return add_enemies_to_encounter(session, campaign, data.enemies)
 
 
 @router.get("/{campaign_id}/session", response_model=CampaignSessionStatus)

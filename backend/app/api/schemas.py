@@ -204,6 +204,7 @@ class EncounterCombatant(BaseModel):
     name: str
     initiative: int = 0
     is_pc: bool = False
+    is_ally: bool = False
     character_id: int | None = None
     hp: int | None = None
     max_hp: int | None = None
@@ -235,6 +236,20 @@ class InitiativeSubmitResponse(BaseModel):
     total: int
     d20_roll: int | None = None
     bonus: int | None = None
+
+
+class EncounterEnemyInput(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    count: int = Field(default=1, ge=1, le=12)
+    initiative: int = 0
+    hp: int | None = Field(default=None, ge=0)
+    max_hp: int | None = Field(default=None, ge=0)
+    ac: int | None = Field(default=None, ge=0)
+    conditions: str | None = Field(default=None, max_length=200)
+
+
+class AddEncounterEnemiesRequest(BaseModel):
+    enemies: list[EncounterEnemyInput] = Field(min_length=1)
 
 
 class CharacterListResponse(BaseModel):

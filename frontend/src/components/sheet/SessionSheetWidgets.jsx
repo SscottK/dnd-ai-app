@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Columns3, Dices, RefreshCw, Rows3 } from "lucide-react";
 import { apiFetch } from "../../lib/api";
+import { formatCombatantAc } from "../../lib/encounterDisplay";
+import { NotesPaneWidget } from "./NotesPaneWidget";
 import {
   INITIATIVE_ORIENTATION_HORIZONTAL,
   INITIATIVE_ORIENTATION_VERTICAL,
@@ -257,12 +259,25 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
   );
 }
 
+export function PlayerNotesWidget({ tabs, activeTabId, onChange }) {
+  return (
+    <NotesPaneWidget
+      tabs={tabs}
+      activeTabId={activeTabId}
+      onChange={onChange}
+      tabsKey="playerNotesTabs"
+      activeKey="activeNotesTabId"
+      hint="Preview · Edit · Format · saved with layout"
+      formattedPreview
+    />
+  );
+}
+
 export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
   const [tab, setTab] = useState("inventory");
   const tabs = [
     { id: "inventory", label: "Inventory" },
     { id: "features", label: "Features" },
-    { id: "notes", label: "Notes" },
   ];
 
   const updateInventoryItem = (index, patch) => {
@@ -364,14 +379,6 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
             ))}
           </div>
         )}
-        {tab === "notes" && (
-          <textarea
-            value={sheet.notes || ""}
-            onChange={(e) => onSheetChange({ ...sheet, notes: e.target.value })}
-            placeholder="Session notes..."
-            className="w-full h-40 bg-black border border-zinc-800 p-2 text-[10px] resize-none focus:outline-none focus:border-neon-cyan"
-          />
-        )}
       </div>
     </div>
   );
@@ -383,7 +390,7 @@ function initiativeCardClass(isActive, isYou) {
   return "border-neon-cyan/40 bg-void-deep/60";
 }
 
-function InitiativeCombatantRow({ combatant, index, isActive, isYou }) {
+function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView }) {
   return (
     <li
       className={`flex w-full items-center gap-3 rounded-sm border-2 px-3 py-2.5 ${initiativeCardClass(isActive, isYou)}`}
@@ -395,13 +402,18 @@ function InitiativeCombatantRow({ combatant, index, isActive, isYou }) {
           {combatant.name}
           {isYou && <span className="ml-1.5 text-[9px] text-neon-cyan">YOU</span>}
           {combatant.is_pc && !isYou && <span className="ml-1.5 text-[9px] text-ink-faint">PC</span>}
+          {combatant.is_ally && !combatant.is_pc && (
+            <span className="ml-1.5 text-[9px] text-neon-cyan">ALLY</span>
+          )}
         </p>
-        {(combatant.hp != null || combatant.ac != null || combatant.conditions) && (
+        {(combatant.hp != null ||
+          formatCombatantAc(combatant, isDmView) ||
+          combatant.conditions) && (
           <p className="truncate text-[10px] font-mono text-ink-faint">
             {combatant.hp != null && combatant.max_hp != null
               ? `HP ${combatant.hp}/${combatant.max_hp}`
               : ""}
-            {combatant.ac != null ? ` · AC ${combatant.ac}` : ""}
+            {formatCombatantAc(combatant, isDmView)}
             {combatant.conditions ? ` · ${combatant.conditions}` : ""}
           </p>
         )}
@@ -410,7 +422,7 @@ function InitiativeCombatantRow({ combatant, index, isActive, isYou }) {
   );
 }
 
-function InitiativeCombatantCard({ combatant, index, isActive, isYou }) {
+function InitiativeCombatantCard({ combatant, index, isActive, isYou, isDmView }) {
   return (
     <div
       className={`flex min-w-[72px] max-w-[120px] flex-1 flex-col items-center gap-1 border-2 p-2 text-center ${initiativeCardClass(isActive, isYou)}`}
@@ -421,18 +433,21 @@ function InitiativeCombatantCard({ combatant, index, isActive, isYou }) {
         {combatant.name}
         {isYou && <span className="block text-[8px] text-neon-cyan">YOU</span>}
       </p>
-      {(combatant.hp != null || combatant.ac != null) && (
+      {(combatant.hp != null || formatCombatantAc(combatant, isDmView)) && (
         <p className="w-full truncate text-[9px] font-mono text-ink-faint">
           {combatant.hp != null && combatant.max_hp != null
             ? `HP ${combatant.hp}/${combatant.max_hp}`
             : ""}
-          {combatant.ac != null ? ` · AC ${combatant.ac}` : ""}
+          {formatCombatantAc(combatant, isDmView)}
         </p>
       )}
       {combatant.conditions && (
         <p className="w-full truncate text-[8px] font-mono text-ink-faint">{combatant.conditions}</p>
       )}
       {combatant.is_pc && !isYou && <span className="text-[8px] text-ink-faint">PC</span>}
+      {combatant.is_ally && !combatant.is_pc && (
+        <span className="text-[8px] text-neon-cyan">ALLY</span>
+      )}
     </div>
   );
 }
@@ -697,6 +712,7 @@ export function InitiativeWidget({
               index={index}
               isActive={index === resolvedIndex}
               isYou={combatant.character_id === characterId}
+              isDmView={isOwner}
             />
           ))}
         </div>
@@ -709,6 +725,7 @@ export function InitiativeWidget({
               index={index}
               isActive={index === resolvedIndex}
               isYou={combatant.character_id === characterId}
+              isDmView={isOwner}
             />
           ))}
         </ul>

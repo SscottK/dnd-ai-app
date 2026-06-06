@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ChevronRight,
@@ -11,9 +11,11 @@ import {
   Wand2,
 } from "lucide-react";
 import { apiFetch } from "../../lib/api";
+import { buildEncounterPrompt, parseEncounterGeneration } from "../../lib/encounterGen";
 import { useChatStream } from "../../hooks/useChatStream";
 import { MarkdownRenderer } from "../MarkdownRenderer";
 import { DiceRoller } from "../DiceRoller";
+import { NotesPaneWidget } from "./NotesPaneWidget";
 
 const DM_CHAT_STORAGE_PREFIX = "quest-terminal-dm-chat-";
 
@@ -305,7 +307,172 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
   );
 }
 
-export function DmGeneratorsWidget({ token, activeTab = "encounter", onTabChange }) {
+function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
+  const [form, setForm] = useState({
+    partyLevel: "5",
+    difficulty: "Medium",
+    setting: "",
+  });
+  const [summary, setSummary] = useState("");
+  const [enemies, setEnemies] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState("");
+  const [added, setAdded] = useState(false);
+
+  const handleGenerate = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setAdded(false);
+    try {
+      const text = await dmGenerate(token, buildEncounterPrompt(form));
+      const parsed = parseEncounterGeneration(text);
+      setSummary(parsed.summary);
+      setEnemies(parsed.enemies);
+      onEncounterGenerated?.({
+        ...parsed,
+        partyLevel: form.partyLevel,
+        difficulty: form.difficulty,
+        setting: form.setting,
+      });
+    } catch (err) {
+      setError(err.message || "Could not generate encounter.");
+      setSummary("");
+      setEnemies([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddToTracker = async () => {
+    if (!campaignId || !enemies.length) return;
+    setAdding(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/add-enemies`, {
+        token,
+        method: "POST",
+        body: { enemies },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not add enemies");
+      }
+      setAdded(true);
+    } catch (err) {
+      setError(err.message || "Could not add to tracker.");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <form onSubmit={handleGenerate} className="shrink-0 space-y-2">
+        <p className="text-[9px] font-black uppercase tracking-widest text-ink-faint">Encounter generator</p>
+        <label className="block">
+          <span className="text-[8px] font-mono uppercase text-ink-faint">Party level</span>
+          <input
+            type="number"
+            value={form.partyLevel}
+            onChange={(e) => setForm((prev) => ({ ...prev, partyLevel: e.target.value }))}
+            className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[8px] font-mono uppercase text-ink-faint">Difficulty</span>
+          <select
+            value={form.difficulty}
+            onChange={(e) => setForm((prev) => ({ ...prev, difficulty: e.target.value }))}
+            className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+          >
+            {["Easy", "Medium", "Hard", "Deadly"].map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[8px] font-mono uppercase text-ink-faint">Scene / setting</span>
+          <textarea
+            value={form.setting}
+            onChange={(e) => setForm((prev) => ({ ...prev, setting: e.target.value }))}
+            rows={2}
+            placeholder="e.g. flooded mine, ambush at the bridge"
+            className="mt-0.5 w-full resize-none rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-1 rounded-sm border border-neon-magenta px-2 py-1.5 text-[10px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+        >
+          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+          Generate
+        </button>
+      </form>
+      {error && <p className="shrink-0 text-[9px] font-mono text-danger">{error}</p>}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/40 p-2">
+        {summary ? (
+          <p className="mb-2 text-[10px] font-mono text-ink-muted">{summary}</p>
+        ) : (
+          <p className="text-[9px] font-mono text-ink-faint">Generated enemies appear here with stats.</p>
+        )}
+        {enemies.length > 0 && (
+          <ul className="space-y-1">
+            {enemies.map((enemy, index) => (
+              <li
+                key={`${enemy.name}-${index}`}
+                className="rounded-sm border border-border/60 px-2 py-1 text-[9px] font-mono text-ink"
+              >
+                <span className="font-black text-starlight">
+                  {enemy.name}
+                  {enemy.count > 1 ? ` ×${enemy.count}` : ""}
+                </span>
+                {" · "}Init {enemy.initiative}
+                {enemy.ac != null ? ` · AC ${enemy.ac}` : ""}
+                {enemy.hp != null ? ` · HP ${enemy.hp}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {enemies.length > 0 && (
+        <button
+          type="button"
+          disabled={adding}
+          onClick={handleAddToTracker}
+          className="shrink-0 rounded-sm border border-starlight bg-starlight/10 px-2 py-1.5 text-[10px] font-black uppercase text-starlight hover:bg-starlight/20 disabled:opacity-40"
+        >
+          {adding ? "Adding..." : added ? "Added to tracker" : "Add enemies to tracker"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function DmNotesWidget({ tabs, activeTabId, onChange }) {
+  return (
+    <NotesPaneWidget
+      tabs={tabs}
+      activeTabId={activeTabId}
+      onChange={onChange}
+      tabsKey="dmNotesTabs"
+      activeKey="activeNotesTabId"
+      hint="Double-click a tab name to rename · saved with layout"
+    />
+  );
+}
+
+export function DmGeneratorsWidget({
+  campaignId,
+  token,
+  activeTab = "encounter",
+  onTabChange,
+  onEncounterGenerated,
+}) {
   const tab = activeTab === "npc" ? "npc" : "encounter";
 
   return (
@@ -320,29 +487,10 @@ export function DmGeneratorsWidget({ token, activeTab = "encounter", onTabChange
       />
       <div className="min-h-0 flex-1 pt-2">
         {tab === "encounter" ? (
-          <GeneratorPanel
+          <EncounterGeneratorPanel
+            campaignId={campaignId}
             token={token}
-            title="Encounter generator"
-            fields={[
-              { key: "partyLevel", label: "Party level", type: "number", default: "5" },
-              {
-                key: "difficulty",
-                label: "Difficulty",
-                type: "select",
-                options: ["Easy", "Medium", "Hard", "Deadly"],
-                default: "Medium",
-              },
-              {
-                key: "setting",
-                label: "Scene / setting",
-                type: "textarea",
-                placeholder: "e.g. flooded mine, 4 PCs, short rest just taken",
-                rows: 3,
-              },
-            ]}
-            buildPrompt={(form) =>
-              `You are a D&D 5e DM assistant. Generate a combat encounter for a party of level ${form.partyLevel} characters. Difficulty: ${form.difficulty}. Setting: ${form.setting || "generic fantasy"}. Format in markdown with sections: ## Overview, ## Terrain & Hazards, ## Enemies (name, count, brief stat notes), ## Tactics, ## Rewards. Keep it table-ready and concise.`
-            }
+            onEncounterGenerated={onEncounterGenerated}
           />
         ) : (
           <GeneratorPanel

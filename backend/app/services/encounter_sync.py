@@ -17,6 +17,17 @@ def parse_encounter(campaign: Campaign) -> EncounterState:
         return EncounterState()
 
 
+def encounter_for_viewer(state: EncounterState, *, is_owner: bool) -> EncounterState:
+    """Hide enemy AC from players; allies and PCs remain visible."""
+    if is_owner:
+        return state
+    redacted = state.model_copy(deep=True)
+    for combatant in redacted.combatants:
+        if not combatant.is_pc and not combatant.is_ally:
+            combatant.ac = None
+    return redacted
+
+
 def sync_character_combat_stats(
     session: Session,
     campaign_id: int,

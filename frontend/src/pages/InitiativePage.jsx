@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch } from "../lib/api";
+import { formatCombatantAc } from "../lib/encounterDisplay";
 import { DiceRoller } from "../components/DiceRoller";
 
 function sortCombatants(combatants) {
@@ -33,6 +34,7 @@ export function InitiativePage() {
   const [error, setError] = useState("");
   const [monsterName, setMonsterName] = useState("");
   const [monsterInit, setMonsterInit] = useState("10");
+  const [monsterAlly, setMonsterAlly] = useState(false);
 
   const saveEncounter = useCallback(
     async (next) => {
@@ -124,6 +126,7 @@ export function InitiativePage() {
           name: member.character_name,
           initiative: 0,
           is_pc: true,
+          is_ally: false,
           character_id: member.character_id,
           hp: member.hp,
           max_hp: member.max_hp,
@@ -147,6 +150,7 @@ export function InitiativePage() {
           name: monsterName.trim(),
           initiative: parseInt(monsterInit, 10) || 0,
           is_pc: false,
+          is_ally: monsterAlly,
           character_id: null,
           hp: null,
           max_hp: null,
@@ -157,6 +161,7 @@ export function InitiativePage() {
     };
     pushEncounter(next);
     setMonsterName("");
+    setMonsterAlly(false);
   };
 
   const updateCombatant = (id, patch) => {
@@ -351,18 +356,34 @@ export function InitiativePage() {
                         {combatant.is_pc && (
                           <span className="ml-2 text-[9px] text-neon-cyan">PC</span>
                         )}
+                        {combatant.is_ally && !combatant.is_pc && (
+                          <span className="ml-2 text-[9px] text-neon-cyan">ALLY</span>
+                        )}
                       </p>
-                      {(combatant.hp != null || combatant.ac != null) && (
+                      {(combatant.hp != null || formatCombatantAc(combatant, isOwner)) && (
                         <p className="text-[10px] font-mono text-zinc-500">
                           {combatant.hp != null && combatant.max_hp != null
                             ? `HP ${combatant.hp}/${combatant.max_hp}`
                             : ""}
-                          {combatant.ac != null ? ` · AC ${combatant.ac}` : ""}
+                          {formatCombatantAc(combatant, isOwner)}
                         </p>
                       )}
                     </div>
                     {isOwner && (
                       <>
+                        {!combatant.is_pc && (
+                          <label className="flex items-center gap-1 text-[9px] font-mono uppercase text-zinc-500">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(combatant.is_ally)}
+                              onChange={(e) =>
+                                updateCombatant(combatant.id, { is_ally: e.target.checked })
+                              }
+                              className="accent-neon-cyan"
+                            />
+                            Ally
+                          </label>
+                        )}
                         <input
                           type="text"
                           value={combatant.conditions || ""}
@@ -435,6 +456,15 @@ export function InitiativePage() {
                     className="w-20 px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
                     title="Initiative"
                   />
+                  <label className="flex items-center gap-1 px-2 text-[10px] font-mono uppercase text-zinc-500">
+                    <input
+                      type="checkbox"
+                      checked={monsterAlly}
+                      onChange={(e) => setMonsterAlly(e.target.checked)}
+                      className="accent-neon-cyan"
+                    />
+                    Ally
+                  </label>
                   <button
                     type="submit"
                     className="px-4 py-2 text-[10px] font-black uppercase bg-neon-cyan text-black"
