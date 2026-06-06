@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -28,7 +29,13 @@ class HealthResponse(BaseModel):
     app_name: str
 
 
+class RegisterRequest(BaseModel):
+    username: str = Field(min_length=2, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+
 class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=1)
 
 
@@ -37,9 +44,15 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class UserRead(BaseModel):
+    id: int
+    username: str
+    created_at: datetime
+
+
 class AuthStatusResponse(BaseModel):
     authenticated: bool
-
+    user: UserRead | None = None
 
 
 class ConversationCreate(BaseModel):
@@ -54,6 +67,7 @@ class ConversationRead(BaseModel):
 
 class ConversationListResponse(BaseModel):
     conversations: list[ConversationRead]
+
 
 class MessageCreate(BaseModel):
     content: str = Field(min_length=1)

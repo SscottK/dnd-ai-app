@@ -1,6 +1,9 @@
+from typing import Annotated
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.api.deps import CurrentUser
 from app.api.schemas import (
     ChatRequest,
     ChatResponseChunk,
@@ -14,7 +17,7 @@ router = APIRouter()
 
 
 @router.post("/generate", response_model=GenerateResponse)
-async def generate(req: GenerateRequest):
+async def generate(req: GenerateRequest, _: CurrentUser):
     try:
         text = await generate_text(req.prompt)
     except Exception:
@@ -27,7 +30,7 @@ async def generate(req: GenerateRequest):
 
 
 @router.post("/chat")
-async def chat(req: ChatRequest):
+async def chat(req: ChatRequest, _: CurrentUser):
     async def event_generator():
         try:
             async for token in gemini_stream(req.messages):

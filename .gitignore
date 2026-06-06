@@ -4,6 +4,7 @@
 **/.venv/
 **/__pycache__/
 **/*.pyc
+**/*.db
 
 # Local environment variables (Backend & Frontend)
 **/.env

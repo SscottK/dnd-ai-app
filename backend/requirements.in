@@ -1,1 +1,6 @@
 fastapi[standard]
+sqlmodel
+python-jose[cryptography]
+bcrypt
+psycopg2-binary
+alembic

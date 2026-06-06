@@ -1,12 +1,15 @@
+import contextlib
 import json
 import logging
-from typing import Annotated, AsyncGenerator
+from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, status
 from fastapi.responses import StreamingResponse
-from sqlmodel import Session, asc, desc, select
+from sqlmodel import asc, desc, select
 
+from app.api.deps import CurrentUser, SessionDep
 from app.api.schemas import (
+    ChatMessage,
     ConversationCreate,
     ConversationDetailResponse,
     ConversationListResponse,
@@ -14,23 +17,17 @@ from app.api.schemas import (
     MessageCreate,
     MessageRead,
     SendMessageResponse,
-    ChatMessage,  # Used by gemini_stream
 )
-from app.api.v1.routes.auth import require_auth
 from app.core.exceptions import DatabaseSessionError, GeminiProxyException
-from app.db.models import Conversation, Message
+from app.db.models import Conversation, Message, User
 from app.db.session import get_session
 from app.services.conversations import build_prompt_from_db_messages
 from app.services.gemini import generate_text
 from app.services.gemini_stream import gemini_stream
 
-# Initialize logger for this module
 logger = logging.getLogger("app.api.v1.conversations")
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
-
-SessionDep = Annotated[Session, Depends(get_session)]
-AuthDep = Annotated[dict, Depends(require_auth)]
 
 
 def to_conversation_read(conversation: Conversation) -> ConversationRead:
@@ -65,59 +62,75 @@ def to_message_read(message: Message) -> MessageRead:
     )
 
 
+def get_owned_conversation(
+    conversation_id: int,
+    current_user: User,
+    session: SessionDep,
+) -> Conversation:
+    try:
+        conversation = session.get(Conversation, conversation_id)
+    except Exception as e:
+        logger.exception(
+            "Failed session lookup on conversation %s: %s",
+            conversation_id,
+            str(e),
+        )
+        raise DatabaseSessionError("Database lookup processing failure.") from e
+
+    if conversation is None or conversation.user_id != current_user.id:
+        raise GeminiProxyException(
+            message="Conversation not found",
+            status_code=404,
+        )
+
+    return conversation
+
+
 @router.post("", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
 def create_conversation(
     data: ConversationCreate,
-    _: AuthDep,
+    current_user: CurrentUser,
     session: SessionDep,
 ):
     try:
-        conversation = Conversation(title=data.title)
+        conversation = Conversation(title=data.title, user_id=current_user.id)
         session.add(conversation)
         session.commit()
         session.refresh(conversation)
         return to_conversation_read(conversation)
     except Exception as e:
         session.rollback()
-        logger.exception(f"Failed to create conversation: {str(e)}")
-        raise DatabaseSessionError("Could not create conversation thread.")
+        logger.exception("Failed to create conversation: %s", str(e))
+        raise DatabaseSessionError("Could not create conversation thread.") from e
 
 
 @router.get("", response_model=ConversationListResponse)
 def list_conversations(
-    _: AuthDep,
+    current_user: CurrentUser,
     session: SessionDep,
 ):
     try:
         rows = list(
             session.exec(
-                select(Conversation).order_by(desc(Conversation.created_at))
+                select(Conversation)
+                .where(Conversation.user_id == current_user.id)
+                .order_by(desc(Conversation.created_at))
             ).all()
         )
         conversations = [to_conversation_read(row) for row in rows]
         return ConversationListResponse(conversations=conversations)
     except Exception as e:
-        logger.exception(f"Failed to list conversation index: {str(e)}")
-        raise DatabaseSessionError("Could not retrieve conversation listings.")
+        logger.exception("Failed to list conversation index: %s", str(e))
+        raise DatabaseSessionError("Could not retrieve conversation listings.") from e
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetailResponse)
 def get_conversation(
     conversation_id: int,
-    _: AuthDep,
+    current_user: CurrentUser,
     session: SessionDep,
 ):
-    try:
-        conversation = session.get(Conversation, conversation_id)
-    except Exception as e:
-        logger.exception(f"Failed session lookup on conversation {conversation_id}: {str(e)}")
-        raise DatabaseSessionError("Database lookup processing failure.")
-
-    if conversation is None:
-        raise GeminiProxyException(
-            message="Conversation not found",
-            status_code=404,
-        )
+    conversation = get_owned_conversation(conversation_id, current_user, session)
 
     try:
         messages = list(
@@ -128,8 +141,8 @@ def get_conversation(
             ).all()
         )
     except Exception as e:
-        logger.exception(f"Failed to query messages context: {str(e)}")
-        raise DatabaseSessionError("Could not compile conversation history.")
+        logger.exception("Failed to query messages context: %s", str(e))
+        raise DatabaseSessionError("Could not compile conversation history.") from e
 
     if conversation.id is None:
         raise GeminiProxyException(
@@ -153,35 +166,29 @@ def get_conversation(
 async def send_message(
     conversation_id: int,
     data: MessageCreate,
-    _: AuthDep,
+    current_user: CurrentUser,
     session: SessionDep,
 ):
-    try:
-        conversation = session.get(Conversation, conversation_id)
-    except Exception as e:
-        logger.exception(f"Error validating conversation {conversation_id}: {str(e)}")
-        raise DatabaseSessionError("Database error during verification.")
-
-    if conversation is None:
-        raise GeminiProxyException(
-            message="Conversation not found",
-            status_code=404,
-        )
+    get_owned_conversation(conversation_id, current_user, session)
 
     user_message = Message(
         conversation_id=conversation_id,
         role="user",
         content=data.content,
     )
-    
+
     try:
         session.add(user_message)
         session.commit()
         session.refresh(user_message)
     except Exception as e:
         session.rollback()
-        logger.exception(f"Failed to save user message to conversation {conversation_id}: {str(e)}")
-        raise DatabaseSessionError("Failed to store user message.")
+        logger.exception(
+            "Failed to save user message to conversation %s: %s",
+            conversation_id,
+            str(e),
+        )
+        raise DatabaseSessionError("Failed to store user message.") from e
 
     try:
         all_messages = list(
@@ -192,34 +199,34 @@ async def send_message(
             ).all()
         )
     except Exception as e:
-        logger.exception(f"Failed to read messages state layout: {str(e)}")
-        raise DatabaseSessionError("Could not access history thread context.")
+        logger.exception("Failed to read messages state layout: %s", str(e))
+        raise DatabaseSessionError("Could not access history thread context.") from e
 
     prompt = build_prompt_from_db_messages(all_messages)
 
     try:
         assistant_text = await generate_text(prompt)
     except Exception as e:
-        logger.error(f"Upstream provider failure at Gemini API endpoint: {str(e)}")
+        logger.error("Upstream provider failure at Gemini API endpoint: %s", str(e))
         raise GeminiProxyException(
             message="Upstream AI provider error. Could not reach assistant.",
             status_code=502,
-        )
+        ) from e
 
     assistant_message = Message(
         conversation_id=conversation_id,
         role="assistant",
         content=assistant_text,
     )
-    
+
     try:
         session.add(assistant_message)
         session.commit()
         session.refresh(assistant_message)
     except Exception as e:
         session.rollback()
-        logger.exception(f"Failed to secure AI reply write-back to database: {str(e)}")
-        raise DatabaseSessionError("Could not store assistant response record.")
+        logger.exception("Failed to secure AI reply write-back to database: %s", str(e))
+        raise DatabaseSessionError("Could not store assistant response record.") from e
 
     return SendMessageResponse(
         user_message=to_message_read(user_message),
@@ -234,22 +241,11 @@ async def send_message(
 async def stream_message(
     conversation_id: int,
     data: MessageCreate,
-    _: AuthDep,
+    current_user: CurrentUser,
     session: SessionDep,
 ):
-    try:
-        conversation = session.get(Conversation, conversation_id)
-    except Exception as e:
-        logger.exception(f"Error validating conversation {conversation_id} during stream: {str(e)}")
-        raise DatabaseSessionError("Database error during verification.")
+    get_owned_conversation(conversation_id, current_user, session)
 
-    if conversation is None:
-        raise GeminiProxyException(
-            message="Conversation not found",
-            status_code=404,
-        )
-
-    # 1. Save user message to database using the active request session
     user_message = Message(
         conversation_id=conversation_id,
         role="user",
@@ -261,10 +257,9 @@ async def stream_message(
         session.refresh(user_message)
     except Exception as e:
         session.rollback()
-        logger.exception(f"Failed to save user dynamic stream message: {str(e)}")
-        raise DatabaseSessionError("Failed to store user message.")
+        logger.exception("Failed to save user dynamic stream message: %s", str(e))
+        raise DatabaseSessionError("Failed to store user message.") from e
 
-    # 2. Grab entire updated conversation message history
     try:
         all_messages = list(
             session.exec(
@@ -273,24 +268,19 @@ async def stream_message(
                 .order_by(asc(Message.created_at))
             ).all()
         )
-        
-        # MAP AND STRIP any database-tied models to plain dataclasses immediately
-        # (This prevents SQLAlchemy from lazy-loading via a dead session inside the stream generator)
+
         chat_history_payload = [
-            ChatMessage(role=msg.role, text=msg.content)
-            for msg in all_messages
+            ChatMessage(role=msg.role, text=msg.content) for msg in all_messages
         ]
     except Exception as e:
-        logger.exception(f"Failed to load stream context message map: {str(e)}")
-        raise DatabaseSessionError("Could not retrieve prompt context history.")
+        logger.exception("Failed to load stream context message map: %s", str(e))
+        raise DatabaseSessionError("Could not retrieve prompt context history.") from e
 
-    # COMMIT & CLOSE any outstanding operations on the request transaction
     try:
         session.commit()
     except Exception:
         pass
 
-    # 3. Create the SSE generator using a clean, separate database session context
     async def sse_event_generator() -> AsyncGenerator[str, None]:
         completed_reply = []
         try:
@@ -298,21 +288,15 @@ async def stream_message(
                 completed_reply.append(chunk)
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
         except Exception as e:
-            logger.error(f"Error during Gemini generator stream: {str(e)}")
+            logger.error("Error during Gemini generator stream: %s", str(e))
             yield f"data: {json.dumps({'error': 'Upstream connection crashed mid-stream'})}\n\n"
             return
 
-        # 4. Save the fully assembled Assistant message using a clean, fresh database session
         full_response_text = "".join(completed_reply)
         if full_response_text:
-            import contextlib
-            from app.db.session import get_session
-            
-            # Wrap get_session in a standard contextmanager to guarantee clean creation/cleanup
             context_session = contextlib.contextmanager(get_session)
-            
+
             try:
-                # Open a fresh database transaction separate from the routing framework
                 with context_session() as bg_session:
                     assistant_message = Message(
                         conversation_id=conversation_id,
@@ -322,41 +306,35 @@ async def stream_message(
                     bg_session.add(assistant_message)
                     bg_session.commit()
                     bg_session.refresh(assistant_message)
-                    
-                    # Convert properties to hard copy types for the final SSE payload
+
                     message_data = {
                         "id": assistant_message.id,
                         "conversation_id": assistant_message.conversation_id,
                         "role": assistant_message.role,
                         "content": assistant_message.content,
-                        "created_at": assistant_message.created_at.isoformat() if assistant_message.created_at else None
+                        "created_at": assistant_message.created_at.isoformat()
+                        if assistant_message.created_at
+                        else None,
                     }
                     yield f"data: {json.dumps({'status': 'DONE', 'message': message_data})}\n\n"
             except Exception as e:
-                logger.exception(f"Failed committing fully assembled streaming reply in background context: {str(e)}")
+                logger.exception(
+                    "Failed committing fully assembled streaming reply in background context: %s",
+                    str(e),
+                )
 
     return StreamingResponse(sse_event_generator(), media_type="text/event-stream")
+
 
 @router.patch("/{conversation_id}", response_model=ConversationRead)
 def update_conversation_title(
     conversation_id: int,
-    payload: ConversationCreate,  # Reuses ConversationCreate schema to validate 'title' securely
-    _: AuthDep,
+    payload: ConversationCreate,
+    current_user: CurrentUser,
     session: SessionDep,
 ):
-    try:
-        conversation = session.get(Conversation, conversation_id)
-    except Exception as e:
-        logger.exception(f"Error accessing conversation {conversation_id} during patch: {str(e)}")
-        raise DatabaseSessionError("Database transaction lookup failing.")
+    conversation = get_owned_conversation(conversation_id, current_user, session)
 
-    if conversation is None:
-        raise GeminiProxyException(
-            message="Conversation not found",
-            status_code=404,
-        )
-
-    # Validate incoming title value
     new_title = payload.title.strip() if payload.title else ""
     if not new_title:
         raise GeminiProxyException(
@@ -364,7 +342,6 @@ def update_conversation_title(
             status_code=400,
         )
 
-    # Update database record
     try:
         conversation.title = new_title
         session.add(conversation)
@@ -373,34 +350,30 @@ def update_conversation_title(
         return to_conversation_read(conversation)
     except Exception as e:
         session.rollback()
-        logger.exception(f"Failed to update title for conversation {conversation_id}: {str(e)}")
-        raise DatabaseSessionError("Could not update conversation thread title.")
-    
+        logger.exception(
+            "Failed to update title for conversation %s: %s",
+            conversation_id,
+            str(e),
+        )
+        raise DatabaseSessionError("Could not update conversation thread title.") from e
+
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_200_OK)
 def delete_conversation(
     conversation_id: int,
-    _: AuthDep,
+    current_user: CurrentUser,
     session: SessionDep,
 ):
-    try:
-        conversation = session.get(Conversation, conversation_id)
-    except Exception as e:
-        logger.exception(f"Error accessing conversation {conversation_id} during delete: {str(e)}")
-        raise DatabaseSessionError("Database transaction lookup failing.")
-
-    if conversation is None:
-        raise GeminiProxyException(
-            message="Conversation not found",
-            status_code=404,
-        )
+    conversation = get_owned_conversation(conversation_id, current_user, session)
 
     try:
-        # SQLite wipes all associated child messages automatically due to cascade relationship rules
         session.delete(conversation)
         session.commit()
-        return {"status": "ok", "message": f"Conversation {conversation_id} deleted successfully."}
+        return {
+            "status": "ok",
+            "message": f"Conversation {conversation_id} deleted successfully.",
+        }
     except Exception as e:
         session.rollback()
-        logger.exception(f"Failed to delete conversation {conversation_id}: {str(e)}")
-        raise DatabaseSessionError("Could not delete conversation thread.")
+        logger.exception("Failed to delete conversation %s: %s", conversation_id, str(e))
+        raise DatabaseSessionError("Could not delete conversation thread.") from e

@@ -8,12 +8,26 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(unique=True, index=True, max_length=50)
+    password_hash: str = Field(max_length=255)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    conversations: list["Conversation"] = Relationship(back_populates="user")
+
+
 class Conversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
     title: str = Field(index=True, max_length=200)
     created_at: datetime = Field(default_factory=utc_now)
 
-    messages: list["Message"] = Relationship(back_populates="conversation", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    user: Optional[User] = Relationship(back_populates="conversations")
+    messages: list["Message"] = Relationship(
+        back_populates="conversation",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
 
 class Message(SQLModel, table=True):

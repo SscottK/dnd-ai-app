@@ -1,28 +1,32 @@
-from typing import Annotated
+from fastapi import APIRouter, HTTPException, status
+from sqlmodel import select
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from app.api.schemas import AuthStatusResponse, LoginRequest, TokenResponse
-from app.core.config import settings
-from app.core.security import create_access_token, verify_access_token
+from app.api.deps import CurrentUser, SessionDep
+from app.api.schemas import (
+    AuthStatusResponse,
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserRead,
+)
+from app.core.security import create_access_token, hash_password, verify_password
+from app.db.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-bearer_scheme = HTTPBearer()
 
-
-def require_auth(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
-) -> dict:
-    token = credentials.credentials
-    payload = verify_access_token(token)
-    if not payload:
+def to_user_read(user: User) -> UserRead:
+    if user.id is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User record is missing an ID",
         )
-    return payload
+
+    return UserRead(
+        id=user.id,
+        username=user.username,
+        created_at=user.created_at,
+    )
 
 
 @router.get("/health")
@@ -30,18 +34,43 @@ def auth_health():
     return {"status": "ok"}
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest):
-    if data.password != settings.shared_app_password:
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+def register(data: RegisterRequest, session: SessionDep):
+    username = data.username.lower()
+    existing = session.exec(select(User).where(User.username == username)).first()
+    if existing:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect password",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That username is already taken",
         )
 
-    access_token = create_access_token(subject="shared-user")
+    user = User(
+        username=username,
+        password_hash=hash_password(data.password),
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    access_token = create_access_token(user_id=user.id, username=user.username)
+    return TokenResponse(access_token=access_token)
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(data: LoginRequest, session: SessionDep):
+    user = session.exec(
+        select(User).where(User.username == data.username.lower())
+    ).first()
+    if user is None or not verify_password(data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+
+    access_token = create_access_token(user_id=user.id, username=user.username)
     return TokenResponse(access_token=access_token)
 
 
 @router.get("/me", response_model=AuthStatusResponse)
-def me(_: Annotated[dict, Depends(require_auth)]):
-    return AuthStatusResponse(authenticated=True)
+def me(current_user: CurrentUser):
+    return AuthStatusResponse(authenticated=True, user=to_user_read(current_user))

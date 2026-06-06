@@ -1,8 +1,5 @@
 import { useState } from "react";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL 
-  ? `${import.meta.env.VITE_API_URL}/api/v1` 
-  : "/api/v1";
+import { API_BASE_URL } from "../lib/api";
 
 export function useChatStream(token) {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -43,18 +40,14 @@ export function useChatStream(token) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        // Decode binary stream data to string
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-
-        // Save incomplete lines back to the buffer
         buffer = lines.pop() || "";
 
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data: ")) continue;
 
-          // Parse our backend custom SSE JSON package
           const rawJson = trimmed.slice(6);
           try {
             const parsed = JSON.parse(rawJson);

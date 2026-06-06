@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.exceptions import GeminiProxyException  # We will create this file next
 from app.core.logging_config import setup_logging
 from app.db.session import create_db_and_tables
+from app.services.bootstrap import bootstrap_admin_user
 
 # 1. Initialize Logging Configuration
 setup_logging()
@@ -20,6 +21,7 @@ logger = logging.getLogger("app.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+    bootstrap_admin_user()
     yield
 
 
