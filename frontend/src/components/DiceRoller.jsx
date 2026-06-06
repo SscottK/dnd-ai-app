@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Dices } from "lucide-react";
+import { apiFetch } from "../lib/api";
 
 const DICE = ["d4", "d6", "d8", "d10", "d12", "d20"];
 
@@ -7,13 +8,35 @@ function rollDie(sides) {
   return Math.floor(Math.random() * sides) + 1;
 }
 
-export function DiceRoller() {
+export function DiceRoller({ campaignId, token, rollerName }) {
   const [lastRoll, setLastRoll] = useState(null);
+  const [error, setError] = useState("");
 
-  const handleRoll = (label) => {
+  const handleRoll = async (label) => {
     const sides = parseInt(label.slice(1), 10);
     const result = rollDie(sides);
     setLastRoll({ label, result, at: new Date().toLocaleTimeString() });
+    setError("");
+
+    if (!campaignId || !token) return;
+
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/roll`, {
+        token,
+        method: "POST",
+        body: {
+          dice: label,
+          result,
+          roller_name: rollerName || undefined,
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not log roll");
+      }
+    } catch (err) {
+      setError(err.message || "Roll not logged to combat.");
+    }
   };
 
   return (
@@ -42,6 +65,10 @@ export function DiceRoller() {
           <span className="text-zinc-600 ml-2">{lastRoll.at}</span>
         </p>
       )}
+      {campaignId && token && (
+        <p className="mt-1 text-[8px] font-mono text-ink-faint">Logged to combat when combat is active.</p>
+      )}
+      {error && <p className="mt-1 text-[9px] font-mono text-danger">{error}</p>}
     </div>
   );
 }

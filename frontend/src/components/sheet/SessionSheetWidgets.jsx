@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { Columns3, Dices, ImagePlus, RefreshCw, Rows3, Trash2 } from "lucide-react";
+import { ChevronRight, Columns3, Dices, ImagePlus, RefreshCw, Rows3, Trash2 } from "lucide-react";
 import { apiFetch, apiUpload } from "../../lib/api";
 import { AuthenticatedImage } from "./AuthenticatedImage";
-import { formatCombatantAc } from "../../lib/encounterDisplay";
+import { formatConditionsList } from "../../lib/conditions";
+import {
+  formatCombatantAc,
+  isDefeatedEnemy,
+  parseEncounterPatchResponse,
+  sortCombatantsForDisplay,
+  sortCombatantsForTurns,
+} from "../../lib/encounterDisplay";
+import { ConditionsEditor } from "./ConditionsEditor";
+import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
 import { NotesPaneWidget } from "./NotesPaneWidget";
 import {
   INITIATIVE_ORIENTATION_HORIZONTAL,
@@ -16,11 +24,207 @@ import {
   formatModifier,
   getInitiativeBonus,
   hasSheetData,
+  itemAffectsAc,
   resolveCombatStats,
+  resolvePassivePerception,
+  resolveSaveBonus,
+  resolveSkillBonus,
+  setInventoryItemEquipped,
 } from "../../lib/characterSheet";
 
-function sortCombatants(combatants) {
-  return [...combatants].sort((a, b) => b.initiative - a.initiative);
+function mergePartyWithEncounter(members, combatants) {
+  const byCharacterId = Object.fromEntries(
+    (combatants || [])
+      .filter((combatant) => combatant.character_id && combatant.is_pc)
+      .map((combatant) => [combatant.character_id, combatant])
+  );
+
+  return members.map((member) => {
+    const combatant = byCharacterId[member.character_id];
+    if (!combatant) return member;
+    return {
+      ...member,
+      hp: combatant.hp ?? member.hp,
+      max_hp: combatant.max_hp ?? member.max_hp,
+      ac: combatant.ac ?? member.ac,
+    };
+  });
+}
+
+function PartyMemberRow({ member, isYou, token }) {
+  const hpLabel =
+    member.hp != null && member.max_hp != null
+      ? `${member.hp}/${member.max_hp}`
+      : member.hp != null
+        ? String(member.hp)
+        : "—";
+  const acLabel = member.ac != null ? String(member.ac) : "—";
+  const subtitle = [member.class_name, member.level != null ? `Lv ${member.level}` : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <li
+      className={`flex items-center gap-2 rounded-sm border px-2 py-2 ${
+        isYou ? "border-neon-cyan/60 bg-neon-cyan/5" : "border-border bg-void-deep/40"
+      }`}
+    >
+      <CombatantAvatar
+        portraitUrl={member.portrait_url}
+        token={token}
+        name={member.character_name}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[10px] font-black uppercase text-starlight">
+          {member.character_name}
+          {isYou && <span className="ml-1.5 text-[8px] text-neon-cyan">YOU</span>}
+        </p>
+        {subtitle && <p className="truncate text-[9px] font-mono text-ink-faint">{subtitle}</p>}
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] font-mono">
+          <span>
+            <span className="text-ink-faint">AC </span>
+            <span className="font-black text-starlight">{acLabel}</span>
+          </span>
+          <span>
+            <span className="text-ink-faint">HP </span>
+            <span className="font-black text-starlight">{hpLabel}</span>
+          </span>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+export function PartyWidget({ campaignId, token, characterId, isOwner = false }) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [addingAll, setAddingAll] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+
+  const loadParty = useCallback(async () => {
+    if (!token || !campaignId) return;
+    try {
+      const [rosterRes, encounterRes] = await Promise.all([
+        apiFetch(`/campaigns/${campaignId}/roster`, { token }),
+        apiFetch(`/campaigns/${campaignId}/encounter`, { token }),
+      ]);
+
+      if (!rosterRes.ok) throw new Error("Could not load party");
+
+      const rosterData = await rosterRes.json();
+      let nextMembers = rosterData.members || [];
+
+      if (encounterRes.ok) {
+        const encounter = await encounterRes.json();
+        nextMembers = mergePartyWithEncounter(nextMembers, encounter.combatants);
+      }
+
+      setMembers(nextMembers);
+      setError("");
+    } catch {
+      setError("Could not load party.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, campaignId]);
+
+  useEffect(() => {
+    loadParty();
+    const timer = setInterval(loadParty, 8000);
+    return () => clearInterval(timer);
+  }, [loadParty]);
+
+  if (loading) {
+    return <p className="text-[10px] font-mono text-ink-faint">Loading party...</p>;
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-2">
+        <p className="text-[10px] font-mono text-danger">{error}</p>
+        <button
+          type="button"
+          onClick={loadParty}
+          className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const handleAddAllToInitiative = async () => {
+    if (!token || !campaignId || !isOwner) return;
+    setAddingAll(true);
+    setActionMessage("");
+    setError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/add-roster`, {
+        token,
+        method: "POST",
+        body: { auto_roll: true },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not add party to initiative");
+      }
+      setActionMessage("Party added to initiative with rolled values.");
+      await loadParty();
+    } catch (err) {
+      setError(err.message || "Could not add party to initiative.");
+    } finally {
+      setAddingAll(false);
+    }
+  };
+
+  if (members.length === 0) {
+    return (
+      <p className="text-[10px] font-mono text-ink-faint">
+        No characters have joined this campaign yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <p className="text-[9px] font-black uppercase tracking-widest text-ink-faint">
+          {members.length} adventurer{members.length === 1 ? "" : "s"}
+        </p>
+        {isOwner && (
+          <button
+            type="button"
+            disabled={addingAll}
+            onClick={handleAddAllToInitiative}
+            className="rounded-sm border border-neon-cyan px-2 py-1 text-[8px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+          >
+            {addingAll ? "Rolling…" : "Add all to initiative"}
+          </button>
+        )}
+      </div>
+      {actionMessage && (
+        <p className="shrink-0 text-[9px] font-mono text-neon-cyan">{actionMessage}</p>
+      )}
+      <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+        {members.map((member) => (
+          <PartyMemberRow
+            key={member.member_id}
+            member={member}
+            isYou={member.character_id === characterId}
+            token={token}
+          />
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={loadParty}
+        className="shrink-0 self-start text-[9px] font-black uppercase text-ink-faint hover:text-neon-cyan"
+      >
+        Refresh
+      </button>
+    </div>
+  );
 }
 
 function ClickableRow({ label, value, sub, onClick }) {
@@ -114,7 +318,7 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail })
       </div>
       <div className="flex justify-between text-[10px] font-mono text-zinc-500">
         <span>Speed: {combat.speed != null ? `${combat.speed} ft` : "—"}</span>
-        <span>PP: {sheet.passive_perception ?? "—"}</span>
+        <span>PP: {resolvePassivePerception(sheet) ?? "—"}</span>
       </div>
       {sheet.conditions?.length > 0 && (
         <p className="text-[10px] text-neon-magenta">{sheet.conditions.join(", ")}</p>
@@ -175,43 +379,49 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
       <div>
         <p className="text-[9px] font-black text-neon-magenta uppercase mb-1">Saving Throws</p>
         <div className="space-y-0.5">
-          {sheet.saving_throws?.map((save) => (
-            <ClickableRow
-              key={save.ability}
-              label={ABILITY_LABELS[save.ability]}
-              value={formatModifier(save.bonus)}
-              sub={save.proficient ? "prof" : ""}
-              onClick={() =>
-                onShowDetail({
-                  title: `${ABILITY_LABELS[save.ability]} Save`,
-                  subtitle: save.proficient ? "Proficient" : "Not proficient",
-                  body: `Bonus: ${formatModifier(save.bonus)}`,
-                })
-              }
-            />
-          ))}
+          {sheet.saving_throws?.map((save) => {
+            const bonus = resolveSaveBonus(save, sheet);
+            return (
+              <ClickableRow
+                key={save.ability}
+                label={ABILITY_LABELS[save.ability]}
+                value={formatModifier(bonus)}
+                sub={save.proficient ? "prof" : ""}
+                onClick={() =>
+                  onShowDetail({
+                    title: `${ABILITY_LABELS[save.ability]} Save`,
+                    subtitle: save.proficient ? "Proficient" : "Not proficient",
+                    body: `Bonus: ${formatModifier(bonus)}`,
+                  })
+                }
+              />
+            );
+          })}
         </div>
       </div>
       <div>
         <p className="text-[9px] font-black text-neon-cyan uppercase mb-1">Skills</p>
         <div className="space-y-0.5 max-h-40 overflow-y-auto">
-          {[...proficientSkills, ...otherSkills].map((skill) => (
-            <ClickableRow
-              key={skill.name}
-              label={skill.name}
-              value={formatModifier(skill.bonus)}
-              sub={
-                skill.expertise ? "exp" : skill.proficient ? "prof" : skill.ability?.toUpperCase()
-              }
-              onClick={() =>
-                onShowDetail({
-                  title: skill.name,
-                  subtitle: `${skill.ability?.toUpperCase()} · ${skill.expertise ? "Expertise" : skill.proficient ? "Proficient" : "Not proficient"}`,
-                  body: `Bonus: ${formatModifier(skill.bonus)}`,
-                })
-              }
-            />
-          ))}
+          {[...proficientSkills, ...otherSkills].map((skill) => {
+            const bonus = resolveSkillBonus(skill, sheet);
+            return (
+              <ClickableRow
+                key={skill.name}
+                label={skill.name}
+                value={formatModifier(bonus)}
+                sub={
+                  skill.expertise ? "exp" : skill.proficient ? "prof" : skill.ability?.toUpperCase()
+                }
+                onClick={() =>
+                  onShowDetail({
+                    title: skill.name,
+                    subtitle: `${skill.ability?.toUpperCase()} · ${skill.expertise ? "Expertise" : skill.proficient ? "Proficient" : "Not proficient"}`,
+                    body: `Bonus: ${formatModifier(bonus)}`,
+                  })
+                }
+              />
+            );
+          })}
         </div>
       </div>
       {(sheet.proficiencies?.languages?.length > 0 ||
@@ -336,9 +546,7 @@ export function CharacterPortraitWidget({
       }
       const character = await res.json();
       setActivePortraitId(character.portrait_photo_id ?? photoId);
-      setPhotos((prev) =>
-        prev.map((photo) => ({ ...photo, is_portrait: photo.id === photoId }))
-      );
+      await loadAlbum();
       onPortraitChange(character);
     } catch (err) {
       setError(err.message || "Could not set portrait.");
@@ -372,11 +580,19 @@ export function CharacterPortraitWidget({
     }
   };
 
+  const activePhoto = photos.find((photo) => photo.id === activePortraitId);
+  const previewSrc =
+    activePhoto?.url ||
+    (portraitUrl && activePortraitId
+      ? `${portraitUrl.split("?")[0]}?photo=${activePortraitId}`
+      : portraitUrl);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-1">
       <div className="flex min-h-0 flex-[2] items-center justify-center overflow-hidden rounded-sm border border-border/60 bg-void-deep/40 p-2">
         <AuthenticatedImage
-          src={portraitUrl}
+          key={activePortraitId ?? "no-portrait"}
+          src={previewSrc}
           token={token}
           alt={characterName || "Character"}
           className="max-h-full max-w-full rounded-sm border border-neon-cyan/30 object-contain"
@@ -459,8 +675,10 @@ export function CharacterPortraitWidget({
 
 function CombatantAvatar({ portraitUrl, token, name, size = "sm" }) {
   const dimensions = size === "lg" ? "h-14 w-14 text-lg" : "h-10 w-10 text-sm";
+  const cacheKey = portraitUrl?.split("photo=")[1] ?? portraitUrl;
   return (
     <AuthenticatedImage
+      key={cacheKey}
       src={portraitUrl}
       token={token}
       alt={name}
@@ -492,6 +710,10 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
   ];
 
   const updateInventoryItem = (index, patch) => {
+    if (Object.prototype.hasOwnProperty.call(patch, "equipped")) {
+      onSheetChange(setInventoryItemEquipped(sheet, index, patch.equipped), { immediate: true });
+      return;
+    }
     const next = sheet.inventory.map((item, i) => (i === index ? { ...item, ...patch } : item));
     onSheetChange({ ...sheet, inventory: next });
   };
@@ -517,51 +739,76 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
       <div className="flex-1 overflow-y-auto">
         {tab === "inventory" && (
           <div className="space-y-1">
+            <p className="mb-1 text-[8px] font-mono leading-relaxed text-ink-faint">
+              Tap <span className="text-starlight">Equip</span> for worn/wielded gear — saves to your
+              digital sheet and updates AC immediately (PDF is not modified).
+            </p>
             {sheet.inventory?.length === 0 && (
               <p className="text-[10px] text-zinc-600">No items parsed yet.</p>
             )}
-            {sheet.inventory?.map((item, index) => (
-              <div
-                key={item.id || index}
-                className="flex items-center gap-2 p-1 border border-zinc-900 hover:border-neon-cyan/40"
-              >
-                <input
-                  type="checkbox"
-                  checked={!!item.equipped}
-                  onChange={(e) => updateInventoryItem(index, { equipped: e.target.checked })}
-                  className="accent-neon-magenta"
-                  title={item.equipped ? "Worn/wielded" : "Mark as worn/wielded"}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    onShowDetail({
-                      title: item.name,
-                      subtitle: item.equipped ? "Equipped" : "Carried",
-                      body: (
-                        <div className="space-y-2 text-xs">
-                          <p>Qty: {item.qty ?? 1}</p>
-                          {item.weight != null && <p>Weight: {item.weight} lb</p>}
-                          {item.notes && <p>{item.notes}</p>}
-                        </div>
-                      ),
-                    })
-                  }
-                  className="flex-1 text-left text-[10px] text-neon-cyan hover:text-starlight truncate"
+            {sheet.inventory?.map((item, index) => {
+              const affectsAc = itemAffectsAc(item);
+              const isEquipped = !!item.equipped;
+              return (
+                <div
+                  key={item.id || index}
+                  className={`flex items-center gap-1.5 p-1 border ${
+                    isEquipped
+                      ? "border-starlight/70 bg-starlight/5"
+                      : "border-zinc-900 hover:border-neon-cyan/40"
+                  }`}
                 >
-                  {item.name}
-                </button>
-                <input
-                  type="number"
-                  min="0"
-                  value={item.qty ?? 1}
-                  onChange={(e) =>
-                    updateInventoryItem(index, { qty: parseInt(e.target.value, 10) || 0 })
-                  }
-                  className="w-10 text-center bg-black border border-zinc-800 text-[10px]"
-                />
-              </div>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => updateInventoryItem(index, { equipped: !isEquipped })}
+                    className={`shrink-0 rounded-sm px-1.5 py-1 text-[8px] font-black uppercase tracking-wide ${
+                      isEquipped
+                        ? "bg-starlight text-black"
+                        : "border border-zinc-700 text-zinc-500 hover:border-neon-cyan hover:text-neon-cyan"
+                    }`}
+                    title={isEquipped ? "Unequip" : "Mark as equipped"}
+                  >
+                    {isEquipped ? "Equipped" : "Equip"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onShowDetail({
+                        title: item.name,
+                        subtitle: isEquipped ? "Equipped" : "Carried",
+                        body: (
+                          <div className="space-y-2 text-xs">
+                            <p>Qty: {item.qty ?? 1}</p>
+                            {item.weight != null && <p>Weight: {item.weight} lb</p>}
+                            {item.notes && <p>{item.notes}</p>}
+                            {affectsAc && (
+                              <p className="text-neon-cyan">Counts toward armor class when equipped.</p>
+                            )}
+                          </div>
+                        ),
+                      })
+                    }
+                    className="min-w-0 flex-1 text-left text-[10px] text-neon-cyan hover:text-starlight truncate"
+                  >
+                    {item.name}
+                  </button>
+                  {affectsAc && (
+                    <span className="shrink-0 text-[7px] font-black uppercase text-neon-cyan/80">
+                      AC
+                    </span>
+                  )}
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.qty ?? 1}
+                    onChange={(e) =>
+                      updateInventoryItem(index, { qty: parseInt(e.target.value, 10) || 0 })
+                    }
+                    className="w-10 shrink-0 text-center bg-black border border-zinc-800 text-[10px]"
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
         {tab === "features" && (
@@ -595,16 +842,171 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
   );
 }
 
-function initiativeCardClass(isActive, isYou) {
+function initiativeCardClass(isActive, isYou, isSelected = false, isDefeated = false) {
+  if (isDefeated) return "border-border/30 bg-void-deep/25 opacity-45";
+  if (isSelected) return "border-starlight bg-starlight/10";
   if (isActive) return "border-starlight bg-starlight/5";
   if (isYou) return "border-neon-cyan/50 bg-neon-cyan/5";
   return "border-neon-cyan/40 bg-void-deep/60";
 }
 
-function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView, token }) {
+function clampCombatantHp(hp, maxHp) {
+  if (hp == null) return null;
+  const ceiling = maxHp != null ? maxHp : hp;
+  return Math.max(0, Math.min(hp, ceiling));
+}
+
+function HpStepButtons({ combatant, disabled, onAdjust }) {
+  const steps = [-10, -5, -1, 1, 5, 10];
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {steps.map((step) => (
+        <button
+          key={step}
+          type="button"
+          disabled={disabled || combatant.hp == null}
+          onClick={() => onAdjust(step)}
+          className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[8px] font-black uppercase disabled:opacity-30 ${
+            step < 0
+              ? "border-danger/50 text-danger hover:bg-danger/10"
+              : "border-neon-cyan/50 text-neon-cyan hover:bg-neon-cyan/10"
+          }`}
+        >
+          {step > 0 ? `+${step}` : step}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DmCombatantEditor({ combatant, saving, onPatch, onRemove }) {
+  const defeated = combatant.hp != null && combatant.hp <= 0;
+  const isEnemy = !combatant.is_pc && !combatant.is_ally;
+
+  const adjustHp = (delta) => {
+    if (combatant.hp == null) return;
+    onPatch({ hp: clampCombatantHp(combatant.hp + delta, combatant.max_hp) });
+  };
+
+  return (
+    <div
+      className={`rounded-sm border p-2 ${
+        defeated ? "border-danger/40 bg-danger/5" : "border-border bg-void-deep/40"
+      }`}
+    >
+      <p className="mb-2 text-[9px] font-black uppercase text-starlight">
+        {combatant.name}
+        {defeated && <span className="ml-1 text-danger">· Defeated</span>}
+      </p>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[8px] font-mono uppercase text-ink-faint">Init</span>
+          <input
+            type="number"
+            value={combatant.initiative}
+            disabled={saving}
+            onChange={(e) =>
+              onPatch({ initiative: parseInt(e.target.value, 10) || 0 })
+            }
+            className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-starlight"
+          />
+          <span className="text-[8px] font-mono uppercase text-ink-faint">HP</span>
+          <input
+            type="number"
+            min="0"
+            value={combatant.hp ?? ""}
+            disabled={saving}
+            onChange={(e) =>
+              onPatch({
+                hp:
+                  e.target.value === ""
+                    ? null
+                    : clampCombatantHp(parseInt(e.target.value, 10) || 0, combatant.max_hp),
+              })
+            }
+            className="w-11 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-starlight"
+          />
+          <span className="text-ink-faint">/</span>
+          <input
+            type="number"
+            min="0"
+            value={combatant.max_hp ?? ""}
+            disabled={saving}
+            onChange={(e) =>
+              onPatch({
+                max_hp: e.target.value === "" ? null : parseInt(e.target.value, 10) || 0,
+              })
+            }
+            className="w-11 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-ink-muted"
+          />
+          {isEnemy && (
+            <>
+              <span className="text-[8px] font-mono uppercase text-ink-faint">AC</span>
+              <input
+                type="number"
+                min="0"
+                value={combatant.ac ?? ""}
+                disabled={saving}
+                onChange={(e) =>
+                  onPatch({
+                    ac: e.target.value === "" ? null : parseInt(e.target.value, 10) || 0,
+                  })
+                }
+                className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-starlight"
+              />
+            </>
+          )}
+        </div>
+        <HpStepButtons combatant={combatant} disabled={saving} onAdjust={adjustHp} />
+        <ConditionsEditor
+          conditions={combatant.conditions}
+          disabled={saving}
+          compact
+          onChange={(next) => onPatch({ conditions: next })}
+        />
+        {isEnemy && (
+          <label className="flex items-center gap-1.5 text-[9px] font-mono uppercase text-ink-faint">
+            <input
+              type="checkbox"
+              checked={Boolean(combatant.is_ally)}
+              disabled={saving}
+              onChange={(e) => onPatch({ is_ally: e.target.checked })}
+              className="accent-neon-cyan"
+            />
+            Ally
+          </label>
+        )}
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onRemove}
+          className="text-[9px] font-black uppercase text-danger hover:underline disabled:opacity-40"
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function InitiativeCombatantRow({
+  combatant,
+  index,
+  isActive,
+  isYou,
+  isDmView,
+  isSelected,
+  isDefeated,
+  onSelect,
+  token,
+}) {
+  const selectable = isDmView && onSelect;
   return (
     <li
-      className={`flex w-full items-center gap-3 rounded-sm border-2 px-3 py-2.5 ${initiativeCardClass(isActive, isYou)}`}
+      onClick={selectable ? () => onSelect(combatant.id) : undefined}
+      className={`flex w-full items-center gap-3 rounded-sm border-2 px-3 py-2.5 ${
+        selectable ? "cursor-pointer" : ""
+      } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
     >
       <span className="w-6 shrink-0 text-center text-[10px] font-mono text-ink-faint">{index + 1}</span>
       <CombatantAvatar portraitUrl={combatant.portrait_url} token={token} name={combatant.name} />
@@ -612,6 +1014,7 @@ function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView, t
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-black uppercase text-ink">
           {combatant.name}
+          {isDefeated && <span className="ml-1.5 text-[9px] text-ink-faint">DEFEATED</span>}
           {isYou && <span className="ml-1.5 text-[9px] text-neon-cyan">YOU</span>}
           {combatant.is_pc && !isYou && <span className="ml-1.5 text-[9px] text-ink-faint">PC</span>}
           {combatant.is_ally && !combatant.is_pc && (
@@ -620,13 +1023,15 @@ function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView, t
         </p>
         {(combatant.hp != null ||
           formatCombatantAc(combatant, isDmView) ||
-          combatant.conditions) && (
+          formatConditionsList(combatant.conditions)) && (
           <p className="truncate text-[10px] font-mono text-ink-faint">
             {combatant.hp != null && combatant.max_hp != null
               ? `HP ${combatant.hp}/${combatant.max_hp}`
               : ""}
             {formatCombatantAc(combatant, isDmView)}
-            {combatant.conditions ? ` · ${combatant.conditions}` : ""}
+            {formatConditionsList(combatant.conditions)
+              ? ` · ${formatConditionsList(combatant.conditions)}`
+              : ""}
           </p>
         )}
       </div>
@@ -634,10 +1039,24 @@ function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView, t
   );
 }
 
-function InitiativeCombatantCard({ combatant, index, isActive, isYou, isDmView, token }) {
+function InitiativeCombatantCard({
+  combatant,
+  index,
+  isActive,
+  isYou,
+  isDmView,
+  isSelected,
+  isDefeated,
+  onSelect,
+  token,
+}) {
+  const selectable = isDmView && onSelect;
   return (
     <div
-      className={`flex min-w-[80px] max-w-[128px] flex-1 flex-col items-center gap-1 border-2 p-2 text-center ${initiativeCardClass(isActive, isYou)}`}
+      onClick={selectable ? () => onSelect(combatant.id) : undefined}
+      className={`flex min-w-[80px] max-w-[128px] flex-1 flex-col items-center gap-1 border-2 p-2 text-center ${
+        selectable ? "cursor-pointer" : ""
+      } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
     >
       <span className="text-[9px] font-mono text-ink-faint">{index + 1}</span>
       <CombatantAvatar
@@ -649,6 +1068,7 @@ function InitiativeCombatantCard({ combatant, index, isActive, isYou, isDmView, 
       <span className="text-xl font-black leading-none text-starlight">{combatant.initiative}</span>
       <p className="w-full truncate text-[10px] font-black uppercase text-ink">
         {combatant.name}
+        {isDefeated && <span className="block text-[8px] text-ink-faint">DEFEATED</span>}
         {isYou && <span className="block text-[8px] text-neon-cyan">YOU</span>}
       </p>
       {(combatant.hp != null || formatCombatantAc(combatant, isDmView)) && (
@@ -659,8 +1079,10 @@ function InitiativeCombatantCard({ combatant, index, isActive, isYou, isDmView, 
           {formatCombatantAc(combatant, isDmView)}
         </p>
       )}
-      {combatant.conditions && (
-        <p className="w-full truncate text-[8px] font-mono text-ink-faint">{combatant.conditions}</p>
+      {formatConditionsList(combatant.conditions) && (
+        <p className="w-full truncate text-[8px] font-mono text-ink-faint">
+          {formatConditionsList(combatant.conditions)}
+        </p>
       )}
       {combatant.is_pc && !isYou && <span className="text-[8px] text-ink-faint">PC</span>}
       {combatant.is_ally && !combatant.is_pc && (
@@ -678,6 +1100,8 @@ export function InitiativeWidget({
   sheet,
   orientation = INITIATIVE_ORIENTATION_VERTICAL,
   onOrientationChange,
+  onCombatEnded,
+  onSheetRefresh,
 }) {
   const isHorizontal = orientation === INITIATIVE_ORIENTATION_HORIZONTAL;
   const initiativeBonus = getInitiativeBonus(sheet);
@@ -686,6 +1110,7 @@ export function InitiativeWidget({
     active_index: 0,
     active_combatant_id: null,
     combatants: [],
+    turn_economy: {},
   });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -693,9 +1118,14 @@ export function InitiativeWidget({
   const [lastRoll, setLastRoll] = useState(null);
   const [actionError, setActionError] = useState("");
   const [error, setError] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [dmActionSheet, setDmActionSheet] = useState(null);
+  const [dmSheetLoading, setDmSheetLoading] = useState(false);
+  const savingRef = useRef(false);
 
   const loadEncounter = useCallback(async () => {
-    if (!token || !campaignId) return;
+    if (!token || !campaignId || savingRef.current) return;
     try {
       const res = await apiFetch(`/campaigns/${campaignId}/encounter`, { token });
       if (!res.ok) throw new Error("Load failed");
@@ -714,14 +1144,46 @@ export function InitiativeWidget({
     return () => clearInterval(timer);
   }, [loadEncounter]);
 
-  const sorted = sortCombatants(encounter.combatants);
-  const activeIndex = encounter.active_combatant_id
-    ? sorted.findIndex((c) => c.id === encounter.active_combatant_id)
-    : encounter.active_index;
-  const resolvedIndex = activeIndex >= 0 ? activeIndex : 0;
-  const activeCombatant = sorted[resolvedIndex] || null;
+  const displaySorted = sortCombatantsForDisplay(encounter.combatants);
+  const turnSorted = sortCombatantsForTurns(encounter.combatants);
+  const activeCombatant = encounter.active_combatant_id
+    ? turnSorted.find((c) => c.id === encounter.active_combatant_id) ||
+      turnSorted[encounter.active_index] ||
+      null
+    : turnSorted[encounter.active_index] || null;
   const myCombatant = encounter.combatants.find((c) => c.character_id === characterId);
-  const isMyTurn = activeCombatant?.character_id === characterId;
+  const isMyTurn = Boolean(myCombatant && activeCombatant?.id === myCombatant.id);
+  const activeCombatantId = activeCombatant?.id ?? null;
+
+  const reloadDmActionSheet = useCallback(async () => {
+    if (!isOwner || !token || !campaignId || !activeCombatantId) {
+      setDmActionSheet(null);
+      return;
+    }
+    setDmSheetLoading(true);
+    try {
+      const res = await apiFetch(
+        `/campaigns/${campaignId}/encounter/combatants/${activeCombatantId}/action-sheet`,
+        { token }
+      );
+      if (!res.ok) throw new Error("Load failed");
+      const data = await res.json();
+      setDmActionSheet(data.sheet || {});
+    } catch {
+      setDmActionSheet({});
+    } finally {
+      setDmSheetLoading(false);
+    }
+  }, [isOwner, token, campaignId, activeCombatantId]);
+
+  useEffect(() => {
+    void reloadDmActionSheet();
+  }, [reloadDmActionSheet]);
+
+  const handleSheetRefresh = useCallback(() => {
+    onSheetRefresh?.();
+    void reloadDmActionSheet();
+  }, [onSheetRefresh, reloadDmActionSheet]);
 
   const submitInitiative = async (body) => {
     if (!token || !campaignId) return;
@@ -782,6 +1244,87 @@ export function InitiativeWidget({
     }
   };
 
+  const handleEndCombat = async () => {
+    if (!token || !campaignId || !isOwner) return;
+    setSubmitting(true);
+    setActionError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/end-combat`, {
+        token,
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not end combat");
+      }
+      const data = await res.json();
+      setEncounter(data.encounter || { round: 1, combatants: [] });
+      setSelectedId(null);
+      onCombatEnded?.(data.combat_log_text, data.reason);
+    } catch (err) {
+      setActionError(err.message || "Could not end combat.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const saveEncounter = useCallback(
+    async (next) => {
+      if (!token || !campaignId || !isOwner) return;
+      savingRef.current = true;
+      setSaving(true);
+      setEncounter(next);
+      setActionError("");
+      try {
+        const res = await apiFetch(`/campaigns/${campaignId}/encounter`, {
+          token,
+          method: "PATCH",
+          body: next,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Could not save");
+        }
+        const parsed = parseEncounterPatchResponse(await res.json());
+        setEncounter(parsed.encounter);
+        if (parsed.combatEnded) {
+          setSelectedId(null);
+          onCombatEnded?.(parsed.combatLogText, parsed.reason);
+          setActionError(
+            "Victory! All enemies defeated. Combat log added to everyone's Session notes."
+          );
+        }
+      } catch (err) {
+        setActionError(err.message || "Could not save combatant.");
+        await loadEncounter();
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    },
+    [token, campaignId, isOwner, loadEncounter, onCombatEnded]
+  );
+
+  const updateCombatant = (id, patch) => {
+    saveEncounter({
+      ...encounter,
+      combatants: encounter.combatants.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    });
+  };
+
+  const removeCombatant = (id) => {
+    const nextCombatants = encounter.combatants.filter((c) => c.id !== id);
+    if (selectedId === id) setSelectedId(null);
+    saveEncounter({
+      ...encounter,
+      combatants: nextCombatants,
+      active_index: Math.min(encounter.active_index, Math.max(0, nextCombatants.length - 1)),
+    });
+  };
+
+  const selectedCombatant = displaySorted.find((c) => c.id === selectedId) || null;
+  const dmBusy = submitting || saving;
+
   if (loading) {
     return <p className="text-[10px] font-mono text-ink-faint">Loading initiative...</p>;
   }
@@ -803,7 +1346,7 @@ export function InitiativeWidget({
 
   const handleOrientation = (nextOrientation) => {
     if (nextOrientation === orientation) return;
-    onOrientationChange?.(nextOrientation, sorted.length);
+    onOrientationChange?.(nextOrientation, displaySorted.length);
   };
 
   return (
@@ -915,51 +1458,136 @@ export function InitiativeWidget({
         </div>
       )}
 
-      {sorted.length === 0 ? (
+      {!isOwner && characterId && myCombatant && turnSorted.length > 0 && (
+        <TurnActionsPanel
+          campaignId={campaignId}
+          token={token}
+          sheet={sheet}
+          actionCatalogMode="pc"
+          encounter={encounter}
+          actorCombatant={myCombatant}
+          canTakeTurn={isMyTurn}
+          activeTurnName={activeCombatant?.name}
+          onEncounterUpdate={setEncounter}
+          onSheetRefresh={handleSheetRefresh}
+          onError={setActionError}
+        />
+      )}
+
+      {isOwner && activeCombatant && turnSorted.length > 0 && (
+        <TurnActionsPanel
+          campaignId={campaignId}
+          token={token}
+          encounter={encounter}
+          actorCombatant={activeCombatant}
+          canTakeTurn
+          isDmProxy
+          actionCatalogMode={activeCombatant.character_id ? "pc" : "npc"}
+          actionSheet={dmActionSheet}
+          actionSheetLoading={dmSheetLoading}
+          onEncounterUpdate={setEncounter}
+          onSheetRefresh={handleSheetRefresh}
+          onError={setActionError}
+        />
+      )}
+
+      {turnSorted.length > 0 && encounter.combat_log?.length > 0 && (
+        <EncounterCombatLog log={encounter.combat_log} />
+      )}
+
+      {displaySorted.length === 0 ? (
         <p className="text-[10px] font-mono text-ink-faint">
           {isOwner
-            ? "Add combatants from the Initiative page, or roll to join the tracker."
+            ? "Add enemies from Generators or party from the Party pane."
             : "Roll initiative to join the tracker when combat starts."}
         </p>
       ) : isHorizontal ? (
         <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto pb-1">
-          {sorted.map((combatant, index) => (
-            <InitiativeCombatantCard
-              key={combatant.id}
-              combatant={combatant}
-              index={index}
-              isActive={index === resolvedIndex}
-              isYou={combatant.character_id === characterId}
-              isDmView={isOwner}
-              token={token}
-            />
-          ))}
+          {displaySorted.map((combatant, index) => {
+            const defeated = isDefeatedEnemy(combatant);
+            return (
+              <InitiativeCombatantCard
+                key={combatant.id}
+                combatant={combatant}
+                index={index}
+                isActive={!defeated && activeCombatant?.id === combatant.id}
+                isYou={combatant.character_id === characterId}
+                isDmView={isOwner}
+                isSelected={isOwner && selectedId === combatant.id}
+                isDefeated={defeated}
+                onSelect={isOwner ? setSelectedId : undefined}
+                token={token}
+              />
+            );
+          })}
         </div>
       ) : (
         <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-          {sorted.map((combatant, index) => (
-            <InitiativeCombatantRow
-              key={combatant.id}
-              combatant={combatant}
-              index={index}
-              isActive={index === resolvedIndex}
-              isYou={combatant.character_id === characterId}
-              isDmView={isOwner}
-              token={token}
-            />
-          ))}
+          {displaySorted.map((combatant, index) => {
+            const defeated = isDefeatedEnemy(combatant);
+            return (
+              <InitiativeCombatantRow
+                key={combatant.id}
+                combatant={combatant}
+                index={index}
+                isActive={!defeated && activeCombatant?.id === combatant.id}
+                isYou={combatant.character_id === characterId}
+                isDmView={isOwner}
+                isSelected={isOwner && selectedId === combatant.id}
+                isDefeated={defeated}
+                onSelect={isOwner ? setSelectedId : undefined}
+                token={token}
+              />
+            );
+          })}
         </ul>
       )}
 
-      <p className="shrink-0 border-t border-border pt-2 text-[9px] font-mono text-ink-faint">
-        {isOwner ? (
-          <Link to={`/initiative/${campaignId}`} className="font-black uppercase text-neon-magenta hover:text-starlight">
-            Open DM Initiative tracker →
-          </Link>
-        ) : (
-          "Roll to add yourself · End turn when it is yours"
+      {isOwner && selectedCombatant && (
+        <div className="shrink-0 border-t border-border pt-2">
+          <DmCombatantEditor
+            combatant={selectedCombatant}
+            saving={saving}
+            onPatch={(patch) => updateCombatant(selectedCombatant.id, patch)}
+            onRemove={() => removeCombatant(selectedCombatant.id)}
+          />
+        </div>
+      )}
+
+      <div className="shrink-0 space-y-2 border-t border-border pt-2">
+        {isOwner && turnSorted.length > 0 && (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              disabled={dmBusy}
+              onClick={handleEndTurn}
+              className="flex flex-1 items-center justify-center gap-1 rounded-sm border border-starlight px-2 py-1.5 text-[9px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
+            >
+              <ChevronRight className="h-3 w-3" />
+              Next turn
+            </button>
+            <button
+              type="button"
+              disabled={dmBusy}
+              onClick={handleEndCombat}
+              className="flex-1 rounded-sm border border-danger/60 px-2 py-1.5 text-[9px] font-black uppercase text-danger hover:bg-danger/10 disabled:opacity-40"
+            >
+              End combat
+            </button>
+          </div>
         )}
-      </p>
+        {isOwner && saving && (
+          <p className="text-[9px] font-mono text-ink-faint">Saving…</p>
+        )}
+        {isOwner && actionError && (
+          <p className="text-[9px] font-mono text-danger">{actionError}</p>
+        )}
+        {!isOwner && (
+          <p className="text-[9px] font-mono text-ink-faint">
+            Roll to add yourself · End turn when it is yours
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import json
 import uuid
 from pathlib import Path
 
@@ -20,7 +21,14 @@ from app.db.models import Campaign, Character, CharacterPhoto
 from app.db.session import BACKEND_DIR
 from app.services.campaign_membership import get_campaign_member_for_user
 from app.services.character_assets import portrait_download_url, portrait_media_type
+from app.services.character_ac import compute_sheet_ac, enrich_sheet_ac
 from app.services.character_pdf import parse_character_from_pdf
+from app.services.character_sheet import (
+    merge_sheet_on_resync,
+    parse_sheet_json,
+    sheet_to_json,
+    skills_summary,
+)
 from app.services.character_photos import (
     add_photo_to_album,
     clear_portrait_selection,
@@ -31,7 +39,6 @@ from app.services.character_photos import (
     resolve_portrait_file_path,
     set_portrait_photo,
 )
-from app.services.character_sheet import parse_sheet_json, sheet_to_json, skills_summary
 from app.services.encounter_sync import sync_character_combat_stats
 
 router = APIRouter(prefix="/characters", tags=["characters"])
@@ -51,6 +58,9 @@ def can_view_character_portrait(character: Character, user_id: int, session: Ses
         return True
     if character.campaign_id is None:
         return False
+    campaign = session.get(Campaign, character.campaign_id)
+    if campaign is not None and campaign.owner_id == user_id:
+        return True
     return get_campaign_member_for_user(character.campaign_id, user_id, session) is not None
 
 
@@ -109,11 +119,31 @@ def get_owned_character(character_id: int, current_user: CurrentUser, session: S
 
 
 def apply_parsed_to_character(character: Character, parsed: dict) -> None:
-    for field in ("name", "class_name", "level", "ac", "hp", "max_hp", "skills"):
+    for field in ("name", "class_name", "level", "hp", "max_hp", "skills"):
         if parsed.get(field) is not None:
             setattr(character, field, parsed[field])
+
     if parsed.get("sheet_json"):
-        character.sheet_json = parsed["sheet_json"]
+        try:
+            old_sheet = json.loads(character.sheet_json or "{}")
+        except (json.JSONDecodeError, TypeError, ValueError):
+            old_sheet = {}
+        try:
+            new_sheet = json.loads(parsed["sheet_json"])
+        except (json.JSONDecodeError, TypeError, ValueError):
+            new_sheet = {}
+
+        merged_sheet = merge_sheet_on_resync(old_sheet, new_sheet)
+        parsed_ac = int(parsed["ac"]) if parsed.get("ac") is not None else None
+        enriched_sheet = enrich_sheet_ac(merged_sheet, parsed_ac)
+        character.sheet_json = json.dumps(enriched_sheet)
+        computed_ac = compute_sheet_ac(enriched_sheet, parsed_ac)
+        if computed_ac is not None:
+            character.ac = computed_ac
+        elif parsed.get("ac") is not None:
+            character.ac = parsed["ac"]
+    elif parsed.get("ac") is not None:
+        character.ac = parsed["ac"]
 
 
 @router.get("", response_model=CharacterListResponse)
@@ -416,11 +446,16 @@ def update_character(
 
     if "sheet_json" in updates and updates["sheet_json"] is not None:
         sheet = parse_sheet_json(updates["sheet_json"])
-        updates["sheet_json"] = sheet_to_json(sheet)
+        parsed_ac = sheet.get("authoritative_ac")
+        enriched = enrich_sheet_ac(sheet, parsed_ac)
+        updates["sheet_json"] = sheet_to_json(enriched)
+        computed_ac = compute_sheet_ac(enriched, parsed_ac)
+        if computed_ac is not None:
+            updates["ac"] = computed_ac
         if "skills" not in updates:
-            updates["skills"] = skills_summary(sheet)
+            updates["skills"] = skills_summary(enriched)
 
-    combat_changed = any(key in updates for key in ("hp", "max_hp", "ac"))
+    combat_changed = any(key in updates for key in ("hp", "max_hp", "ac", "sheet_json"))
 
     for field, value in updates.items():
         setattr(character, field, value)

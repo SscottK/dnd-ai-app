@@ -11,12 +11,16 @@ import {
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch } from "../lib/api";
-import { formatCombatantAc } from "../lib/encounterDisplay";
+import { ConditionsEditor } from "../components/sheet/ConditionsEditor";
+import { formatConditionsList } from "../lib/conditions";
+import {
+  formatCombatantAc,
+  isDefeatedEnemy,
+  parseEncounterPatchResponse,
+  sortCombatantsForDisplay,
+  sortCombatantsForTurns,
+} from "../lib/encounterDisplay";
 import { DiceRoller } from "../components/DiceRoller";
-
-function sortCombatants(combatants) {
-  return [...combatants].sort((a, b) => b.initiative - a.initiative);
-}
 
 function newId() {
   return `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -32,9 +36,39 @@ export function InitiativePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const [monsterName, setMonsterName] = useState("");
   const [monsterInit, setMonsterInit] = useState("10");
   const [monsterAlly, setMonsterAlly] = useState(false);
+  const [monsterSuggestions, setMonsterSuggestions] = useState([]);
+  const [sessionActive, setSessionActive] = useState(false);
+
+  useEffect(() => {
+    if (!token || !isOwner || monsterName.trim().length < 2) {
+      setMonsterSuggestions([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void apiFetch(`/campaigns/srd-monsters/search?q=${encodeURIComponent(monsterName.trim())}`, {
+        token,
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Search failed");
+          const data = await res.json();
+          if (!cancelled) setMonsterSuggestions(data.monsters || []);
+        })
+        .catch(() => {
+          if (!cancelled) setMonsterSuggestions([]);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [token, isOwner, monsterName]);
 
   const saveEncounter = useCallback(
     async (next) => {
@@ -47,8 +81,13 @@ export function InitiativePage() {
           body: next,
         });
         if (!res.ok) throw new Error("Save failed");
-        const data = await res.json();
-        setEncounter(data);
+        const parsed = parseEncounterPatchResponse(await res.json());
+        setEncounter(parsed.encounter);
+        if (parsed.combatEnded) {
+          setStatusMessage(
+            "Victory! All enemies defeated. Combat log added to everyone's Session notes."
+          );
+        }
       } catch (err) {
         console.error(err);
         setError("Could not save initiative.");
@@ -64,15 +103,23 @@ export function InitiativePage() {
     setLoading(true);
     setError("");
     try {
-      const [campaignRes, encounterRes] = await Promise.all([
+      const [campaignRes, encounterRes, sessionRes] = await Promise.all([
         apiFetch("/campaigns", { token }),
         apiFetch(`/campaigns/${campaignId}/encounter`, { token }),
+        apiFetch(`/campaigns/${campaignId}/session`, { token }),
       ]);
 
       if (!encounterRes.ok) throw new Error("Encounter not available");
 
       const encounterData = await encounterRes.json();
       setEncounter(encounterData);
+
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        setSessionActive(!!sessionData.session_active);
+      } else {
+        setSessionActive(false);
+      }
 
       if (campaignRes.ok) {
         const campaignData = await campaignRes.json();
@@ -103,12 +150,17 @@ export function InitiativePage() {
     loadData();
   }, [loadData]);
 
-  const sorted = sortCombatants(encounter.combatants);
-  const activeIndex = encounter.active_combatant_id
-    ? sorted.findIndex((c) => c.id === encounter.active_combatant_id)
-    : encounter.active_index;
-  const resolvedIndex = activeIndex >= 0 ? activeIndex : 0;
-  const activeCombatant = sorted[resolvedIndex] || null;
+  const displaySorted = sortCombatantsForDisplay(encounter.combatants);
+  const turnSorted = sortCombatantsForTurns(encounter.combatants);
+  const activeCombatant = encounter.active_combatant_id
+    ? turnSorted.find((c) => c.id === encounter.active_combatant_id) ||
+      turnSorted[encounter.active_index] ||
+      null
+    : turnSorted[encounter.active_index] || null;
+  const turnIndex = activeCombatant
+    ? turnSorted.findIndex((c) => c.id === activeCombatant.id)
+    : 0;
+  const resolvedTurnIndex = turnIndex >= 0 ? turnIndex : 0;
 
   const pushEncounter = (next) => {
     setEncounter(next);
@@ -131,7 +183,7 @@ export function InitiativePage() {
           hp: member.hp,
           max_hp: member.max_hp,
           ac: member.ac,
-          conditions: "",
+          conditions: [],
         },
       ],
     };
@@ -155,7 +207,7 @@ export function InitiativePage() {
           hp: null,
           max_hp: null,
           ac: null,
-          conditions: "",
+          conditions: [],
         },
       ],
     };
@@ -183,28 +235,28 @@ export function InitiativePage() {
   };
 
   const nextTurn = () => {
-    if (!sorted.length) return;
-    const nextIndex = (resolvedIndex + 1) % sorted.length;
+    if (!turnSorted.length) return;
+    const nextIndex = (resolvedTurnIndex + 1) % turnSorted.length;
     const nextRound = nextIndex === 0 ? encounter.round + 1 : encounter.round;
     pushEncounter({
       ...encounter,
       active_index: nextIndex,
-      active_combatant_id: sorted[nextIndex]?.id ?? null,
+      active_combatant_id: turnSorted[nextIndex]?.id ?? null,
       round: nextRound,
     });
   };
 
   const prevTurn = () => {
-    if (!sorted.length) return;
-    const nextIndex = (resolvedIndex - 1 + sorted.length) % sorted.length;
+    if (!turnSorted.length) return;
+    const nextIndex = (resolvedTurnIndex - 1 + turnSorted.length) % turnSorted.length;
     const nextRound =
-      nextIndex === sorted.length - 1 && resolvedIndex === 0
+      nextIndex === turnSorted.length - 1 && resolvedTurnIndex === 0
         ? Math.max(1, encounter.round - 1)
         : encounter.round;
     pushEncounter({
       ...encounter,
       active_index: nextIndex,
-      active_combatant_id: sorted[nextIndex]?.id ?? null,
+      active_combatant_id: turnSorted[nextIndex]?.id ?? null,
       round: nextRound,
     });
   };
@@ -218,6 +270,32 @@ export function InitiativePage() {
     });
   };
 
+  const handleEndCombat = async () => {
+    if (!token || !campaignId || !isOwner) return;
+    setSaving(true);
+    setError("");
+    setStatusMessage("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/end-combat`, {
+        token,
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not end combat");
+      }
+      const data = await res.json();
+      setEncounter(data.encounter || { round: 1, combatants: [] });
+      setStatusMessage(
+        "Combat ended by DM. Initiative order, rolls, and events were added to everyone's Session notes."
+      );
+    } catch (err) {
+      setError(err.message || "Could not end combat.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const addAllFromRoster = async () => {
     if (!token || !campaignId) return;
     setSaving(true);
@@ -226,6 +304,7 @@ export function InitiativePage() {
       const res = await apiFetch(`/campaigns/${campaignId}/encounter/add-roster`, {
         token,
         method: "POST",
+        body: { auto_roll: true },
       });
       if (!res.ok) throw new Error("Add roster failed");
       setEncounter(await res.json());
@@ -248,13 +327,26 @@ export function InitiativePage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto p-6">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-zinc-500 hover:text-neon-cyan mb-4"
-        >
-          <ArrowLeft className="w-3 h-3" />
-          Campaigns
-        </Link>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-zinc-500 hover:text-neon-cyan"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            Campaigns
+          </Link>
+          <Link
+            to={`/session/${campaignId}`}
+            className={`inline-flex items-center gap-1 border-2 px-3 py-1.5 text-[10px] font-black uppercase ${
+              sessionActive
+                ? "border-neon-cyan bg-neon-cyan/10 text-neon-cyan hover:bg-neon-cyan/20"
+                : "border-zinc-700 text-zinc-500 hover:border-neon-cyan hover:text-neon-cyan"
+            }`}
+          >
+            <ArrowLeft className="w-3 h-3" />
+            {sessionActive ? "Back to live session" : "Session playspace"}
+          </Link>
+        </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
@@ -293,10 +385,26 @@ export function InitiativePage() {
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
+                {turnSorted.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={handleEndCombat}
+                    className="px-3 py-2 text-[10px] font-black uppercase border-2 border-danger text-danger hover:bg-danger/10 disabled:opacity-40"
+                  >
+                    End Combat
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
+
+        {statusMessage && (
+          <p className="mb-4 text-[10px] font-mono text-neon-cyan border-l-2 border-neon-cyan pl-2">
+            {statusMessage}
+          </p>
+        )}
 
         {error && (
           <p className="mb-4 text-xs font-mono text-danger border-l-2 border-danger pl-2">
@@ -319,19 +427,24 @@ export function InitiativePage() {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_220px]">
           <section>
-            {sorted.length === 0 ? (
+            {displaySorted.length === 0 ? (
               <div className="p-8 border-2 border-dashed border-zinc-700 text-center text-xs font-mono text-zinc-500">
                 No combatants yet. {isOwner ? "Add PCs from roster or monsters below." : ""}
               </div>
             ) : (
               <div className="space-y-2">
-                {sorted.map((combatant, index) => (
+                {displaySorted.map((combatant, index) => {
+                  const defeated = isDefeatedEnemy(combatant);
+                  const isActive = !defeated && activeCombatant?.id === combatant.id;
+                  return (
                   <div
                     key={combatant.id}
                     className={`p-3 border-2 flex flex-wrap items-center gap-3 ${
-                      index === resolvedIndex
-                        ? "border-starlight bg-starlight/5"
-                        : "border-neon-cyan/40 bg-black"
+                      defeated
+                        ? "border-zinc-800/60 bg-zinc-950 opacity-45"
+                        : isActive
+                          ? "border-starlight bg-starlight/5"
+                          : "border-neon-cyan/40 bg-black"
                     }`}
                   >
                     <span className="text-[10px] font-mono text-zinc-600 w-6">{index + 1}</span>
@@ -353,6 +466,9 @@ export function InitiativePage() {
                     <div className="flex-1 min-w-[120px]">
                       <p className="font-black text-starlight uppercase text-sm">
                         {combatant.name}
+                        {defeated && (
+                          <span className="ml-2 text-[9px] text-zinc-500">DEFEATED</span>
+                        )}
                         {combatant.is_pc && (
                           <span className="ml-2 text-[9px] text-neon-cyan">PC</span>
                         )}
@@ -384,15 +500,47 @@ export function InitiativePage() {
                             Ally
                           </label>
                         )}
-                        <input
-                          type="text"
-                          value={combatant.conditions || ""}
-                          onChange={(e) =>
-                            updateCombatant(combatant.id, { conditions: e.target.value })
-                          }
-                          placeholder="Conditions"
-                          className="w-28 px-2 py-1 bg-black border border-zinc-800 text-[10px]"
-                        />
+                        {!combatant.is_pc && (
+                          <>
+                            <input
+                              type="number"
+                              min="0"
+                              value={combatant.hp ?? ""}
+                              onChange={(e) =>
+                                updateCombatant(combatant.id, {
+                                  hp: e.target.value === "" ? null : parseInt(e.target.value, 10),
+                                })
+                              }
+                              placeholder="HP"
+                              className="w-14 px-2 py-1 bg-black border border-zinc-800 text-[10px] font-mono"
+                              title="Current HP"
+                            />
+                            <span className="text-zinc-600 text-[10px]">/</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={combatant.max_hp ?? ""}
+                              onChange={(e) =>
+                                updateCombatant(combatant.id, {
+                                  max_hp:
+                                    e.target.value === "" ? null : parseInt(e.target.value, 10),
+                                })
+                              }
+                              placeholder="Max"
+                              className="w-14 px-2 py-1 bg-black border border-zinc-800 text-[10px] font-mono"
+                              title="Max HP"
+                            />
+                          </>
+                        )}
+                        <div className="w-full min-w-[200px]">
+                          <ConditionsEditor
+                            conditions={combatant.conditions}
+                            compact
+                            onChange={(next) =>
+                              updateCombatant(combatant.id, { conditions: next })
+                            }
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeCombatant(combatant.id)}
@@ -402,11 +550,14 @@ export function InitiativePage() {
                         </button>
                       </>
                     )}
-                    {!isOwner && combatant.conditions && (
-                      <span className="text-[10px] text-zinc-500">{combatant.conditions}</span>
+                    {!isOwner && formatConditionsList(combatant.conditions) && (
+                      <span className="text-[10px] text-zinc-500">
+                        {formatConditionsList(combatant.conditions)}
+                      </span>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -422,7 +573,7 @@ export function InitiativePage() {
                         disabled={saving}
                         className="px-2 py-1 text-[10px] font-black uppercase border border-starlight text-starlight hover:bg-starlight/10 disabled:opacity-40"
                       >
-                        Add all players
+                        Add all & roll init
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -442,13 +593,38 @@ export function InitiativePage() {
                 )}
 
                 <form onSubmit={addMonster} className="p-4 border-2 border-neon-magenta bg-black flex flex-wrap gap-2">
-                  <input
-                    type="text"
-                    value={monsterName}
-                    onChange={(e) => setMonsterName(e.target.value)}
-                    placeholder="Monster / NPC name"
-                    className="flex-1 min-w-[160px] px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
-                  />
+                  <div className="relative flex-1 min-w-[160px]">
+                    <input
+                      type="text"
+                      value={monsterName}
+                      onChange={(e) => setMonsterName(e.target.value)}
+                      placeholder="SRD monster name (e.g. Goblin)"
+                      className="w-full px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
+                      autoComplete="off"
+                    />
+                    {monsterSuggestions.length > 0 && (
+                      <ul className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto border border-zinc-700 bg-black shadow-lg">
+                        {monsterSuggestions.map((monster) => (
+                          <li key={monster.name}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMonsterName(monster.name);
+                                setMonsterSuggestions([]);
+                              }}
+                              className="flex w-full items-center justify-between px-3 py-2 text-left text-[11px] font-mono hover:bg-zinc-900"
+                            >
+                              <span className="font-black text-starlight">{monster.name}</span>
+                              <span className="text-zinc-500">
+                                CR {monster.cr}
+                                {monster.action_count ? ` · ${monster.action_count} actions` : ""}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={monsterInit}
@@ -471,6 +647,9 @@ export function InitiativePage() {
                   >
                     Add NPC
                   </button>
+                  <p className="w-full text-[9px] font-mono text-zinc-500">
+                    Matching SRD 5.2.1 names auto-fill HP, AC, and real attacks (Scimitar, breath weapons, etc.).
+                  </p>
                   <button
                     type="button"
                     onClick={clearEncounter}
@@ -484,7 +663,7 @@ export function InitiativePage() {
           </section>
 
           <aside className="space-y-4">
-            <DiceRoller />
+            <DiceRoller campaignId={campaignId} token={token} rollerName="DM" />
           </aside>
         </div>
       </div>

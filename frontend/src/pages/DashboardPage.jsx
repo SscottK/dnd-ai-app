@@ -43,7 +43,9 @@ export function DashboardPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [joinCharacterId, setJoinCharacterId] = useState("");
   const [showCharacterForm, setShowCharacterForm] = useState(false);
+  const [editingCharacterId, setEditingCharacterId] = useState(null);
   const [characterForm, setCharacterForm] = useState(emptyCharacterForm);
+  const [savingCharacter, setSavingCharacter] = useState(false);
 
   const availableCharacters = characters.filter((c) => !c.campaign_id);
 
@@ -204,9 +206,38 @@ export function DashboardPage() {
     }
   };
 
-  const handleCreateCharacter = async (e) => {
+  const resetCharacterForm = () => {
+    setCharacterForm(emptyCharacterForm);
+    setEditingCharacterId(null);
+    setParseWarning("");
+    setShowCharacterForm(false);
+  };
+
+  const handleEditCharacter = (character) => {
+    setEditingCharacterId(character.id);
+    setCharacterForm({
+      name: character.name || "",
+      class_name: character.class_name || "",
+      level: String(character.level ?? 1),
+      ac: character.ac != null ? String(character.ac) : "",
+      hp: character.hp != null ? String(character.hp) : "",
+      max_hp: character.max_hp != null ? String(character.max_hp) : "",
+      skills: character.skills || "",
+      dnd_beyond_url: character.dnd_beyond_url || "",
+      pdf_stored_name: null,
+      sheet_json: character.sheet_json || null,
+    });
+    setParseWarning("");
+    setShowCharacterForm(true);
+    setError("");
+  };
+
+  const handleSaveCharacter = async (e) => {
     e.preventDefault();
     if (!characterForm.name.trim() || !token) return;
+
+    setSavingCharacter(true);
+    setError("");
 
     const body = {
       name: characterForm.name.trim(),
@@ -217,25 +248,42 @@ export function DashboardPage() {
       max_hp: characterForm.max_hp ? parseInt(characterForm.max_hp, 10) : null,
       skills: characterForm.skills.trim() || null,
       dnd_beyond_url: characterForm.dnd_beyond_url.trim() || null,
-      pdf_stored_name: characterForm.pdf_stored_name,
-      sheet_json: characterForm.sheet_json,
     };
 
-    const response = await apiFetch("/characters", {
-      token,
-      method: "POST",
-      body,
-    });
+    try {
+      if (editingCharacterId) {
+        const response = await apiFetch(`/characters/${editingCharacterId}`, {
+          token,
+          method: "PATCH",
+          body,
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to update character.");
+        }
+      } else {
+        const response = await apiFetch("/characters", {
+          token,
+          method: "POST",
+          body: {
+            ...body,
+            pdf_stored_name: characterForm.pdf_stored_name,
+            sheet_json: characterForm.sheet_json,
+          },
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.detail || "Failed to create character.");
+        }
+      }
 
-    if (!response.ok) {
-      setError("Failed to create character.");
-      return;
+      resetCharacterForm();
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message || "Could not save character.");
+    } finally {
+      setSavingCharacter(false);
     }
-
-    setCharacterForm(emptyCharacterForm);
-    setParseWarning("");
-    setShowCharacterForm(false);
-    await loadDashboard();
   };
 
   const handleToggleSession = async (campaignId, active) => {
@@ -512,7 +560,10 @@ export function DashboardPage() {
                 />
               </label>
               <button
-                onClick={() => setShowCharacterForm((prev) => !prev)}
+                onClick={() => {
+                  if (showCharacterForm) resetCharacterForm();
+                  else setShowCharacterForm(true);
+                }}
                 className="text-xs font-black uppercase tracking-widest text-neon-magenta hover:text-starlight"
               >
                 {showCharacterForm ? "Cancel" : "+ Manual Entry"}
@@ -522,9 +573,14 @@ export function DashboardPage() {
 
           {showCharacterForm && (
             <form
-              onSubmit={handleCreateCharacter}
+              onSubmit={handleSaveCharacter}
               className="mb-4 p-4 border-2 border-neon-cyan bg-zinc-950 space-y-3"
             >
+              <p className="text-[10px] text-zinc-500 font-mono">
+                {editingCharacterId
+                  ? "Update basic stats here. Equip gear and edit notes in a live session."
+                  : "Create a new character. Upload a PDF first or enter details manually."}
+              </p>
               {characterForm.pdf_stored_name && (
                 <p className="text-[10px] text-starlight font-mono">
                   PDF loaded — review the fields below, then save.
@@ -605,9 +661,14 @@ export function DashboardPage() {
               />
               <button
                 type="submit"
-                className="w-full py-2 bg-neon-cyan text-black font-black text-xs uppercase tracking-widest border-2 border-black hover:bg-starlight"
+                disabled={savingCharacter}
+                className="w-full py-2 bg-neon-cyan text-black font-black text-xs uppercase tracking-widest border-2 border-black hover:bg-starlight disabled:opacity-50"
               >
-                Save Character
+                {savingCharacter
+                  ? "Saving..."
+                  : editingCharacterId
+                    ? "Save Changes"
+                    : "Save Character"}
               </button>
             </form>
           )}
@@ -650,18 +711,27 @@ export function DashboardPage() {
                         className="text-[10px] text-starlight hover:text-neon-cyan font-black uppercase inline-flex items-center gap-1"
                       >
                         <FileText className="w-3 h-3" />
-                        View Sheet
+                        View PDF
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleEditCharacter(character)}
+                        className="text-[10px] text-neon-cyan hover:text-starlight font-black uppercase"
+                      >
+                        Edit
+                      </button>
                     </div>
                   </div>
-                  {!character.campaign_id && (
-                    <button
-                      onClick={() => handleDeleteCharacter(character.id)}
-                      className="text-[10px] font-black uppercase text-zinc-600 hover:text-danger shrink-0"
-                    >
-                      Delete
-                    </button>
-                  )}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    {!character.campaign_id && (
+                      <button
+                        onClick={() => handleDeleteCharacter(character.id)}
+                        className="text-[10px] font-black uppercase text-zinc-600 hover:text-danger"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import {
-  ChevronRight,
   Copy,
   Loader2,
   MessageSquare,
   Send,
-  Swords,
-  Users,
   Wand2,
 } from "lucide-react";
 import { apiFetch } from "../../lib/api";
@@ -434,6 +430,7 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
                 {" · "}Init {enemy.initiative}
                 {enemy.ac != null ? ` · AC ${enemy.ac}` : ""}
                 {enemy.hp != null ? ` · HP ${enemy.hp}` : ""}
+                {enemy.combat_actions?.length ? ` · ${enemy.combat_actions.length} actions` : ""}
               </li>
             ))}
           </ul>
@@ -523,136 +520,10 @@ export function DmGeneratorsWidget({
   );
 }
 
-export function DmToolboxWidget({ campaignId, token, activeTab = "dice", onTabChange }) {
-  const tab = ["dice", "session", "party"].includes(activeTab) ? activeTab : "dice";
-  const [roster, setRoster] = useState([]);
-  const [encounter, setEncounter] = useState({ round: 1, combatants: [] });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  const loadData = useCallback(async () => {
-    if (!token || !campaignId) return;
-    try {
-      const [rosterRes, encounterRes] = await Promise.all([
-        apiFetch(`/campaigns/${campaignId}/roster`, { token }),
-        apiFetch(`/campaigns/${campaignId}/encounter`, { token }),
-      ]);
-      if (rosterRes.ok) {
-        const data = await rosterRes.json();
-        setRoster(data.members || []);
-      }
-      if (encounterRes.ok) {
-        setEncounter(await encounterRes.json());
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }, [token, campaignId]);
-
-  useEffect(() => {
-    if (tab === "party" || tab === "session") loadData();
-  }, [tab, loadData]);
-
-  const runAction = async (path) => {
-    setBusy(true);
-    setError("");
-    try {
-      const res = await apiFetch(path, { token, method: "POST" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Action failed");
-      }
-      setEncounter(await res.json());
-      await loadData();
-    } catch (err) {
-      setError(err.message || "Action failed.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
+export function DmToolboxWidget({ campaignId, token }) {
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <PaneTabs
-        tabs={[
-          { id: "dice", label: "Dice" },
-          { id: "session", label: "Combat" },
-          { id: "party", label: "Party" },
-        ]}
-        active={tab}
-        onChange={onTabChange}
-      />
-      <div className="min-h-0 flex-1 overflow-y-auto pt-2">
-        {tab === "dice" && (
-          <div className="[&>div]:border-border [&>div]:bg-void-deep/40">
-            <DiceRoller />
-          </div>
-        )}
-        {tab === "session" && (
-          <div className="space-y-2">
-            <p className="text-[10px] font-mono text-ink-faint">
-              Round <span className="font-black text-neon-cyan">{encounter.round}</span>
-              {" · "}
-              {encounter.combatants?.length || 0} combatants
-            </p>
-            <div className="flex flex-wrap gap-1">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => runAction(`/campaigns/${campaignId}/encounter/next-turn`)}
-                className="flex items-center gap-1 rounded-sm border border-starlight px-2 py-1 text-[9px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
-              >
-                <ChevronRight className="h-3 w-3" />
-                Next turn
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => runAction(`/campaigns/${campaignId}/encounter/add-roster`)}
-                className="rounded-sm border border-neon-cyan px-2 py-1 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
-              >
-                Add all PCs
-              </button>
-              <Link
-                to={`/initiative/${campaignId}`}
-                className="flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[9px] font-black uppercase text-ink-muted hover:text-starlight"
-              >
-                <Swords className="h-3 w-3" />
-                Full tracker
-              </Link>
-            </div>
-            {error && <p className="text-[9px] font-mono text-danger">{error}</p>}
-          </div>
-        )}
-        {tab === "party" && (
-          <div className="space-y-1">
-            {roster.length === 0 ? (
-              <p className="text-[9px] font-mono text-ink-faint">No players have joined yet.</p>
-            ) : (
-              roster.map((member) => (
-                <div
-                  key={member.member_id}
-                  className="flex items-center justify-between gap-2 rounded-sm border border-border/60 px-2 py-1"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-[10px] font-black uppercase text-starlight">
-                      {member.character_name}
-                    </p>
-                    <p className="truncate text-[9px] font-mono text-ink-faint">
-                      {member.username}
-                      {member.class_name ? ` · ${member.class_name}` : ""}
-                      {member.hp != null && member.max_hp != null
-                        ? ` · HP ${member.hp}/${member.max_hp}`
-                        : ""}
-                    </p>
-                  </div>
-                  <Users className="h-3 w-3 shrink-0 text-ink-faint" />
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto [&>div]:border-border [&>div]:bg-void-deep/40">
+      <DiceRoller campaignId={campaignId} token={token} rollerName="DM" />
     </div>
   );
 }

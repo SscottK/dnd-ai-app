@@ -1,3 +1,5 @@
+import { normalizeConditions } from "./conditions";
+
 /** Extract structured encounter JSON from an AI response. */
 export function parseEncounterGeneration(text) {
   if (!text) throw new Error("Empty response");
@@ -62,7 +64,21 @@ export function formatEncounterNotesContent({ title, summary, enemies, partyLeve
   return lines.join("\n");
 }
 
+function normalizeCombatAction(raw, index = 0) {
+  if (!raw?.name) return null;
+  return {
+    id: raw.id || `enemy-action-${index}-${String(raw.name).toLowerCase().replace(/\s+/g, "-")}`,
+    name: String(raw.name).trim(),
+    action_type: raw.action_type || raw.actionType || "action",
+    targeting: raw.targeting || "one_enemy",
+    description: raw.description || raw.notes || null,
+  };
+}
+
 function normalizeEnemy(raw) {
+  const combat_actions = (raw.combat_actions || raw.actions || [])
+    .map((entry, index) => normalizeCombatAction(entry, index))
+    .filter(Boolean);
   return {
     name: String(raw.name || "Creature").trim(),
     count: Math.min(12, Math.max(1, Number(raw.count) || 1)),
@@ -70,7 +86,8 @@ function normalizeEnemy(raw) {
     hp: toOptionalInt(raw.hp),
     max_hp: toOptionalInt(raw.max_hp ?? raw.hp),
     ac: toOptionalInt(raw.ac),
-    conditions: raw.conditions ? String(raw.conditions) : "",
+    conditions: normalizeConditions(raw.conditions),
+    combat_actions,
   };
 }
 
@@ -95,10 +112,24 @@ Respond with ONLY valid JSON (no markdown prose outside the JSON). Schema:
       "hp": 22,
       "max_hp": 22,
       "ac": 15,
-      "conditions": ""
+      "conditions": [],
+      "combat_actions": [
+        {
+          "name": "Scimitar",
+          "action_type": "action",
+          "targeting": "one_enemy",
+          "description": "+4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) slashing damage."
+        },
+        {
+          "name": "Shortbow",
+          "action_type": "action",
+          "targeting": "one_enemy",
+          "description": "+4 to hit, range 80/320 ft., one target. Hit: 5 (1d6 + 2) piercing damage."
+        }
+      ]
     }
   ]
 }
 
-Include realistic initiative, AC, and HP for each enemy type. Use count > 1 for groups of identical creatures.`;
+Include realistic initiative, AC, HP, and combat_actions (attacks, multiattack, breath weapons, spells, bonus-action abilities) for each enemy type. Use count > 1 for groups of identical creatures.`;
 }

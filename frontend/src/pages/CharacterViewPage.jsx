@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, RefreshCw } from "lucide-react";
 import { AuthenticatedPdfFrame, openAuthenticatedPdfInTab } from "../components/sheet/AuthenticatedPdfFrame";
+import { DigitalSheetEditor } from "../components/sheet/DigitalSheetEditor";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch } from "../lib/api";
 
@@ -11,6 +12,8 @@ export function CharacterViewPage() {
   const [character, setCharacter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [view, setView] = useState("pdf");
 
   const loadCharacter = useCallback(async () => {
     if (!token || !characterId) return;
@@ -53,6 +56,27 @@ export function CharacterViewPage() {
 
   const hasPdf = !!character.pdf_url;
 
+  const handleResync = async () => {
+    if (!token || !characterId) return;
+    setSyncing(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/characters/${characterId}/refresh-from-pdf`, {
+        token,
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Re-sync failed");
+      }
+      setCharacter(await res.json());
+    } catch (err) {
+      setError(err.message || "Could not re-sync from PDF.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleOpenPdfTab = async () => {
     try {
       await openAuthenticatedPdfInTab(character.pdf_url, token);
@@ -90,20 +114,68 @@ export function CharacterViewPage() {
             </a>
           )}
           {hasPdf && (
-            <button
-              type="button"
-              onClick={handleOpenPdfTab}
-              className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight inline-flex items-center gap-1"
-            >
-              <FileText className="w-3 h-3" />
-              Open PDF in tab
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={syncing}
+                onClick={handleResync}
+                className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan inline-flex items-center gap-1 disabled:opacity-40"
+              >
+                <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Re-syncing…" : "Re-sync PDF"}
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenPdfTab}
+                className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight inline-flex items-center gap-1"
+              >
+                <FileText className="w-3 h-3" />
+                Open PDF in tab
+              </button>
+            </>
           )}
         </div>
       </header>
 
+      {error && (
+        <p className="shrink-0 px-4 py-2 text-[10px] text-danger font-mono border-b border-danger/30">
+          {error}
+        </p>
+      )}
+
+      <div className="shrink-0 flex border-b border-zinc-800 px-4">
+        <button
+          type="button"
+          onClick={() => setView("pdf")}
+          className={`px-4 py-2 text-[10px] font-black uppercase ${
+            view === "pdf"
+              ? "text-starlight border-b-2 border-neon-magenta"
+              : "text-zinc-600 hover:text-neon-cyan"
+          }`}
+        >
+          PDF (read-only)
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("digital")}
+          className={`px-4 py-2 text-[10px] font-black uppercase ${
+            view === "digital"
+              ? "text-starlight border-b-2 border-neon-magenta"
+              : "text-zinc-600 hover:text-neon-cyan"
+          }`}
+        >
+          Digital sheet
+        </button>
+      </div>
+
       <div className="flex-1 overflow-hidden bg-void">
-        {hasPdf ? (
+        {view === "digital" ? (
+          <DigitalSheetEditor
+            character={character}
+            token={token}
+            onSaved={(data) => setCharacter(data)}
+          />
+        ) : hasPdf ? (
           <AuthenticatedPdfFrame
             pdfUrl={character.pdf_url}
             token={token}
@@ -117,7 +189,8 @@ export function CharacterViewPage() {
               D&amp;D Beyond Character
             </h2>
             <p className="text-xs font-mono text-zinc-500 max-w-md mb-6">
-              This character is linked on D&amp;D Beyond. Open it there to view the full sheet.
+              This character is linked on D&amp;D Beyond. Open it there to view the full sheet, or
+              use the Digital sheet tab to equip gear and update AC.
             </p>
             <a
               href={character.dnd_beyond_url}
@@ -133,7 +206,8 @@ export function CharacterViewPage() {
             <FileText className="w-12 h-12 text-zinc-700 mb-4" />
             <h2 className="text-lg font-black text-starlight uppercase mb-2">No sheet file</h2>
             <p className="text-xs font-mono text-zinc-500 max-w-md mb-4">
-              Upload a PDF or add a D&amp;D Beyond link from the campaigns page.
+              Upload a PDF or add a D&amp;D Beyond link from the campaigns page. Use the Digital
+              sheet tab to equip inventory and save AC.
             </p>
             <div className="text-left text-xs font-mono text-zinc-400 border border-zinc-800 p-4 max-w-sm">
               <p>

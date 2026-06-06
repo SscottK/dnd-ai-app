@@ -1,3 +1,28 @@
+export function isEnemy(combatant) {
+  return Boolean(combatant && !combatant.is_pc && !combatant.is_ally);
+}
+
+/** Enemies at 0 HP leave the turn order and sit at the bottom — no death saves. */
+export function isDefeatedEnemy(combatant) {
+  return isEnemy(combatant) && combatant.hp != null && combatant.hp <= 0;
+}
+
+export function canTakeTurn(combatant) {
+  return !isDefeatedEnemy(combatant);
+}
+
+export function sortCombatantsForDisplay(combatants) {
+  const list = [...(combatants || [])];
+  const living = list.filter((c) => canTakeTurn(c));
+  const defeated = list.filter((c) => isDefeatedEnemy(c));
+  const byInit = (a, b) => b.initiative - a.initiative;
+  return [...living.sort(byInit), ...defeated.sort(byInit)];
+}
+
+export function sortCombatantsForTurns(combatants) {
+  return [...(combatants || [])].filter(canTakeTurn).sort((a, b) => b.initiative - a.initiative);
+}
+
 /** Whether a player (non-DM) may see this combatant's AC on the initiative tracker. */
 export function playerCanSeeCombatantAc(combatant) {
   return Boolean(combatant?.is_pc || combatant?.is_ally);
@@ -6,6 +31,19 @@ export function playerCanSeeCombatantAc(combatant) {
 export function shouldShowCombatantAc(combatant, isDmView) {
   if (isDmView) return true;
   return playerCanSeeCombatantAc(combatant);
+}
+
+/** Normalize PATCH /encounter response (wraps encounter when combat auto-ends). */
+export function parseEncounterPatchResponse(data) {
+  if (data?.encounter) {
+    return {
+      encounter: data.encounter,
+      combatEnded: Boolean(data.combat_ended),
+      combatLogText: data.combat_log_text ?? null,
+      reason: data.reason ?? null,
+    };
+  }
+  return { encounter: data, combatEnded: false, combatLogText: null, reason: null };
 }
 
 export function formatCombatantAc(combatant, isDmView) {

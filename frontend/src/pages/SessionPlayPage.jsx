@@ -19,6 +19,7 @@ import {
   SheetDataGuard,
   CharacterPortraitWidget,
   InitiativeWidget,
+  PartyWidget,
   PlayerNotesWidget,
   SkillsSavesWidget,
   VttZoneWidget,
@@ -32,7 +33,9 @@ import {
   MIN_PANE_HEIGHT,
   paneOptionsForSession,
   SINGLETON_WIDGET_TYPES,
+  appendCombatLogToDmSessionNotes,
   appendEncounterDmNotesTab,
+  ensurePlaySessionNotesTab,
   clampWidget,
   buildDefaultLayout,
   buildDmDefaultLayout,
@@ -42,6 +45,7 @@ import {
   defaultViewport,
   hydrateLayout,
   INITIATIVE_ORIENTATION_HORIZONTAL,
+  mergePlayerNotesOnResync,
   migrateLegacyNotesIntoLayout,
   parseLayout,
   readStoredDmLayout,
@@ -80,6 +84,9 @@ export function SessionPlayPage() {
   const characterRef = useRef(character);
   const sheetRef = useRef(sheet);
   const sessionStatusRef = useRef(sessionStatus);
+  const lastCombatLogIdRef = useRef(null);
+  const playSessionTabIdRef = useRef(null);
+  const dirtyRef = useRef(false);
 
   const characterId = sessionStatus?.character_id;
   const isDmSession =
@@ -100,6 +107,10 @@ export function SessionPlayPage() {
   useEffect(() => {
     sessionStatusRef.current = sessionStatus;
   }, [sessionStatus]);
+
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
 
   const getCanvasBounds = useCallback(() => canvasBoundsRef.current, []);
 
@@ -168,6 +179,13 @@ export function SessionPlayPage() {
     return migrated;
   }, []);
 
+  const refreshPlaySheet = useCallback(async () => {
+    const charId = characterRef.current?.id;
+    if (!token || !charId) return;
+    const res = await apiFetch(`/characters/${charId}`, { token });
+    if (res.ok) hydrateCharacter(await res.json(), { applyLayout: false });
+  }, [token, hydrateCharacter]);
+
   useLayoutEffect(() => {
     if (!sessionStatus?.session_active) {
       boundsLockedRef.current = false;
@@ -225,10 +243,11 @@ export function SessionPlayPage() {
 
   const persistCharacter = useCallback(
     async (patch) => {
-      if (!token || !characterId) return;
+      const id = characterRef.current?.id ?? characterId;
+      if (!token || !id) return;
       setSaving(true);
       try {
-        const res = await apiFetch(`/characters/${characterId}`, {
+        const res = await apiFetch(`/characters/${id}`, {
           token,
           method: "PATCH",
           body: patch,
@@ -236,8 +255,11 @@ export function SessionPlayPage() {
         if (!res.ok) throw new Error("Save failed");
         const data = await res.json();
         const sheetData = parseSheetJson(data.sheet_json);
-        setCharacter(applyEquipmentToCharacter(data, sheetData));
+        const nextCharacter = applyEquipmentToCharacter(data, sheetData);
+        setCharacter(nextCharacter);
         setSheet(sheetData);
+        characterRef.current = nextCharacter;
+        sheetRef.current = sheetData;
         setDirty(false);
       } catch (err) {
         console.error(err);
@@ -278,6 +300,67 @@ export function SessionPlayPage() {
     []
   );
 
+  const applyPlaySessionNotesTab = useCallback(
+    (status, { save = false } = {}) => {
+      const tabId = status?.play_session_notes_tab_id;
+      const tabTitle = status?.play_session_notes_tab_title;
+      if (!tabId || !tabTitle) return;
+
+      const dmMode = Boolean(status?.is_owner && !status?.character_id);
+      const { width, height } = canvasBoundsRef.current;
+      const widgetType = dmMode ? "dm_notes" : "player_notes";
+      const tabsKey = dmMode ? "dmNotesTabs" : "playerNotesTabs";
+
+      setLayout((prev) => {
+        const next = ensurePlaySessionNotesTab(prev, tabId, tabTitle, {
+          widgetType,
+          tabsKey,
+          canvasW: width || 1280,
+          canvasH: height || 800,
+        });
+        layoutRef.current = next;
+        if (save) {
+          if (dmMode) {
+            writeStoredDmLayout(campaignId, next);
+          } else if (characterRef.current) {
+            void persistCharacter(buildPatch(characterRef.current, sheetRef.current, next));
+          }
+        }
+        return next;
+      });
+    },
+    [campaignId, persistCharacter, buildPatch]
+  );
+
+  const handleCombatEnded = useCallback(
+    (combatLogText) => {
+      if (!combatLogText) return;
+      const tabId =
+        sessionStatusRef.current?.play_session_notes_tab_id || "notes-session";
+      const tabTitle =
+        sessionStatusRef.current?.play_session_notes_tab_title || "Session";
+      const { width, height } = canvasBoundsRef.current;
+      setLayout((prev) => {
+        const next = appendCombatLogToDmSessionNotes(
+          prev,
+          combatLogText,
+          width || 1280,
+          height || 800,
+          tabId,
+          tabTitle
+        );
+        layoutRef.current = next;
+        if (isDmSession) {
+          writeStoredDmLayout(campaignId, next);
+        } else if (characterRef.current) {
+          void persistCharacter(buildPatch(characterRef.current, sheetRef.current, next));
+        }
+        return next;
+      });
+    },
+    [campaignId, isDmSession, persistCharacter, buildPatch]
+  );
+
   const loadSession = useCallback(async () => {
     if (!token || !campaignId) return;
     setLoading(true);
@@ -287,6 +370,8 @@ export function SessionPlayPage() {
       if (!sessionRes.ok) throw new Error("Session not available");
       const status = await sessionRes.json();
       setSessionStatus(status);
+      lastCombatLogIdRef.current = status.last_combat_log_id ?? null;
+      playSessionTabIdRef.current = status.play_session_notes_tab_id ?? null;
 
       if (!status.session_active) {
         setCharacter(null);
@@ -303,6 +388,7 @@ export function SessionPlayPage() {
             notes: "",
           });
         }
+        applyPlaySessionNotesTab(status, { save: true });
         return;
       }
 
@@ -312,6 +398,7 @@ export function SessionPlayPage() {
         const stored = readStoredDmLayout(campaignId);
         const hydrated = stored ? hydrateLayout(stored, 1280, 800) : null;
         setLayout(hydrated || { widgets: [], viewport: defaultViewport() });
+        applyPlaySessionNotesTab(status, { save: true });
         return;
       }
 
@@ -322,11 +409,66 @@ export function SessionPlayPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, campaignId, hydrateCharacter, scheduleSave, buildPatch]);
+  }, [token, campaignId, hydrateCharacter, scheduleSave, buildPatch, applyPlaySessionNotesTab]);
 
   useEffect(() => {
     loadSession();
   }, [loadSession]);
+
+  useEffect(() => {
+    if (!token || !campaignId || !sessionStatus?.session_active) return;
+
+    const pollNotes = async () => {
+      try {
+        const res = await apiFetch(`/campaigns/${campaignId}/session`, { token });
+        if (!res.ok) return;
+        const status = await res.json();
+        const playTabId = status.play_session_notes_tab_id ?? null;
+        if (playTabId && playTabId !== playSessionTabIdRef.current) {
+          playSessionTabIdRef.current = playTabId;
+          applyPlaySessionNotesTab(status, { save: true });
+        }
+
+        const logId = status.last_combat_log_id ?? null;
+        if (logId != null && logId !== lastCombatLogIdRef.current) {
+          lastCombatLogIdRef.current = logId;
+          const charId = status.character_id ?? characterRef.current?.id;
+          if (charId) {
+            const charRes = await apiFetch(`/characters/${charId}`, { token });
+            if (charRes.ok) hydrateCharacter(await charRes.json());
+          }
+          return;
+        }
+
+        const charId = status.character_id ?? characterRef.current?.id;
+        if (!charId || dirtyRef.current) return;
+
+        const charRes = await apiFetch(`/characters/${charId}`, { token });
+        if (!charRes.ok) return;
+        const data = await charRes.json();
+        const current = characterRef.current;
+        const sheetData = parseSheetJson(data.sheet_json);
+        const conditionsChanged =
+          JSON.stringify(sheetData.conditions || []) !==
+          JSON.stringify(sheetRef.current?.conditions || []);
+        if (
+          !current ||
+          data.hp !== current.hp ||
+          data.max_hp !== current.max_hp ||
+          data.ac !== current.ac ||
+          conditionsChanged
+        ) {
+          hydrateCharacter(data, { applyLayout: false });
+        }
+      } catch {
+        // ignore polling errors
+      }
+    };
+
+    pollNotes();
+    const timer = setInterval(pollNotes, 8000);
+    return () => clearInterval(timer);
+  }, [token, campaignId, sessionStatus?.session_active, hydrateCharacter, applyPlaySessionNotesTab]);
 
   const saveLayoutSnapshot = useCallback(
     (nextLayout) => {
@@ -408,12 +550,24 @@ export function SessionPlayPage() {
     scheduleSave(buildPatch(next, sheet, layout));
   };
 
-  const onSheetChange = (nextSheet) => {
-    setSheet(nextSheet);
-    const nextCharacter = applyEquipmentToCharacter(character, nextSheet);
-    setCharacter(nextCharacter);
-    scheduleSave(buildPatch(nextCharacter, nextSheet, layout));
-  };
+  const onSheetChange = useCallback(
+    (nextSheet, { immediate = false } = {}) => {
+      const nextCharacter = applyEquipmentToCharacter(characterRef.current, nextSheet);
+      sheetRef.current = nextSheet;
+      characterRef.current = nextCharacter;
+      setSheet(nextSheet);
+      setCharacter(nextCharacter);
+      const patch = buildPatch(nextCharacter, nextSheet, layoutRef.current);
+      if (immediate) {
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        setDirty(true);
+        void persistCharacter(patch);
+        return;
+      }
+      scheduleSave(patch);
+    },
+    [scheduleSave, buildPatch, persistCharacter]
+  );
 
   const updateWidget = (widget) => {
     const { width, height } = canvasBoundsRef.current;
@@ -575,6 +729,12 @@ export function SessionPlayPage() {
 
   const handleResyncPdf = async () => {
     if (!token || !characterId) return;
+    const preservedNotesWidget = layoutRef.current.widgets?.find(
+      (widget) => widget.type === "player_notes"
+    );
+    const preservedNotesTabs = preservedNotesWidget?.playerNotesTabs || [];
+    const preservedEquippedOverrides = sheetRef.current?.equipped_overrides || {};
+
     setSyncing(true);
     setError("");
     try {
@@ -586,7 +746,50 @@ export function SessionPlayPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || "Re-sync failed");
       }
-      hydrateCharacter(await res.json());
+      const data = await res.json();
+      if (Object.keys(preservedEquippedOverrides).length > 0 && data.sheet_json) {
+        try {
+          const mergedSheet = JSON.parse(data.sheet_json);
+          mergedSheet.equipped_overrides = {
+            ...(mergedSheet.equipped_overrides || {}),
+            ...preservedEquippedOverrides,
+          };
+          if (Array.isArray(mergedSheet.inventory)) {
+            mergedSheet.inventory = mergedSheet.inventory.map((item) => {
+              const key = String(item.name || "")
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, " ");
+              if (Object.prototype.hasOwnProperty.call(mergedSheet.equipped_overrides, key)) {
+                return { ...item, equipped: !!mergedSheet.equipped_overrides[key] };
+              }
+              return item;
+            });
+          }
+          data.sheet_json = JSON.stringify(mergedSheet);
+        } catch {
+          // keep server payload if merge fails
+        }
+      }
+      const notesMigrated = hydrateCharacter(data);
+
+      const { width, height } = canvasBoundsRef.current;
+      const canvasW = width || 1280;
+      const canvasH = height || 800;
+      const sheetData = parseSheetJson(data.sheet_json);
+      const notesMerge = mergePlayerNotesOnResync(
+        layoutRef.current,
+        preservedNotesTabs,
+        sheetData.notes,
+        canvasW,
+        canvasH
+      );
+
+      if (notesMerge.changed || notesMigrated) {
+        layoutRef.current = notesMerge.layout;
+        setLayout(notesMerge.layout);
+        scheduleSave(buildPatch(characterRef.current, sheetRef.current, notesMerge.layout));
+      }
     } catch (err) {
       setError(err.message || "Could not re-sync from PDF.");
     } finally {
@@ -594,9 +797,24 @@ export function SessionPlayPage() {
     }
   };
 
+  const flushPendingSave = useCallback(async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    if (!characterRef.current) return;
+    await persistCharacter(
+      buildPatch(characterRef.current, sheetRef.current, layoutRef.current)
+    );
+  }, [persistCharacter, buildPatch]);
+
   const handleFullSheetClose = async () => {
+    try {
+      await flushPendingSave();
+    } catch {
+      // persistCharacter already surfaces errors
+    }
     setFullSheetOpen(false);
-    await loadSession();
   };
 
   useEffect(() => {
@@ -684,6 +902,15 @@ export function SessionPlayPage() {
         );
       case "vtt_zone":
         return <VttZoneWidget />;
+      case "party":
+        return (
+          <PartyWidget
+            campaignId={campaignId}
+            token={token}
+            characterId={character?.id}
+            isOwner={sessionStatus?.is_owner}
+          />
+        );
       case "initiative":
         return (
           <InitiativeWidget
@@ -696,6 +923,8 @@ export function SessionPlayPage() {
             onOrientationChange={(nextOrientation, combatantCount) =>
               setInitiativeOrientation(widget.id, nextOrientation, combatantCount)
             }
+            onCombatEnded={handleCombatEnded}
+            onSheetRefresh={refreshPlaySheet}
           />
         );
       case "dm_rules_chat":
@@ -725,14 +954,7 @@ export function SessionPlayPage() {
           />
         );
       case "dm_toolbox":
-        return (
-          <DmToolboxWidget
-            campaignId={campaignId}
-            token={token}
-            activeTab={widget.dmToolboxTab}
-            onTabChange={(tab) => updateWidgetMeta(widget.id, { dmToolboxTab: tab })}
-          />
-        );
+        return <DmToolboxWidget campaignId={campaignId} token={token} />;
       default:
         return <p className="text-zinc-600 text-[10px]">Legacy pane — remove and add a new one.</p>;
     }
@@ -863,6 +1085,13 @@ export function SessionPlayPage() {
           )}
         </div>
       </header>
+
+      {syncing && (
+        <p className="px-4 py-2 text-[10px] text-neon-cyan font-mono border-b border-neon-cyan/30 bg-neon-cyan/5">
+          Re-syncing from PDF — this may take a couple of minutes. Please wait while your sheet is
+          updated.
+        </p>
+      )}
 
       {error && (
         <p className="px-4 py-1 text-[10px] text-danger font-mono border-b border-danger/30">{error}</p>

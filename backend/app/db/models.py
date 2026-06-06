@@ -50,6 +50,7 @@ class Campaign(SQLModel, table=True):
     invite_code: str = Field(unique=True, index=True, max_length=12)
     encounter_json: str = Field(default="{}")
     session_active: bool = Field(default=False)
+    play_session_json: str = Field(default="{}")
     created_at: datetime = Field(default_factory=utc_now)
 
     owner: Optional[User] = Relationship(back_populates="owned_campaigns")
@@ -106,12 +107,17 @@ class Character(SQLModel, table=True):
     )
     photos: list["CharacterPhoto"] = Relationship(
         back_populates="character",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+        sa_relationship_kwargs={
+            "foreign_keys": "[CharacterPhoto.character_id]",
+            "cascade": "all, delete-orphan",
+        },
     )
     portrait_photo: Optional["CharacterPhoto"] = Relationship(
         sa_relationship_kwargs={
             "foreign_keys": "[Character.portrait_photo_id]",
+            "primaryjoin": "Character.portrait_photo_id==CharacterPhoto.id",
             "uselist": False,
+            "viewonly": True,
         }
     )
 
@@ -122,7 +128,13 @@ class CharacterPhoto(SQLModel, table=True):
     file_path: str = Field(max_length=500)
     created_at: datetime = Field(default_factory=utc_now)
 
-    character: Optional[Character] = Relationship(back_populates="photos")
+    character: Optional[Character] = Relationship(
+        back_populates="photos",
+        sa_relationship_kwargs={
+            "foreign_keys": "[CharacterPhoto.character_id]",
+            "primaryjoin": "CharacterPhoto.character_id==Character.id",
+        },
+    )
 
 
 class HistoricalEncounter(SQLModel, table=True):

@@ -26,6 +26,7 @@ export const PLAYER_WIDGET_TYPES = [
   { type: "skills_saves", label: "Skills & Saves" },
   { type: "character_tabs", label: "Character (Tabs)" },
   { type: "character_portrait", label: "Photo Album" },
+  { type: "party", label: "Party" },
   { type: "player_notes", label: "Notes" },
   { type: "vtt_zone", label: "VTT Zone" },
   { type: "initiative", label: "Initiative" },
@@ -35,7 +36,8 @@ export const DM_WIDGET_TYPES = [
   { type: "dm_rules_chat", label: "Rules AI" },
   { type: "dm_generators", label: "Generators" },
   { type: "dm_notes", label: "DM Notes" },
-  { type: "dm_toolbox", label: "DM Toolbox" },
+  { type: "dm_toolbox", label: "Dice Roller" },
+  { type: "party", label: "Party" },
   { type: "initiative", label: "Initiative" },
   { type: "vtt_zone", label: "VTT Zone" },
 ];
@@ -57,6 +59,158 @@ export function defaultPlayerNotesTabs() {
 function truncateTabTitle(title) {
   const text = String(title || "Encounter").trim() || "Encounter";
   return text.length <= 28 ? text : `${text.slice(0, 25)}…`;
+}
+
+function appendTextToSessionNotesTab(layout, combatLogText, widgetType, tabsKey, canvasW, canvasH) {
+  let notesWidget = layout.widgets?.find((widget) => widget.type === widgetType);
+  let widgets = layout.widgets || [];
+
+  if (!notesWidget) {
+    if (widgetType !== "dm_notes") return layout;
+    notesWidget = createWidget("dm_notes", canvasW || 1280, canvasH || 800);
+    widgets = [...widgets, notesWidget];
+  }
+
+  const existingTabs =
+    Array.isArray(notesWidget[tabsKey]) && notesWidget[tabsKey].length
+      ? notesWidget[tabsKey]
+      : widgetType === "dm_notes"
+        ? defaultDmNotesTabs()
+        : defaultPlayerNotesTabs();
+
+  const sessionTab =
+    existingTabs.find((tab) => tab.id === "notes-session") || existingTabs[0] || {
+      id: "notes-session",
+      title: "Session",
+      content: "",
+    };
+
+  const trimmed = String(sessionTab.content || "").trim();
+  const separator = trimmed ? "\n\n---\n\n" : "";
+  const nextSessionTab = {
+    ...sessionTab,
+    content: `${trimmed}${separator}${combatLogText}`,
+  };
+
+  const nextTabs = existingTabs.map((tab) =>
+    tab.id === nextSessionTab.id ? nextSessionTab : tab
+  );
+  if (!nextTabs.some((tab) => tab.id === nextSessionTab.id)) {
+    nextTabs.unshift(nextSessionTab);
+  }
+
+  const nextWidgets = widgets.map((widget) =>
+    widget.id === notesWidget.id
+      ? {
+          ...widget,
+          [tabsKey]: nextTabs,
+          activeNotesTabId: "notes-session",
+        }
+      : widget
+  );
+
+  return { ...layout, widgets: nextWidgets };
+}
+
+/** Ensure the current play-session tab exists and is active (DM or player notes). */
+export function ensurePlaySessionNotesTab(
+  layout,
+  tabId,
+  tabTitle,
+  { widgetType = "player_notes", tabsKey = "playerNotesTabs", canvasW, canvasH } = {}
+) {
+  if (!tabId || !tabTitle) return layout;
+
+  let notesWidget = layout.widgets?.find((widget) => widget.type === widgetType);
+  let widgets = layout.widgets || [];
+
+  if (!notesWidget) {
+    if (widgetType === "dm_notes") {
+      notesWidget = createWidget("dm_notes", canvasW || 1280, canvasH || 800);
+      widgets = [...widgets, notesWidget];
+    } else {
+      widgets = ensurePlayerNotesWidget(widgets, canvasW || 1280, canvasH || 800);
+      notesWidget = widgets.find((widget) => widget.type === "player_notes");
+    }
+  }
+
+  const existingTabs =
+    Array.isArray(notesWidget[tabsKey]) && notesWidget[tabsKey].length
+      ? notesWidget[tabsKey]
+      : widgetType === "dm_notes"
+        ? defaultDmNotesTabs()
+        : defaultPlayerNotesTabs();
+
+  const nextTabs = existingTabs.some((tab) => tab.id === tabId)
+    ? existingTabs
+    : [{ id: tabId, title: tabTitle, content: "" }, ...existingTabs];
+
+  const nextWidgets = widgets.map((widget) =>
+    widget.id === notesWidget.id
+      ? { ...widget, [tabsKey]: nextTabs, activeNotesTabId: tabId }
+      : widget
+  );
+
+  return { ...layout, widgets: nextWidgets };
+}
+
+function appendTextToNamedNotesTab(
+  layout,
+  combatLogText,
+  tabId,
+  tabTitle,
+  widgetType,
+  tabsKey,
+  canvasW,
+  canvasH
+) {
+  const withTab = ensurePlaySessionNotesTab(layout, tabId, tabTitle || "Session", {
+    widgetType,
+    tabsKey,
+    canvasW,
+    canvasH,
+  });
+  let notesWidget = withTab.widgets?.find((widget) => widget.type === widgetType);
+  if (!notesWidget) return withTab;
+
+  const tabs = notesWidget[tabsKey] || [];
+  const target = tabs.find((tab) => tab.id === tabId);
+  if (!target) return withTab;
+
+  const trimmed = String(target.content || "").trim();
+  const separator = trimmed ? "\n\n---\n\n" : "";
+  const nextTarget = {
+    ...target,
+    content: `${trimmed}${separator}${combatLogText}`,
+  };
+  const nextTabs = tabs.map((tab) => (tab.id === tabId ? nextTarget : tab));
+  const nextWidgets = withTab.widgets.map((widget) =>
+    widget.id === notesWidget.id
+      ? { ...widget, [tabsKey]: nextTabs, activeNotesTabId: tabId }
+      : widget
+  );
+  return { ...layout, widgets: nextWidgets };
+}
+
+/** Append a combat log block to the DM Notes play-session tab. */
+export function appendCombatLogToDmSessionNotes(
+  layout,
+  combatLogText,
+  canvasW,
+  canvasH,
+  tabId = "notes-session",
+  tabTitle = "Session"
+) {
+  return appendTextToNamedNotesTab(
+    layout,
+    combatLogText,
+    tabId,
+    tabTitle,
+    "dm_notes",
+    "dmNotesTabs",
+    canvasW,
+    canvasH
+  );
 }
 
 /** Append an encounter tab to the DM Notes pane (creates the pane if missing). */
@@ -95,6 +249,7 @@ export const WIDGET_TYPES = [...PLAYER_WIDGET_TYPES, ...DM_WIDGET_TYPES];
 export const SINGLETON_WIDGET_TYPES = new Set([
   "vtt_zone",
   "initiative",
+  "party",
   "player_notes",
   "character_portrait",
   "dm_rules_chat",
@@ -232,7 +387,6 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         h: Math.min(200, Math.max(140, canvasH - 576)),
         pinned: false,
         minimized: false,
-        dmToolboxTab: "dice",
       },
       {
         id: "vtt-dm-1",
@@ -250,18 +404,28 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         x: rightX,
         y: margin,
         w: colW,
-        h: 280,
+        h: 400,
         pinned: false,
         minimized: false,
         initiativeOrientation: INITIATIVE_ORIENTATION_VERTICAL,
       },
       {
+        id: "party-dm-1",
+        type: "party",
+        x: rightX,
+        y: 432,
+        w: colW,
+        h: 160,
+        pinned: false,
+        minimized: false,
+      },
+      {
         id: "dm-notes-1",
         type: "dm_notes",
         x: rightX,
-        y: 304,
+        y: 608,
         w: colW,
-        h: Math.min(360, Math.max(200, canvasH - 320)),
+        h: Math.min(360, Math.max(200, canvasH - 624)),
         pinned: false,
         minimized: false,
         dmNotesTabs: defaultDmNotesTabs(),
@@ -308,6 +472,16 @@ export function buildDefaultLayout(canvasW, canvasH) {
         x: rightX,
         y: margin,
         w: colW,
+        h: 180,
+        pinned: false,
+        minimized: false,
+      },
+      {
+        id: "party-1",
+        type: "party",
+        x: rightX,
+        y: 204,
+        w: colW,
         h: 200,
         pinned: false,
         minimized: false,
@@ -316,9 +490,9 @@ export function buildDefaultLayout(canvasW, canvasH) {
         id: "character-1",
         type: "character_tabs",
         x: rightX,
-        y: 232,
+        y: 420,
         w: colW,
-        h: 280,
+        h: 240,
         pinned: false,
         minimized: false,
       },
@@ -326,9 +500,9 @@ export function buildDefaultLayout(canvasW, canvasH) {
         id: "player-notes-1",
         type: "player_notes",
         x: rightX,
-        y: 528,
+        y: 676,
         w: colW,
-        h: Math.min(320, Math.max(180, canvasH - 544)),
+        h: Math.min(280, Math.max(160, canvasH - 692)),
         pinned: false,
         minimized: false,
         playerNotesTabs: defaultPlayerNotesTabs(),
@@ -392,11 +566,6 @@ function normalizeWidget(widget) {
   }
   if (widget.type === "dm_generators") {
     normalized.dmGeneratorsTab = widget.dmGeneratorsTab === "npc" ? "npc" : "encounter";
-  }
-  if (widget.type === "dm_toolbox") {
-    normalized.dmToolboxTab = ["dice", "session", "party"].includes(widget.dmToolboxTab)
-      ? widget.dmToolboxTab
-      : "dice";
   }
   if (widget.type === "dm_notes") {
     const tabs =
@@ -475,6 +644,46 @@ function ensurePlayerNotesWidget(widgets, canvasW, canvasH) {
   ];
 }
 
+/** Keep player-written notes on re-sync; optionally fill Character tab from PDF notes. */
+export function mergePlayerNotesOnResync(layout, preservedTabs, pdfNotes, canvasW, canvasH) {
+  const trimmedPdfNotes = normalizeNotesText(pdfNotes);
+  let widgets = ensurePlayerNotesWidget(layout.widgets || [], canvasW, canvasH);
+  const notesWidget = widgets.find((widget) => widget.type === "player_notes");
+  if (!notesWidget) return { layout, changed: false };
+
+  const incomingTabs = notesWidget.playerNotesTabs?.length
+    ? notesWidget.playerNotesTabs
+    : defaultPlayerNotesTabs();
+  const preservedById = Object.fromEntries((preservedTabs || []).map((tab) => [tab.id, tab]));
+
+  const nextTabs = incomingTabs.map((tab) => {
+    const preserved = preservedById[tab.id];
+    if (preserved?.content?.trim()) {
+      return { ...tab, content: preserved.content };
+    }
+    if (tab.id === "notes-character" && trimmedPdfNotes) {
+      return { ...tab, content: trimmedPdfNotes };
+    }
+    return tab;
+  });
+
+  for (const preserved of preservedTabs || []) {
+    if (!nextTabs.some((tab) => tab.id === preserved.id) && preserved.content?.trim()) {
+      nextTabs.push(preserved);
+    }
+  }
+
+  const changed = JSON.stringify(nextTabs) !== JSON.stringify(incomingTabs);
+  const nextWidgets = widgets.map((widget) =>
+    widget.id === notesWidget.id ? { ...widget, playerNotesTabs: nextTabs } : widget
+  );
+
+  return {
+    layout: { ...layout, widgets: nextWidgets },
+    changed,
+  };
+}
+
 /** Move legacy sheet/character notes into the player Notes pane Character tab. */
 export function migrateLegacyNotesIntoLayout(layout, legacyNotes, canvasW, canvasH) {
   const trimmed = normalizeNotesText(legacyNotes);
@@ -539,7 +748,11 @@ export function hydrateLayout(layout, canvasW = 1280, canvasH = 800) {
   const layoutW = layout.viewport?.canvasW ?? canvasW;
   const layoutH = layout.viewport?.canvasH ?? canvasH;
   return {
-    widgets: clampWidgets(layout.widgets.map(normalizeWidget), layoutW, layoutH),
+    widgets: clampWidgets(
+      layout.widgets.filter((widget) => widget.type !== "dm_combatants").map(normalizeWidget),
+      layoutW,
+      layoutH
+    ),
     viewport: {
       scale: layout.viewport?.scale ?? DEFAULT_ZOOM,
       canvasW: layoutW,
@@ -595,7 +808,8 @@ export function createWidget(type, canvasW, canvasH) {
     character_portrait: { w: 300, h: 200 },
     player_notes: { w: 320, h: 360 },
     vtt_zone: vttZoneDefault(canvasW, canvasH),
-    initiative: { w: 280, h: 320 },
+    initiative: { w: 300, h: 400 },
+    party: { w: 280, h: 220 },
     dm_rules_chat: { w: 300, h: 240 },
     dm_generators: { w: 300, h: 280 },
     dm_toolbox: { w: 300, h: 180 },
@@ -614,7 +828,6 @@ export function createWidget(type, canvasW, canvasH) {
     expandedH: size.h,
     ...(type === "initiative" ? { initiativeOrientation: INITIATIVE_ORIENTATION_VERTICAL } : {}),
     ...(type === "dm_generators" ? { dmGeneratorsTab: "encounter" } : {}),
-    ...(type === "dm_toolbox" ? { dmToolboxTab: "dice" } : {}),
     ...(type === "dm_notes"
       ? { dmNotesTabs: defaultDmNotesTabs(), activeNotesTabId: "notes-session" }
       : {}),

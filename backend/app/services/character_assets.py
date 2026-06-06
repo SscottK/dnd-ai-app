@@ -23,7 +23,10 @@ def portrait_download_url(character: Character, session: Session | None = None) 
         else character.portrait_path
     )
     if file_path:
-        return f"/api/v1/characters/{character.id}/portrait"
+        url = f"/api/v1/characters/{character.id}/portrait"
+        if character.portrait_photo_id is not None:
+            return f"{url}?photo={character.portrait_photo_id}"
+        return url
     return None
 
 

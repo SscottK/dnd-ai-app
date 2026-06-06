@@ -26,7 +26,8 @@ export function FullSheetModal({
           <div>
             <h2 className="font-black text-starlight uppercase text-sm">{character.name}</h2>
             <p className="text-[10px] text-zinc-500 font-mono">
-              Edit on D&amp;D Beyond or PDF, then re-sync to update live session panes.
+              PDF is read-only and cannot be edited here. Equip gear in Inventory panes — changes
+              save to your digital sheet, not the PDF.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -38,7 +39,7 @@ export function FullSheetModal({
                 className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase border border-starlight text-starlight disabled:opacity-40"
               >
                 <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
-                Re-sync from PDF
+                {syncing ? "Re-syncing…" : "Re-sync from PDF"}
               </button>
             )}
             {character.dnd_beyond_url && (
@@ -57,14 +58,26 @@ export function FullSheetModal({
               onClick={onClose}
               className="px-3 py-1.5 text-[10px] font-black uppercase bg-neon-magenta text-black"
             >
-              Save &amp; Close
+              Save session &amp; close
             </button>
             <button type="button" onClick={onClose} className="text-zinc-500 hover:text-white p-1">
               <X className="w-5 h-5" />
             </button>
           </div>
         </header>
-        <div className="flex-1 overflow-hidden bg-white">
+        <div className="relative flex-1 overflow-hidden bg-white">
+          {syncing && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 p-6">
+              <div className="max-w-sm rounded-sm border-2 border-neon-cyan bg-zinc-950 px-6 py-5 text-center shadow-lg">
+                <RefreshCw className="mx-auto mb-3 h-8 w-8 animate-spin text-neon-cyan" />
+                <p className="text-sm font-black uppercase text-starlight">Re-syncing from PDF</p>
+                <p className="mt-2 text-[11px] font-mono leading-relaxed text-zinc-400">
+                  This may take a couple of minutes while we read your sheet. Please wait — your
+                  panes will update when it finishes.
+                </p>
+              </div>
+            </div>
+          )}
           {hasPdf ? (
             <AuthenticatedPdfFrame
               pdfUrl={character.pdf_url}

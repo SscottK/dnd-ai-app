@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.services.conditions import assert_conditions_valid, normalize_conditions
 
 
 class GenerateRequest(BaseModel):
@@ -126,6 +128,16 @@ class CampaignSessionStatus(BaseModel):
     is_owner: bool
     character_id: int | None = None
     character_name: str | None = None
+    last_combat_log_id: int | None = None
+    play_session_notes_tab_id: str | None = None
+    play_session_notes_tab_title: str | None = None
+
+
+class DiceRollRequest(BaseModel):
+    dice: str = Field(min_length=2, max_length=8)
+    result: int = Field(ge=1, le=1000)
+    roller_name: str | None = Field(default=None, max_length=120)
+    message: str | None = Field(default=None, max_length=200)
 
 
 class CampaignListResponse(BaseModel):
@@ -219,6 +231,28 @@ class SetPortraitRequest(BaseModel):
     photo_id: int = Field(ge=1)
 
 
+class CombatLogEntry(BaseModel):
+    at: str
+    message: str
+    kind: str = "event"
+    actor: str | None = None
+    roller_name: str | None = None
+    dice: str | None = None
+    result: int | None = None
+    bonus: int | None = None
+    total: int | None = None
+
+
+class CombatActionEntry(BaseModel):
+    id: str | None = None
+    name: str = Field(min_length=1, max_length=120)
+    action_type: str = Field(default="action", max_length=32)
+    targeting: str = Field(default="one_enemy", max_length=32)
+    description: str | None = Field(default=None, max_length=500)
+    attack_bonus: int | None = None
+    damage_dice: str | None = Field(default=None, max_length=32)
+
+
 class EncounterCombatant(BaseModel):
     id: str
     name: str
@@ -230,7 +264,24 @@ class EncounterCombatant(BaseModel):
     hp: int | None = None
     max_hp: int | None = None
     ac: int | None = None
-    conditions: str | None = None
+    conditions: list[str] = Field(default_factory=list)
+    combat_actions: list[CombatActionEntry] = Field(default_factory=list)
+
+    @field_validator("conditions", mode="before")
+    @classmethod
+    def coerce_conditions(cls, value: list[str] | str | None) -> list[str]:
+        return normalize_conditions(value)
+
+    @field_validator("conditions")
+    @classmethod
+    def validate_conditions(cls, value: list[str]) -> list[str]:
+        return assert_conditions_valid(value)
+
+
+class TurnEconomySnapshot(BaseModel):
+    action_used: bool = False
+    bonus_action_used: bool = False
+    reaction_used: bool = False
 
 
 class EncounterState(BaseModel):
@@ -238,6 +289,40 @@ class EncounterState(BaseModel):
     active_index: int = 0
     active_combatant_id: str | None = None
     combatants: list[EncounterCombatant] = Field(default_factory=list)
+    combat_log: list[CombatLogEntry] = Field(default_factory=list)
+    turn_economy: dict[str, TurnEconomySnapshot] = Field(default_factory=dict)
+
+
+class UseActionRequest(BaseModel):
+    combatant_id: str | None = Field(default=None, max_length=64)
+    action_id: str = Field(min_length=1, max_length=120)
+    action_name: str = Field(min_length=1, max_length=120)
+    action_type: str = Field(min_length=1, max_length=32)
+    targeting: str = Field(min_length=1, max_length=32)
+    target_ids: list[str] = Field(default_factory=list)
+    detail: str | None = Field(default=None, max_length=200)
+
+
+class UseActionResponse(BaseModel):
+    encounter: EncounterState
+    action_messages: list[str] = Field(default_factory=list)
+
+
+class CombatantActionSheetResponse(BaseModel):
+    sheet: dict = Field(default_factory=dict)
+
+
+class MonsterSearchEntry(BaseModel):
+    name: str
+    cr: str | None = None
+    type: str | None = None
+    armor_class: int | None = None
+    hp_max: int | None = None
+    action_count: int = 0
+
+
+class MonsterSearchResponse(BaseModel):
+    monsters: list[MonsterSearchEntry] = Field(default_factory=list)
 
 
 class EncounterUpdate(BaseModel):
@@ -245,6 +330,15 @@ class EncounterUpdate(BaseModel):
     active_index: int | None = Field(default=None, ge=0)
     active_combatant_id: str | None = None
     combatants: list[EncounterCombatant] | None = None
+
+
+class EncounterPatchResponse(BaseModel):
+    encounter: EncounterState
+    combat_ended: bool = False
+    combat_log_id: int | None = None
+    combat_log_text: str | None = None
+    party_updated: int | None = None
+    reason: str | None = None
 
 
 class InitiativeSubmitRequest(BaseModel):
@@ -259,6 +353,14 @@ class InitiativeSubmitResponse(BaseModel):
     bonus: int | None = None
 
 
+class EndCombatResponse(BaseModel):
+    encounter: EncounterState
+    combat_log_id: int
+    combat_log_text: str
+    party_updated: int
+    reason: str
+
+
 class EncounterEnemyInput(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     count: int = Field(default=1, ge=1, le=12)
@@ -266,11 +368,26 @@ class EncounterEnemyInput(BaseModel):
     hp: int | None = Field(default=None, ge=0)
     max_hp: int | None = Field(default=None, ge=0)
     ac: int | None = Field(default=None, ge=0)
-    conditions: str | None = Field(default=None, max_length=200)
+    conditions: list[str] = Field(default_factory=list)
+    combat_actions: list[CombatActionEntry] = Field(default_factory=list)
+
+    @field_validator("conditions", mode="before")
+    @classmethod
+    def coerce_enemy_conditions(cls, value: list[str] | str | None) -> list[str]:
+        return normalize_conditions(value)
+
+    @field_validator("conditions")
+    @classmethod
+    def validate_enemy_conditions(cls, value: list[str]) -> list[str]:
+        return assert_conditions_valid(value)
 
 
 class AddEncounterEnemiesRequest(BaseModel):
     enemies: list[EncounterEnemyInput] = Field(min_length=1)
+
+
+class AddRosterRequest(BaseModel):
+    auto_roll: bool = False
 
 
 class CharacterListResponse(BaseModel):

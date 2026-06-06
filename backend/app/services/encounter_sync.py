@@ -3,9 +3,11 @@ import logging
 
 from sqlmodel import Session
 
-from app.api.schemas import EncounterState
+from app.api.schemas import EncounterCombatant, EncounterState
 from app.db.models import Campaign, Character
 from app.services.character_assets import portrait_download_url
+from app.services.character_sheet import parse_sheet_json, sheet_to_json
+from app.services.conditions import normalize_conditions, sanitize_conditions_list
 
 logger = logging.getLogger("app.encounter_sync")
 
@@ -77,3 +79,55 @@ def sync_character_combat_stats(
         character_id,
         campaign_id,
     )
+
+
+def _pc_combatant_changed(
+    before: EncounterCombatant | None, after: EncounterCombatant
+) -> bool:
+    if before is None:
+        return True
+    return (
+        before.hp != after.hp
+        or before.max_hp != after.max_hp
+        or before.ac != after.ac
+        or normalize_conditions(before.conditions) != normalize_conditions(after.conditions)
+    )
+
+
+def sync_encounter_combatants_to_characters(
+    session: Session,
+    before: EncounterState,
+    after: EncounterState,
+) -> None:
+    """Push PC combatant HP/AC/conditions from encounter into character records."""
+    before_by_char = {
+        c.character_id: c
+        for c in before.combatants
+        if c.character_id is not None and c.is_pc
+    }
+
+    for combatant in after.combatants:
+        if not combatant.is_pc or combatant.character_id is None:
+            continue
+        if not _pc_combatant_changed(before_by_char.get(combatant.character_id), combatant):
+            continue
+
+        character = session.get(Character, combatant.character_id)
+        if character is None:
+            continue
+
+        if combatant.hp is not None:
+            character.hp = combatant.hp
+        if combatant.max_hp is not None:
+            character.max_hp = combatant.max_hp
+        if combatant.ac is not None:
+            character.ac = combatant.ac
+
+        sheet = parse_sheet_json(character.sheet_json)
+        sheet["conditions"] = sanitize_conditions_list(combatant.conditions)
+        character.sheet_json = sheet_to_json(sheet)
+        session.add(character)
+        logger.info(
+            "Synced encounter combat stats to character %s from campaign encounter",
+            combatant.character_id,
+        )

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
+from app.services.character_ac import compute_sheet_ac, enrich_sheet_ac
 from app.services.character_sheet import normalize_sheet, sheet_to_json, skills_summary
 from app.services.gemini import generate_from_pdf, generate_text
 
@@ -40,10 +41,26 @@ Return ONLY valid JSON (no markdown, no commentary) with this shape:
       "languages": ["Common", "Elvish"]
     },
     "inventory": [
-      { "name": "Chain Mail", "qty": 1, "weight": 55, "equipped": true, "notes": "" }
+      { "name": "Chain Mail +1", "qty": 1, "weight": 55, "equipped": true, "ac_bonus": 1, "notes": "" }
     ],
     "features": [
-      { "name": "Fighting Style", "description": "Brief description", "source": "Fighter" }
+      { "name": "Defense", "description": "+1 AC while wearing armor", "source": "Fighting Style" }
+    ],
+    "attacks": [
+      { "name": "Longsword", "to_hit": 5, "damage": "1d8+3 slashing", "action_type": "action", "targeting": "one_enemy" }
+    ],
+    "spells": [
+      { "name": "Fire Bolt", "level": 0, "action_type": "action", "targeting": "one_enemy", "prepared": true, "description": "Ranged spell attack" }
+    ],
+    "combat_actions": [
+      { "name": "Second Wind", "action_type": "bonus_action", "targeting": "self", "description": "Regain hit points" }
+    ],
+    "ac_breakdown": [
+      { "label": "Chain Mail", "value": 16, "kind": "armor" },
+      { "label": "Armored Bonus (Defense)", "value": 1, "kind": "bonus" }
+    ],
+    "ac_bonuses": [
+      { "name": "Armored Bonus (Defense)", "bonus": 1, "requires_armor": true }
     ],
     "conditions": [],
     "notes": ""
@@ -55,7 +72,19 @@ Rules:
 - Include ALL 18 skills with correct proficient/expertise flags and bonuses when visible.
 - Include all six saving throws.
 - Inventory: list gear with qty, weight if shown, equipped=true for worn/wielded items.
+- For magic armor/shields, include ac_bonus (e.g. +1 plate → ac_bonus: 1) and keep +N in the name when shown.
+- Parse the full AC breakdown from the Armor Class section into ac_breakdown AND ac_bonuses.
+- Top-level "ac" MUST be the large final total (e.g. 17), NOT a sub-line like armor base 16 alone.
+- Every bonus line that is not armor base, DEX, or shield goes in ac_bonuses (e.g. "+1 Armored Bonus (Defense)" → { "name": "Armored Bonus (Defense)", "bonus": 1, "requires_armor": true }).
+- Fighting Style: Defense must appear in features AND as an ac_bonus when it affects AC.
+- Do NOT put armor base, shield, DEX, unarmored "Base" (10), or ability modifiers in ac_bonuses — only true extras like Defense, magic bonuses, or feats.
+- ac_breakdown kinds must be: armor, shield, dex, base, ability, or bonus. Only kind "bonus" rows belong in ac_bonuses.
+- Parse character notes/backstory from NOTES, CHARACTER BACKSTORY, and ADDITIONAL NOTES sections into sheet.notes.
 - Features: class/race/background features with short descriptions.
+- attacks: every weapon attack from ACTIONS or ATTACKS sections with name, to_hit bonus, damage dice, action_type (usually action), targeting (usually one_enemy).
+- spells: prepared/known spells with name, level (0 for cantrips), action_type, targeting, prepared boolean, short description.
+- combat_actions: class features and abilities that cost an Action, Bonus Action, or Reaction (Second Wind, Action Surge, Channel Divinity, etc.) with action_type and targeting.
+- For features that clearly use a Bonus Action or Reaction in their text, duplicate them in combat_actions with the correct action_type.
 - Use null only when a value truly cannot be found.
 - ability keys must be lowercase: str, dex, con, int, wis, cha.
 """
@@ -105,13 +134,20 @@ def _normalize_parsed(data: dict) -> dict:
         class_name = str(class_name).strip() or None
 
     sheet = normalize_sheet(data)
+    parsed_ac = int(data["ac"]) if data.get("ac") is not None else None
+    sheet = enrich_sheet_ac(sheet, parsed_ac)
+    computed_ac = compute_sheet_ac(sheet, parsed_ac)
+    if parsed_ac is not None and computed_ac is not None:
+        final_ac = parsed_ac
+    else:
+        final_ac = computed_ac if computed_ac is not None else parsed_ac
     skills = skills_summary(sheet)
 
     return {
         "name": name[:100] if name else "",
         "class_name": class_name,
         "level": int(data["level"]) if data.get("level") is not None else None,
-        "ac": int(data["ac"]) if data.get("ac") is not None else None,
+        "ac": final_ac,
         "hp": int(data["hp"]) if data.get("hp") is not None else None,
         "max_hp": int(data["max_hp"]) if data.get("max_hp") is not None else None,
         "skills": skills,
