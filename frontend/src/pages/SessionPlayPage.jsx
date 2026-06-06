@@ -17,6 +17,7 @@ import {
   CharacterTabsWidget,
   CombatWidget,
   SheetDataGuard,
+  CharacterPortraitWidget,
   InitiativeWidget,
   PlayerNotesWidget,
   SkillsSavesWidget,
@@ -652,6 +653,26 @@ export function SessionPlayPage() {
       case "character_tabs":
         return guard(
           <CharacterTabsWidget sheet={sheet} onSheetChange={onSheetChange} onShowDetail={showDetail} />
+        );
+      case "character_portrait":
+        return character ? (
+          <CharacterPortraitWidget
+            characterId={character.id}
+            portraitUrl={character.portrait_url}
+            portraitPhotoId={character.portrait_photo_id}
+            characterName={character.name}
+            token={token}
+            onPortraitChange={(data) => {
+              const sheetData = parseSheetJson(data.sheet_json);
+              const nextCharacter = applyEquipmentToCharacter(data, sheetData);
+              setCharacter(nextCharacter);
+              setSheet(sheetData);
+              characterRef.current = nextCharacter;
+              sheetRef.current = sheetData;
+            }}
+          />
+        ) : (
+          sheetPanePlaceholder
         );
       case "player_notes":
         return (

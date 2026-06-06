@@ -10,12 +10,27 @@ from app.api.schemas import (
     CharacterCreate,
     CharacterDraft,
     CharacterListResponse,
+    CharacterPhotoListResponse,
+    CharacterPhotoRead,
     CharacterRead,
     CharacterUpdate,
+    SetPortraitRequest,
 )
-from app.db.models import Campaign, Character
+from app.db.models import Campaign, Character, CharacterPhoto
 from app.db.session import BACKEND_DIR
+from app.services.campaign_membership import get_campaign_member_for_user
+from app.services.character_assets import portrait_download_url, portrait_media_type
 from app.services.character_pdf import parse_character_from_pdf
+from app.services.character_photos import (
+    add_photo_to_album,
+    clear_portrait_selection,
+    delete_album_photo,
+    delete_all_character_photos,
+    list_character_photos,
+    photo_download_url,
+    resolve_portrait_file_path,
+    set_portrait_photo,
+)
 from app.services.character_sheet import parse_sheet_json, sheet_to_json, skills_summary
 from app.services.encounter_sync import sync_character_combat_stats
 
@@ -29,6 +44,24 @@ def pdf_download_url(character: Character) -> str | None:
     if character.pdf_path:
         return f"/api/v1/characters/files/{character.pdf_path}"
     return None
+
+
+def can_view_character_portrait(character: Character, user_id: int, session: SessionDep) -> bool:
+    if character.user_id == user_id:
+        return True
+    if character.campaign_id is None:
+        return False
+    return get_campaign_member_for_user(character.campaign_id, user_id, session) is not None
+
+
+def photo_to_read(photo: CharacterPhoto, character: Character) -> CharacterPhotoRead:
+    return CharacterPhotoRead(
+        id=photo.id,
+        character_id=photo.character_id,
+        url=photo_download_url(character.id, photo.id),
+        created_at=photo.created_at,
+        is_portrait=character.portrait_photo_id == photo.id,
+    )
 
 
 def to_character_read(character: Character, session: SessionDep) -> CharacterRead:
@@ -61,6 +94,8 @@ def to_character_read(character: Character, session: SessionDep) -> CharacterRea
         campaign_id=character.campaign_id,
         campaign_name=campaign_name,
         pdf_url=pdf_download_url(character),
+        portrait_url=portrait_download_url(character, session),
+        portrait_photo_id=character.portrait_photo_id,
         dnd_beyond_url=character.dnd_beyond_url,
         created_at=character.created_at,
     )
@@ -149,6 +184,133 @@ def download_character_pdf(user_id: int, filename: str, current_user: CurrentUse
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
     return FileResponse(path, media_type="application/pdf", filename=filename)
+
+
+@router.get("/{character_id}/photos", response_model=CharacterPhotoListResponse)
+def list_character_photo_album(character_id: int, current_user: CurrentUser, session: SessionDep):
+    character = get_owned_character(character_id, current_user, session)
+    photos = list_character_photos(session, character.id)
+    return CharacterPhotoListResponse(
+        photos=[photo_to_read(photo, character) for photo in photos],
+        portrait_photo_id=character.portrait_photo_id,
+    )
+
+
+@router.post("/{character_id}/photos", response_model=CharacterPhotoListResponse)
+async def upload_character_photo(
+    character_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+    file: UploadFile = File(...),
+):
+    character = get_owned_character(character_id, current_user, session)
+    await add_photo_to_album(session, character, current_user.id, file)
+    session.commit()
+    session.refresh(character)
+    photos = list_character_photos(session, character.id)
+    return CharacterPhotoListResponse(
+        photos=[photo_to_read(photo, character) for photo in photos],
+        portrait_photo_id=character.portrait_photo_id,
+    )
+
+
+@router.get("/{character_id}/photos/{photo_id}")
+def get_character_photo(
+    character_id: int,
+    photo_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    photo = session.get(CharacterPhoto, photo_id)
+    if photo is None or photo.character_id != character.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+
+    path = UPLOADS_DIR / photo.file_path
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo file missing")
+
+    return FileResponse(path, media_type=portrait_media_type(path))
+
+
+@router.delete("/{character_id}/photos/{photo_id}", response_model=CharacterPhotoListResponse)
+def delete_character_photo(
+    character_id: int,
+    photo_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    delete_album_photo(session, character, photo_id)
+    session.commit()
+    session.refresh(character)
+    photos = list_character_photos(session, character.id)
+    return CharacterPhotoListResponse(
+        photos=[photo_to_read(photo, character) for photo in photos],
+        portrait_photo_id=character.portrait_photo_id,
+    )
+
+
+@router.get("/{character_id}/portrait")
+def get_character_portrait(character_id: int, current_user: CurrentUser, session: SessionDep):
+    character = session.get(Character, character_id)
+    if character is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
+
+    file_path = resolve_portrait_file_path(character, session)
+    if not file_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portrait not found")
+
+    if not can_view_character_portrait(character, current_user.id, session):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    path = UPLOADS_DIR / file_path
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portrait file missing")
+
+    return FileResponse(path, media_type=portrait_media_type(path))
+
+
+@router.put("/{character_id}/portrait", response_model=CharacterRead)
+def select_character_portrait(
+    character_id: int,
+    data: SetPortraitRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    photo = session.get(CharacterPhoto, data.photo_id)
+    if photo is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    set_portrait_photo(session, character, photo)
+    session.commit()
+    session.refresh(character)
+    return to_character_read(character, session)
+
+
+@router.post("/{character_id}/portrait", response_model=CharacterRead)
+async def upload_character_portrait(
+    character_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+    file: UploadFile = File(...),
+):
+    """Legacy upload — adds to album and sets as active portrait."""
+    character = get_owned_character(character_id, current_user, session)
+    photo = await add_photo_to_album(session, character, current_user.id, file)
+    set_portrait_photo(session, character, photo)
+    session.commit()
+    session.refresh(character)
+    return to_character_read(character, session)
+
+
+@router.delete("/{character_id}/portrait", response_model=CharacterRead)
+def clear_character_portrait(character_id: int, current_user: CurrentUser, session: SessionDep):
+    character = get_owned_character(character_id, current_user, session)
+    clear_portrait_selection(session, character)
+    session.commit()
+    session.refresh(character)
+    return to_character_read(character, session)
 
 
 @router.get("/{character_id}", response_model=CharacterRead)
@@ -293,6 +455,7 @@ def delete_character(character_id: int, current_user: CurrentUser, session: Sess
     if character.pdf_path:
         pdf_file = UPLOADS_DIR / character.pdf_path
         pdf_file.unlink(missing_ok=True)
+    delete_all_character_photos(session, character)
 
     session.delete(character)
     session.commit()

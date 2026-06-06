@@ -38,7 +38,8 @@ from app.services.encounter_actions import (
     sorted_combatants,
     upsert_pc_combatant,
 )
-from app.services.encounter_sync import encounter_for_viewer
+from app.services.character_assets import portrait_download_url
+from app.services.encounter_sync import encounter_for_viewer, enrich_encounter_portraits
 from app.services.invite_codes import generate_invite_code
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -261,6 +262,7 @@ def get_campaign_roster(campaign_id: int, current_user: CurrentUser, session: Se
                 ac=character.ac,
                 hp=character.hp,
                 max_hp=character.max_hp,
+                portrait_url=portrait_download_url(character, session),
             )
         )
 
@@ -301,10 +303,17 @@ def parse_encounter(campaign: Campaign) -> EncounterState:
         return EncounterState()
 
 
+def build_encounter_response(
+    session: SessionDep, campaign: Campaign, *, is_owner: bool
+) -> EncounterState:
+    state = enrich_encounter_portraits(session, parse_encounter(campaign))
+    return encounter_for_viewer(state, is_owner=is_owner)
+
+
 @router.get("/{campaign_id}/encounter", response_model=EncounterState)
 def get_encounter(campaign_id: int, current_user: CurrentUser, session: SessionDep):
     campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
-    return encounter_for_viewer(parse_encounter(campaign), is_owner=is_owner)
+    return build_encounter_response(session, campaign, is_owner=is_owner)
 
 
 @router.patch("/{campaign_id}/encounter", response_model=EncounterState)
@@ -336,7 +345,7 @@ def update_encounter(
     session.add(campaign)
     session.commit()
     session.refresh(campaign)
-    return parse_encounter(campaign)
+    return build_encounter_response(session, campaign, is_owner=True)
 
 
 @router.post("/{campaign_id}/encounter/submit-initiative", response_model=InitiativeSubmitResponse)
@@ -375,9 +384,10 @@ def submit_initiative(
         )
 
     upsert_pc_combatant(state, character, total)
-    state = persist_encounter(session, campaign, state)
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
     return InitiativeSubmitResponse(
-        encounter=encounter_for_viewer(state, is_owner=is_owner),
+        encounter=build_encounter_response(session, campaign, is_owner=is_owner),
         total=total,
         d20_roll=d20_roll,
         bonus=bonus,
@@ -411,8 +421,9 @@ def next_encounter_turn(campaign_id: int, current_user: CurrentUser, session: Se
             )
 
     advance_turn(state)
-    state = persist_encounter(session, campaign, state)
-    return encounter_for_viewer(state, is_owner=is_owner)
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+    return build_encounter_response(session, campaign, is_owner=is_owner)
 
 
 @router.post("/{campaign_id}/encounter/add-roster", response_model=EncounterState)
@@ -423,7 +434,9 @@ def add_roster_to_tracker(campaign_id: int, current_user: CurrentUser, session: 
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the campaign owner can add roster to the tracker",
         )
-    return add_roster_to_encounter(session, campaign)
+    add_roster_to_encounter(session, campaign)
+    session.refresh(campaign)
+    return build_encounter_response(session, campaign, is_owner=True)
 
 
 @router.post("/{campaign_id}/encounter/add-enemies", response_model=EncounterState)
@@ -439,7 +452,9 @@ def add_enemies_to_tracker(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the campaign owner can add enemies to the tracker",
         )
-    return add_enemies_to_encounter(session, campaign, data.enemies)
+    add_enemies_to_encounter(session, campaign, data.enemies)
+    session.refresh(campaign)
+    return build_encounter_response(session, campaign, is_owner=True)
 
 
 @router.get("/{campaign_id}/session", response_model=CampaignSessionStatus)

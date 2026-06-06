@@ -25,6 +25,7 @@ export const PLAYER_WIDGET_TYPES = [
   { type: "abilities", label: "Abilities" },
   { type: "skills_saves", label: "Skills & Saves" },
   { type: "character_tabs", label: "Character (Tabs)" },
+  { type: "character_portrait", label: "Photo Album" },
   { type: "player_notes", label: "Notes" },
   { type: "vtt_zone", label: "VTT Zone" },
   { type: "initiative", label: "Initiative" },
@@ -95,6 +96,7 @@ export const SINGLETON_WIDGET_TYPES = new Set([
   "vtt_zone",
   "initiative",
   "player_notes",
+  "character_portrait",
   "dm_rules_chat",
   "dm_generators",
   "dm_toolbox",
@@ -301,12 +303,22 @@ export function buildDefaultLayout(canvasW, canvasH) {
         minimized: false,
       },
       {
-        id: "character-1",
-        type: "character_tabs",
+        id: "portrait-1",
+        type: "character_portrait",
         x: rightX,
         y: margin,
         w: colW,
-        h: 340,
+        h: 200,
+        pinned: false,
+        minimized: false,
+      },
+      {
+        id: "character-1",
+        type: "character_tabs",
+        x: rightX,
+        y: 232,
+        w: colW,
+        h: 280,
         pinned: false,
         minimized: false,
       },
@@ -314,9 +326,9 @@ export function buildDefaultLayout(canvasW, canvasH) {
         id: "player-notes-1",
         type: "player_notes",
         x: rightX,
-        y: 364,
+        y: 528,
         w: colW,
-        h: Math.min(400, Math.max(220, canvasH - 380)),
+        h: Math.min(320, Math.max(180, canvasH - 544)),
         pinned: false,
         minimized: false,
         playerNotesTabs: defaultPlayerNotesTabs(),
@@ -415,6 +427,28 @@ function normalizeWidget(widget) {
       : tabs[0].id;
   }
   return normalized;
+}
+
+function ensureCharacterPortraitWidget(widgets, canvasW, canvasH) {
+  if (widgets.some((widget) => widget.type === "character_portrait")) {
+    return widgets;
+  }
+  const colW = 300;
+  const margin = 16;
+  const rightX = Math.max(margin, canvasW - margin - colW);
+  return [
+    ...widgets,
+    {
+      id: `portrait-${Date.now()}`,
+      type: "character_portrait",
+      x: rightX,
+      y: margin,
+      w: colW,
+      h: 200,
+      pinned: false,
+      minimized: false,
+    },
+  ];
 }
 
 function ensurePlayerNotesWidget(widgets, canvasW, canvasH) {
@@ -526,8 +560,12 @@ export function parseLayout(layoutJson, canvasW = 1280, canvasH = 800) {
     const layoutW = parsed.viewport?.canvasW ?? canvasW;
     const layoutH = parsed.viewport?.canvasH ?? canvasH;
     const widgets = clampWidgets(
-      ensurePlayerNotesWidget(
-        ensureVttWidget(recenterWidgets(parsed.widgets, layoutW, layoutH), layoutW, layoutH),
+      ensureCharacterPortraitWidget(
+        ensurePlayerNotesWidget(
+          ensureVttWidget(recenterWidgets(parsed.widgets, layoutW, layoutH), layoutW, layoutH),
+          layoutW,
+          layoutH
+        ),
         layoutW,
         layoutH
       ).map(normalizeWidget),
@@ -553,7 +591,8 @@ export function createWidget(type, canvasW, canvasH) {
     combat: { w: 280, h: 240 },
     abilities: { w: 300, h: 200 },
     skills_saves: { w: 300, h: 380 },
-    character_tabs: { w: 300, h: 340 },
+    character_tabs: { w: 300, h: 280 },
+    character_portrait: { w: 300, h: 200 },
     player_notes: { w: 320, h: 360 },
     vtt_zone: vttZoneDefault(canvasW, canvasH),
     initiative: { w: 280, h: 320 },

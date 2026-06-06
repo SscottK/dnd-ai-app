@@ -93,6 +93,8 @@ class Character(SQLModel, table=True):
     layout_json: str = Field(default="{}")
     sheet_json: str = Field(default="{}")
     pdf_path: Optional[str] = Field(default=None, max_length=500)
+    portrait_path: Optional[str] = Field(default=None, max_length=500)
+    portrait_photo_id: Optional[int] = Field(default=None, foreign_key="characterphoto.id")
     dnd_beyond_url: Optional[str] = Field(default=None, max_length=500)
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -102,6 +104,25 @@ class Character(SQLModel, table=True):
         back_populates="character",
         sa_relationship_kwargs={"uselist": False},
     )
+    photos: list["CharacterPhoto"] = Relationship(
+        back_populates="character",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    portrait_photo: Optional["CharacterPhoto"] = Relationship(
+        sa_relationship_kwargs={
+            "foreign_keys": "[Character.portrait_photo_id]",
+            "uselist": False,
+        }
+    )
+
+
+class CharacterPhoto(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    character_id: int = Field(foreign_key="character.id", index=True)
+    file_path: str = Field(max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    character: Optional[Character] = Relationship(back_populates="photos")
 
 
 class HistoricalEncounter(SQLModel, table=True):

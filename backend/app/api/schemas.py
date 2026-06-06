@@ -142,6 +142,7 @@ class CampaignMemberRead(BaseModel):
     ac: int | None
     hp: int | None
     max_hp: int | None
+    portrait_url: str | None = None
 
 
 class CampaignRosterResponse(BaseModel):
@@ -195,8 +196,27 @@ class CharacterRead(BaseModel):
     campaign_id: int | None
     campaign_name: str | None
     pdf_url: str | None
+    portrait_url: str | None = None
+    portrait_photo_id: int | None = None
     dnd_beyond_url: str | None
     created_at: datetime
+
+
+class CharacterPhotoRead(BaseModel):
+    id: int
+    character_id: int
+    url: str
+    created_at: datetime
+    is_portrait: bool = False
+
+
+class CharacterPhotoListResponse(BaseModel):
+    photos: list[CharacterPhotoRead]
+    portrait_photo_id: int | None = None
+
+
+class SetPortraitRequest(BaseModel):
+    photo_id: int = Field(ge=1)
 
 
 class EncounterCombatant(BaseModel):
@@ -206,6 +226,7 @@ class EncounterCombatant(BaseModel):
     is_pc: bool = False
     is_ally: bool = False
     character_id: int | None = None
+    portrait_url: str | None = None
     hp: int | None = None
     max_hp: int | None = None
     ac: int | None = None

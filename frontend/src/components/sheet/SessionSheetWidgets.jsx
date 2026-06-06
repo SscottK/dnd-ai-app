@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Columns3, Dices, RefreshCw, Rows3 } from "lucide-react";
-import { apiFetch } from "../../lib/api";
+import { Columns3, Dices, ImagePlus, RefreshCw, Rows3, Trash2 } from "lucide-react";
+import { apiFetch, apiUpload } from "../../lib/api";
+import { AuthenticatedImage } from "./AuthenticatedImage";
 import { formatCombatantAc } from "../../lib/encounterDisplay";
 import { NotesPaneWidget } from "./NotesPaneWidget";
 import {
@@ -259,6 +260,216 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
   );
 }
 
+export function CharacterPortraitWidget({
+  characterId,
+  portraitUrl,
+  portraitPhotoId,
+  characterName,
+  token,
+  onPortraitChange,
+}) {
+  const inputRef = useRef(null);
+  const [photos, setPhotos] = useState([]);
+  const [activePortraitId, setActivePortraitId] = useState(portraitPhotoId ?? null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadAlbum = useCallback(async () => {
+    if (!characterId || !token) return;
+    try {
+      const res = await apiFetch(`/characters/${characterId}/photos`, { token });
+      if (!res.ok) throw new Error("Could not load album");
+      const data = await res.json();
+      setPhotos(data.photos || []);
+      setActivePortraitId(data.portrait_photo_id ?? null);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [characterId, token]);
+
+  useEffect(() => {
+    loadAlbum();
+  }, [loadAlbum]);
+
+  useEffect(() => {
+    setActivePortraitId(portraitPhotoId ?? null);
+  }, [portraitPhotoId]);
+
+  const handleFile = async (file) => {
+    if (!file || !characterId || !token) return;
+    setUploading(true);
+    setError("");
+    try {
+      const res = await apiUpload(`/characters/${characterId}/photos`, { token, file });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not add photo");
+      }
+      const data = await res.json();
+      setPhotos(data.photos || []);
+      setActivePortraitId(data.portrait_photo_id ?? null);
+      if (data.portrait_photo_id) {
+        const charRes = await apiFetch(`/characters/${characterId}`, { token });
+        if (charRes.ok) onPortraitChange(await charRes.json());
+      }
+    } catch (err) {
+      setError(err.message || "Could not add photo.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const handleSelectPortrait = async (photoId) => {
+    if (!characterId || !token || photoId === activePortraitId) return;
+    setUploading(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/characters/${characterId}/portrait`, {
+        token,
+        method: "PUT",
+        body: { photo_id: photoId },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not set portrait");
+      }
+      const character = await res.json();
+      setActivePortraitId(character.portrait_photo_id ?? photoId);
+      setPhotos((prev) =>
+        prev.map((photo) => ({ ...photo, is_portrait: photo.id === photoId }))
+      );
+      onPortraitChange(character);
+    } catch (err) {
+      setError(err.message || "Could not set portrait.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeletePhoto = async (photoId) => {
+    if (!characterId || !token) return;
+    setUploading(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/characters/${characterId}/photos/${photoId}`, {
+        token,
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not delete photo");
+      }
+      const data = await res.json();
+      setPhotos(data.photos || []);
+      setActivePortraitId(data.portrait_photo_id ?? null);
+      const charRes = await apiFetch(`/characters/${characterId}`, { token });
+      if (charRes.ok) onPortraitChange(await charRes.json());
+    } catch (err) {
+      setError(err.message || "Could not delete photo.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2 p-1">
+      <div className="flex min-h-0 flex-[2] items-center justify-center overflow-hidden rounded-sm border border-border/60 bg-void-deep/40 p-2">
+        <AuthenticatedImage
+          src={portraitUrl}
+          token={token}
+          alt={characterName || "Character"}
+          className="max-h-full max-w-full rounded-sm border border-neon-cyan/30 object-contain"
+          fallbackClassName="flex h-28 w-28 items-center justify-center rounded-sm border-2 border-dashed border-border text-3xl"
+        />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/20 p-1.5">
+        <p className="mb-1 text-[8px] font-black uppercase tracking-widest text-ink-faint">Album</p>
+        {photos.length === 0 ? (
+          <p className="text-[9px] font-mono text-ink-faint">Add photos below, then tap one to set your portrait.</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-1.5">
+            {photos.map((photo) => {
+              const isActive = photo.id === activePortraitId || photo.is_portrait;
+              return (
+                <div key={photo.id} className="group relative">
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => handleSelectPortrait(photo.id)}
+                    className={`block w-full overflow-hidden rounded-sm border-2 ${
+                      isActive ? "border-starlight" : "border-border hover:border-neon-cyan/60"
+                    }`}
+                    title={isActive ? "Current portrait" : "Set as portrait"}
+                  >
+                    <AuthenticatedImage
+                      src={photo.url}
+                      token={token}
+                      alt="Album photo"
+                      className="aspect-square w-full object-cover"
+                      fallbackClassName="aspect-square w-full bg-void-deep/80 text-sm"
+                    />
+                  </button>
+                  {isActive && (
+                    <span className="pointer-events-none absolute left-0.5 top-0.5 rounded-sm bg-starlight/90 px-1 text-[7px] font-black uppercase text-black">
+                      Portrait
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => handleDeletePhoto(photo.id)}
+                    className="absolute right-0.5 top-0.5 rounded-sm bg-black/80 p-0.5 text-ink-faint opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                    title="Delete photo"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) handleFile(file);
+        }}
+      />
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={() => inputRef.current?.click()}
+        className="flex shrink-0 items-center justify-center gap-1 rounded-sm border border-neon-cyan px-2 py-1 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+      >
+        <ImagePlus className="h-3 w-3" />
+        Add photo
+      </button>
+      {error && <p className="shrink-0 text-center text-[9px] font-mono text-danger">{error}</p>}
+      <p className="shrink-0 text-center text-[8px] font-mono text-ink-faint">
+        Up to 24 photos · JPEG, PNG, WebP, GIF · max 4 MB
+      </p>
+    </div>
+  );
+}
+
+function CombatantAvatar({ portraitUrl, token, name, size = "sm" }) {
+  const dimensions = size === "lg" ? "h-14 w-14 text-lg" : "h-10 w-10 text-sm";
+  return (
+    <AuthenticatedImage
+      src={portraitUrl}
+      token={token}
+      alt={name}
+      className={`${dimensions} shrink-0 rounded-sm border border-border object-cover`}
+      fallbackClassName={`${dimensions} shrink-0 rounded-sm border border-border`}
+    />
+  );
+}
+
 export function PlayerNotesWidget({ tabs, activeTabId, onChange }) {
   return (
     <NotesPaneWidget
@@ -390,12 +601,13 @@ function initiativeCardClass(isActive, isYou) {
   return "border-neon-cyan/40 bg-void-deep/60";
 }
 
-function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView }) {
+function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView, token }) {
   return (
     <li
       className={`flex w-full items-center gap-3 rounded-sm border-2 px-3 py-2.5 ${initiativeCardClass(isActive, isYou)}`}
     >
       <span className="w-6 shrink-0 text-center text-[10px] font-mono text-ink-faint">{index + 1}</span>
+      <CombatantAvatar portraitUrl={combatant.portrait_url} token={token} name={combatant.name} />
       <span className="w-10 shrink-0 text-center text-lg font-black text-starlight">{combatant.initiative}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-black uppercase text-ink">
@@ -422,12 +634,18 @@ function InitiativeCombatantRow({ combatant, index, isActive, isYou, isDmView })
   );
 }
 
-function InitiativeCombatantCard({ combatant, index, isActive, isYou, isDmView }) {
+function InitiativeCombatantCard({ combatant, index, isActive, isYou, isDmView, token }) {
   return (
     <div
-      className={`flex min-w-[72px] max-w-[120px] flex-1 flex-col items-center gap-1 border-2 p-2 text-center ${initiativeCardClass(isActive, isYou)}`}
+      className={`flex min-w-[80px] max-w-[128px] flex-1 flex-col items-center gap-1 border-2 p-2 text-center ${initiativeCardClass(isActive, isYou)}`}
     >
       <span className="text-[9px] font-mono text-ink-faint">{index + 1}</span>
+      <CombatantAvatar
+        portraitUrl={combatant.portrait_url}
+        token={token}
+        name={combatant.name}
+        size="lg"
+      />
       <span className="text-xl font-black leading-none text-starlight">{combatant.initiative}</span>
       <p className="w-full truncate text-[10px] font-black uppercase text-ink">
         {combatant.name}
@@ -713,6 +931,7 @@ export function InitiativeWidget({
               isActive={index === resolvedIndex}
               isYou={combatant.character_id === characterId}
               isDmView={isOwner}
+              token={token}
             />
           ))}
         </div>
@@ -726,6 +945,7 @@ export function InitiativeWidget({
               isActive={index === resolvedIndex}
               isYou={combatant.character_id === characterId}
               isDmView={isOwner}
+              token={token}
             />
           ))}
         </ul>
