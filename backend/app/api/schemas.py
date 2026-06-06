@@ -91,3 +91,66 @@ class ConversationDetailResponse(BaseModel):
 class SendMessageResponse(BaseModel):
     user_message: MessageRead
     assistant_message: MessageRead
+
+
+class CampaignCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class CampaignJoin(BaseModel):
+    invite_code: str = Field(min_length=4, max_length=12)
+
+
+class CampaignRead(BaseModel):
+    id: int
+    name: str
+    owner_username: str
+    is_owner: bool
+    invite_code: str | None = None
+    created_at: datetime
+
+
+class CampaignListResponse(BaseModel):
+    campaigns: list[CampaignRead]
+
+
+class CharacterCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    class_name: str | None = Field(default=None, max_length=50)
+    level: int | None = Field(default=1, ge=1, le=30)
+    ac: int | None = Field(default=None, ge=0)
+    hp: int | None = Field(default=None, ge=0)
+    max_hp: int | None = Field(default=None, ge=0)
+    skills: str | None = None
+    pdf_url: str | None = Field(default=None, max_length=500)
+    dnd_beyond_url: str | None = Field(default=None, max_length=500)
+
+
+class CharacterUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    class_name: str | None = Field(default=None, max_length=50)
+    level: int | None = Field(default=None, ge=1, le=30)
+    ac: int | None = Field(default=None, ge=0)
+    hp: int | None = Field(default=None, ge=0)
+    max_hp: int | None = Field(default=None, ge=0)
+    skills: str | None = None
+    pdf_url: str | None = Field(default=None, max_length=500)
+    dnd_beyond_url: str | None = Field(default=None, max_length=500)
+
+
+class CharacterRead(BaseModel):
+    id: int
+    name: str
+    class_name: str | None
+    level: int | None
+    ac: int | None
+    hp: int | None
+    max_hp: int | None
+    skills: str | None
+    pdf_url: str | None
+    dnd_beyond_url: str | None
+    created_at: datetime
+
+
+class CharacterListResponse(BaseModel):
+    characters: list[CharacterRead]

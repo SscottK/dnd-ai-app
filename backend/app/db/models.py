@@ -15,6 +15,9 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
     conversations: list["Conversation"] = Relationship(back_populates="user")
+    characters: list["Character"] = Relationship(back_populates="user")
+    owned_campaigns: list["Campaign"] = Relationship(back_populates="owner")
+    campaign_memberships: list["CampaignMember"] = Relationship(back_populates="user")
 
 
 class Conversation(SQLModel, table=True):
@@ -38,3 +41,59 @@ class Message(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
     conversation: Optional[Conversation] = Relationship(back_populates="messages")
+
+
+class Campaign(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    owner_id: int = Field(foreign_key="user.id", index=True)
+    name: str = Field(max_length=200)
+    invite_code: str = Field(unique=True, index=True, max_length=12)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    owner: Optional[User] = Relationship(back_populates="owned_campaigns")
+    members: list["CampaignMember"] = Relationship(
+        back_populates="campaign",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+    historical_encounters: list["HistoricalEncounter"] = Relationship(
+        back_populates="campaign",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
+
+class CampaignMember(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    campaign_id: int = Field(foreign_key="campaign.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    joined_at: datetime = Field(default_factory=utc_now)
+
+    campaign: Optional[Campaign] = Relationship(back_populates="members")
+    user: Optional[User] = Relationship(back_populates="campaign_memberships")
+
+
+class Character(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    name: str = Field(max_length=100)
+    class_name: Optional[str] = Field(default=None, max_length=50)
+    level: Optional[int] = Field(default=1)
+    ac: Optional[int] = Field(default=None)
+    hp: Optional[int] = Field(default=None)
+    max_hp: Optional[int] = Field(default=None)
+    skills: Optional[str] = Field(default=None)
+    pdf_url: Optional[str] = Field(default=None, max_length=500)
+    dnd_beyond_url: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    user: Optional[User] = Relationship(back_populates="characters")
+
+
+class HistoricalEncounter(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    campaign_id: int = Field(foreign_key="campaign.id", index=True)
+    recorded_at: datetime = Field(default_factory=utc_now)
+    round_count: Optional[int] = Field(default=None)
+    combat_log_json: str = Field(default="[]")
+    defeated_monsters_json: str = Field(default="[]")
+
+    campaign: Optional[Campaign] = Relationship(back_populates="historical_encounters")
