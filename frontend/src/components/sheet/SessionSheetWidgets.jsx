@@ -19,6 +19,7 @@ import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
 import { AbilityScoresGrid } from "./AbilityScoresGrid";
 import { NotesPaneWidget } from "./NotesPaneWidget";
 import { PartyMemberSheetModal } from "./PartyMemberSheetModal";
+import { PortraitPreviewModal } from "./PortraitPreviewModal";
 import {
   INITIATIVE_ORIENTATION_HORIZONTAL,
   INITIATIVE_ORIENTATION_VERTICAL,
@@ -58,7 +59,7 @@ function mergePartyWithEncounter(members, combatants) {
   });
 }
 
-function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet }) {
+function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortraitPreview }) {
   const hpLabel =
     member.hp != null && member.max_hp != null
       ? `${member.hp}/${member.max_hp}`
@@ -83,6 +84,7 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet }) {
         portraitUrl={member.portrait_url}
         token={token}
         name={member.character_name}
+        onPreview={onPortraitPreview}
       />
       <button
         type="button"
@@ -133,6 +135,7 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
   const [addingAll, setAddingAll] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [sheetModalMember, setSheetModalMember] = useState(null);
+  const [portraitPreview, setPortraitPreview] = useState(null);
 
   const loadParty = useCallback(async () => {
     if (!token || !campaignId) return;
@@ -247,6 +250,7 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
             token={token}
             isOwner={isOwner}
             onViewSheet={isOwner ? setSheetModalMember : undefined}
+            onPortraitPreview={setPortraitPreview}
           />
         ))}
       </ul>
@@ -262,6 +266,13 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
         characterId={sheetModalMember?.character_id}
         token={token}
         onClose={() => setSheetModalMember(null)}
+      />
+      <PortraitPreviewModal
+        open={!!portraitPreview}
+        portraitUrl={portraitPreview?.portraitUrl}
+        name={portraitPreview?.name}
+        token={token}
+        onClose={() => setPortraitPreview(null)}
       />
     </div>
   );
@@ -556,6 +567,7 @@ export function CharacterPortraitWidget({
   const [activePortraitId, setActivePortraitId] = useState(portraitPhotoId ?? null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [portraitPreviewOpen, setPortraitPreviewOpen] = useState(false);
 
   const loadAlbum = useCallback(async () => {
     if (!characterId || !token) return;
@@ -663,14 +675,32 @@ export function CharacterPortraitWidget({
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-1">
       <div className="flex min-h-0 flex-[2] items-center justify-center overflow-hidden rounded-sm border border-border/60 bg-void-deep/40 p-2">
-        <AuthenticatedImage
-          key={activePortraitId ?? "no-portrait"}
-          src={previewSrc}
-          token={token}
-          alt={characterName || "Character"}
-          className="max-h-full max-w-full rounded-sm border border-neon-cyan/30 object-contain"
-          fallbackClassName="flex h-28 w-28 items-center justify-center rounded-sm border-2 border-dashed border-border text-3xl"
-        />
+        {previewSrc ? (
+          <button
+            type="button"
+            onClick={() => setPortraitPreviewOpen(true)}
+            className="flex max-h-full max-w-full items-center justify-center rounded-sm focus:outline-none focus:ring-2 focus:ring-neon-cyan/60"
+            title="View larger portrait"
+          >
+            <AuthenticatedImage
+              key={activePortraitId ?? "no-portrait"}
+              src={previewSrc}
+              token={token}
+              alt={characterName || "Character"}
+              className="max-h-full max-w-full rounded-sm border border-neon-cyan/30 object-contain"
+              fallbackClassName="flex h-28 w-28 items-center justify-center rounded-sm border-2 border-dashed border-border text-3xl"
+            />
+          </button>
+        ) : (
+          <AuthenticatedImage
+            key={activePortraitId ?? "no-portrait"}
+            src={previewSrc}
+            token={token}
+            alt={characterName || "Character"}
+            className="max-h-full max-w-full rounded-sm border border-neon-cyan/30 object-contain"
+            fallbackClassName="flex h-28 w-28 items-center justify-center rounded-sm border-2 border-dashed border-border text-3xl"
+          />
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/20 p-1.5">
         <p className="mb-1 text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">Album</p>
@@ -742,14 +772,21 @@ export function CharacterPortraitWidget({
       <p className="shrink-0 text-center text-[11px] sm:text-xs font-mono text-ink-faint">
         Up to 24 photos · JPEG, PNG, WebP, GIF · max 4 MB
       </p>
+      <PortraitPreviewModal
+        open={portraitPreviewOpen}
+        portraitUrl={previewSrc}
+        name={characterName}
+        token={token}
+        onClose={() => setPortraitPreviewOpen(false)}
+      />
     </div>
   );
 }
 
-function CombatantAvatar({ portraitUrl, token, name, size = "sm" }) {
+function CombatantAvatar({ portraitUrl, token, name, size = "sm", onPreview }) {
   const dimensions = size === "lg" ? "h-14 w-14 text-lg" : "h-10 w-10 text-sm";
   const cacheKey = portraitUrl?.split("photo=")[1] ?? portraitUrl;
-  return (
+  const image = (
     <AuthenticatedImage
       key={cacheKey}
       src={portraitUrl}
@@ -758,6 +795,24 @@ function CombatantAvatar({ portraitUrl, token, name, size = "sm" }) {
       className={`${dimensions} shrink-0 rounded-sm border border-border object-cover`}
       fallbackClassName={`${dimensions} shrink-0 rounded-sm border border-border`}
     />
+  );
+
+  if (!onPreview || !portraitUrl) {
+    return image;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onPreview({ portraitUrl, name });
+      }}
+      className="shrink-0 rounded-sm focus:outline-none focus:ring-2 focus:ring-neon-cyan/60 hover:opacity-90"
+      title={`View ${name}`}
+    >
+      {image}
+    </button>
   );
 }
 
@@ -1221,6 +1276,7 @@ function InitiativeCombatantRow({
   isSelected,
   isDefeated,
   onSelect,
+  onPortraitPreview,
   token,
   turnEconomy,
   resourceSheet,
@@ -1234,7 +1290,12 @@ function InitiativeCombatantRow({
       } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
     >
       <InitiativeTurnBadge index={index} compact />
-      <CombatantAvatar portraitUrl={combatant.portrait_url} token={token} name={combatant.name} />
+      <CombatantAvatar
+        portraitUrl={combatant.portrait_url}
+        token={token}
+        name={combatant.name}
+        onPreview={onPortraitPreview}
+      />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-black uppercase text-starlight" title={combatant.name}>
           {combatant.name}
@@ -1265,6 +1326,7 @@ function InitiativeCombatantCard({
   isSelected,
   isDefeated,
   onSelect,
+  onPortraitPreview,
   token,
   turnEconomy,
   resourceSheet,
@@ -1284,6 +1346,7 @@ function InitiativeCombatantCard({
           token={token}
           name={combatant.name}
           size="lg"
+          onPreview={onPortraitPreview}
         />
       </div>
       <p
@@ -1343,6 +1406,7 @@ export function InitiativeWidget({
   const [dmActionSheet, setDmActionSheet] = useState(null);
   const [dmSheetLoading, setDmSheetLoading] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
+  const [portraitPreview, setPortraitPreview] = useState(null);
   const savingRef = useRef(false);
 
   const loadEncounter = useCallback(async () => {
@@ -1770,6 +1834,7 @@ export function InitiativeWidget({
                 isSelected={isOwner && selectedId === combatant.id}
                 isDefeated={defeated}
                 onSelect={isOwner ? handleSelectCombatant : undefined}
+                onPortraitPreview={setPortraitPreview}
                 token={token}
                 turnEconomy={encounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
@@ -1800,6 +1865,7 @@ export function InitiativeWidget({
                 isSelected={isOwner && selectedId === combatant.id}
                 isDefeated={defeated}
                 onSelect={isOwner ? handleSelectCombatant : undefined}
+                onPortraitPreview={setPortraitPreview}
                 token={token}
                 turnEconomy={encounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
@@ -1814,6 +1880,14 @@ export function InitiativeWidget({
           })}
         </ul>
       )}
+
+      <PortraitPreviewModal
+        open={!!portraitPreview}
+        portraitUrl={portraitPreview?.portraitUrl}
+        name={portraitPreview?.name}
+        token={token}
+        onClose={() => setPortraitPreview(null)}
+      />
 
       {isOwner && selectedCombatant && (
         <div className="shrink-0 border-t border-border pt-2">
