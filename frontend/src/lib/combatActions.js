@@ -2,7 +2,12 @@
  * D&D 5.5e turn actions — sheet-derived attacks, spells, features, and NPC stat-block actions.
  */
 
-import { enrichRawAction, inferTargeting, overrideActionType } from "./actionRules";
+import {
+  enrichRawAction,
+  inferTargeting,
+  lookupCatalogAction,
+  overrideActionType,
+} from "./actionRules";
 import { inferPrimaryActionType } from "./actionTypeInference";
 import { abilityModifier, getProficiencyBonus } from "./characterSheet";
 import { ACTION_TYPES as SCHEMA_ACTION_TYPES } from "./sheetSchema";
@@ -82,6 +87,60 @@ function cleanActionName(name) {
 
 function actionNameKey(name) {
   return slug(cleanActionName(name));
+}
+
+/** One turn-menu entry per action type + name (features beat mislabeled attacks). */
+function actionDedupeKey(action) {
+  return `${action.actionType}:${actionNameKey(action.name)}`;
+}
+
+function actionCategoryPriority(category) {
+  if (category === "feature" || category === "combat" || category === "class_feature") return 3;
+  if (category === "spell") return 2;
+  if (category === "standard") return 1;
+  return 0;
+}
+
+function sheetCombatAbilityNames(sheet) {
+  const names = new Set();
+  for (const action of sheet?.combat_actions || []) {
+    if (action?.name) names.add(actionNameKey(action.name));
+  }
+  return names;
+}
+
+/** Sheet attacks[] often includes class features misparsed from PDF — keep real strikes only. */
+function isRealAttackEntry(raw, sheet) {
+  const name = String(raw?.name || "").trim();
+  if (!name) return false;
+
+  const key = actionNameKey(name);
+  if (sheetCombatAbilityNames(sheet).has(key)) return false;
+
+  const catalog = lookupCatalogAction(name);
+  if (catalog) {
+    if (catalog.category === "class_feature") return false;
+    if (catalog.healing_dice || catalog.resource_cost || catalog.effect) return false;
+    if (
+      catalog.targeting === "self" &&
+      !raw?.to_hit &&
+      !raw?.damage &&
+      !raw?.damage_dice &&
+      !catalog.damage_dice
+    ) {
+      return false;
+    }
+  }
+
+  if (/unarmed|talon|bite|claw|fist|slam|kick|punch|hoof|horn/i.test(name)) return true;
+  if (isWeaponItem({ name, type: raw?.type, damage: raw?.damage, to_hit: raw?.to_hit })) {
+    return true;
+  }
+  if (raw?.to_hit != null || raw?.damage || raw?.damage_dice) {
+    return !catalog?.healing_dice;
+  }
+
+  return false;
 }
 
 function isPassiveTurnAction(action) {
@@ -168,7 +227,8 @@ export function normalizeCombatAction(raw, index = 0, category = "action") {
     detail: enriched.detail || (detailParts ? `${detailParts}${costLabel || ""}` : costLabel || undefined),
     attackBonus: enriched.attack_bonus ?? enriched.attackBonus ?? enriched.to_hit ?? null,
     damageDice: parsedDamage,
-    resourceCost: resourceCost || undefined,
+    resourceCost: resourceCost || enriched.resource_cost || undefined,
+    skipsEconomy: enriched.effect === "extra_action",
     requiresOption: Boolean(enriched.requires_option || enriched.requiresOption),
     optionSource: enriched.option_source || enriched.optionSource || null,
     options: Array.isArray(enriched.options) ? enriched.options : undefined,
@@ -273,6 +333,7 @@ export function collectSheetAttackEntries(sheet) {
   const defaultToHit = inferDefaultToHit(sheet);
 
   for (const attack of sheet?.attacks || []) {
+    if (!isRealAttackEntry(attack, sheet)) continue;
     const entry = mapAttackEntry(attack, sheet);
     if (!entry || seen.has(entry.name.toLowerCase())) continue;
     seen.add(entry.name.toLowerCase());
@@ -302,78 +363,73 @@ export function collectSheetAttackEntries(sheet) {
   return entries;
 }
 
-/** Non-attack sheet actions for the digital sheet Actions tab. */
-export function collectSheetCombatActions(sheet) {
-  const actions = [];
-  const seen = new Set();
-
-  const add = (raw, category = "action") => {
-    const normalized = normalizeCombatAction(raw, actions.length, category);
-    if (!normalized) return;
-    const key = `${normalized.actionType}:${actionNameKey(normalized.name)}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    actions.push(normalized);
-  };
-
-  for (const action of sheet?.combat_actions || []) {
-    add(action, npcActionCategory(action));
-  }
-
-  for (const feat of sheet?.features || []) {
-    if (!feat?.action_type || !feat?.targeting) continue;
-    if (isPassiveTurnAction(feat)) continue;
-    add(
-      {
-        id: feat.id || `feat-${feat.name}`,
-        name: feat.name,
-        action_type: feat.action_type,
-        targeting: feat.targeting,
-        description: feat.description,
-      },
-      "feature"
-    );
-  }
-
-  for (const spell of sheet?.spells || []) {
-    if (!spell?.name || spell.prepared === false) continue;
-    add(
-      {
-        id: spell.id || `spell-${spell.name}`,
-        name: spell.name,
-        action_type: spell.action_type || spell.actionType || ACTION_TYPES.action,
-        targeting: spell.targeting,
-        description: spell.description,
-      },
-      "spell"
-    );
-  }
-
-  return actions;
-}
-
-function inventoryWeaponActions(sheet) {
-  return (sheet?.inventory || [])
-    .filter((item) => isWeaponItem(item))
-    .map((item, index) => {
-      const detail = [item.damage, item.to_hit != null ? `+${item.to_hit} to hit` : null, item.notes]
+function attackEntriesAsActions(sheet, attacks) {
+  return attacks
+    .map((entry, index) => {
+      const detail = [entry.damage, entry.toHit != null ? `+${entry.toHit} to hit` : null, entry.range, entry.notes]
         .filter(Boolean)
         .join(" · ");
+      const category = String(entry.id || "").startsWith("weapon-") ? "weapon" : "attack";
       return normalizeCombatAction(
         {
-          id: `weapon-${item.id || item.name}`,
-          name: item.name,
-          action_type: ACTION_TYPES.action,
+          id: entry.id,
+          name: entry.name,
+          action_type: entry.actionType || ACTION_TYPES.action,
           targeting: TARGETING.one_enemy,
-          detail: detail || item.name,
-          to_hit: item.to_hit,
-          damage: item.damage,
+          to_hit: entry.toHit,
+          damage: entry.damage,
+          notes: entry.notes,
+          detail: detail || entry.name,
         },
         index,
-        "weapon"
+        category
       );
     })
     .filter(Boolean);
+}
+
+/**
+ * Canonical sheet action catalog — single source for digital sheet and turn UI.
+ * @returns {{ attacks: object[], actions: object[] }}
+ */
+export function collectSheetActionCatalog(sheet) {
+  const attacks = collectSheetAttackEntries(sheet);
+  const actions = [];
+  const seen = new Set();
+
+  const add = (action) => {
+    if (!action) return;
+    const key = actionDedupeKey(action);
+    const existingIndex = actions.findIndex((entry) => actionDedupeKey(entry) === key);
+    if (existingIndex >= 0) {
+      if (
+        actionCategoryPriority(action.category) >
+        actionCategoryPriority(actions[existingIndex].category)
+      ) {
+        actions[existingIndex] = action;
+      }
+      return;
+    }
+    actions.push(action);
+  };
+
+  spellActions(sheet).forEach(add);
+  explicitSheetActions(sheet).forEach(add);
+  featureActions(sheet).forEach(add);
+  inferredFeatureActions(sheet).forEach(add);
+  attackEntriesAsActions(sheet, attacks).forEach(add);
+
+  return {
+    attacks,
+    actions: attachWildShapeOptions(sheet, actions),
+  };
+}
+
+/** Non-attack actions for the digital sheet Actions tab (attacks use the table). */
+export function collectSheetCombatActions(sheet) {
+  return collectSheetActionCatalog(sheet).actions.filter(
+    (action) => action.category !== "attack" && action.category !== "weapon"
+  );
 }
 
 /** Single menu entry — item picked in a follow-up submenu. Slot type is set per menu. */
@@ -438,22 +494,6 @@ export function unequipItemAction(item, slotType = ACTION_TYPES.action) {
   );
 }
 
-function attackRowActions(sheet) {
-  return (sheet?.attacks || [])
-    .map((attack, index) =>
-      normalizeCombatAction(
-        {
-          ...attack,
-          action_type: attack.action_type || attack.actionType || ACTION_TYPES.action,
-          targeting: attack.targeting || TARGETING.one_enemy,
-        },
-        index,
-        "attack"
-      )
-    )
-    .filter(Boolean);
-}
-
 function spellActions(sheet) {
   return (sheet?.spells || [])
     .filter((spell) => spell?.name && spell.prepared !== false)
@@ -512,7 +552,12 @@ function inferFeatureTargeting(feat) {
   return normalizeTargeting(feat?.targeting, text, "feature");
 }
 
-function npcActionCategory(action) {
+function combatActionCategory(action) {
+  const catalog = lookupCatalogAction(String(action?.name || ""));
+  if (catalog?.category === "class_feature") return "feature";
+  if (catalog?.category === "standard") return "standard";
+  if (action?.category === "class_feature") return "feature";
+
   const id = String(action?.id || "");
   if (/^(action|bonus|reaction|legendary|npc|attack)-/.test(id)) return "attack";
   if (action?.attack_bonus != null || action?.attackBonus != null || action?.damage_dice) {
@@ -523,7 +568,7 @@ function npcActionCategory(action) {
 
 function explicitSheetActions(sheet) {
   return (sheet?.combat_actions || [])
-    .map((action, index) => normalizeCombatAction(action, index, npcActionCategory(action)))
+    .map((action, index) => normalizeCombatAction(action, index, combatActionCategory(action)))
     .filter(Boolean);
 }
 
@@ -572,14 +617,41 @@ function attachWildShapeOptions(sheet, actions) {
 }
 
 function collectSheetDerivedActions(sheet) {
-  return attachWildShapeOptions(sheet, [
-    ...attackRowActions(sheet),
-    ...inventoryWeaponActions(sheet),
-    ...spellActions(sheet),
-    ...explicitSheetActions(sheet),
-    ...featureActions(sheet),
-    ...inferredFeatureActions(sheet),
-  ]);
+  return collectSheetActionCatalog(sheet).actions;
+}
+
+/**
+ * Standard actions shown on sheet / added to turn menu — mirrors buildAvailableActions rules.
+ * @param {object|null} sheet
+ * @param {{ filter?: string, mode?: 'pc' | 'npc' }} options
+ */
+export function resolveStandardActions(sheet, options = {}) {
+  const { filter = "all", mode = "pc" } = options;
+  if (mode === "npc") return [];
+
+  const catalog = collectSheetActionCatalog(sheet || {});
+  const hasAttacks = catalog.attacks.length > 0;
+  const hasActionSlotActions = catalog.actions.some(
+    (action) => action.actionType === ACTION_TYPES.action
+  );
+
+  let standards = hasAttacks
+    ? STANDARD_ACTIONS.filter((action) => action.id !== "std-attack")
+    : [...STANDARD_ACTIONS];
+
+  if (hasActionSlotActions) {
+    standards = standards.filter((action) => action.targeting === TARGETING.self);
+  }
+
+  if (filter === "action") {
+    standards = standards.filter((action) => action.actionType === ACTION_TYPES.action);
+  } else if (filter === "bonus_action") {
+    standards = standards.filter((action) => action.actionType === ACTION_TYPES.bonus_action);
+  } else if (filter === "reaction" || filter === "attack" || filter === "limited_use") {
+    standards = [];
+  }
+
+  return standards;
 }
 
 /**
@@ -597,7 +669,7 @@ export function buildAvailableActions(sheet, options = {}) {
   const seen = new Set();
   const add = (action) => {
     if (!canSelectTurnAction(action)) return;
-    const key = `${action.actionType}:${actionNameKey(action.name)}`;
+    const key = actionDedupeKey(action);
     if (seen.has(key)) return;
     seen.add(key);
     if (byType[action.actionType]) byType[action.actionType].push(action);
@@ -606,10 +678,6 @@ export function buildAvailableActions(sheet, options = {}) {
   const derived = collectSheetDerivedActions(sheet || {});
   derived.forEach(add);
 
-  const hasWeaponAttacks = derived.some(
-    (action) => action.category === "weapon" || action.category === "attack"
-  );
-
   if (mode === "npc") {
     if (byType[ACTION_TYPES.action].length === 0) {
       NPC_FALLBACK_ACTIONS.forEach(add);
@@ -617,17 +685,7 @@ export function buildAvailableActions(sheet, options = {}) {
     return byType;
   }
 
-  const standards = hasWeaponAttacks
-    ? STANDARD_ACTIONS.filter((action) => action.id !== "std-attack")
-    : STANDARD_ACTIONS;
-
-  if (byType[ACTION_TYPES.action].length === 0) {
-    standards.forEach(add);
-  } else {
-    standards
-      .filter((action) => action.targeting === TARGETING.self)
-      .forEach(add);
-  }
+  resolveStandardActions(sheet, { mode }).forEach(add);
 
   return byType;
 }
@@ -708,6 +766,49 @@ export function validateTargetSelection(action, actorCombatantId, targetIds, com
     return { ok: false, reason: "That target is not valid for this action." };
   }
   return { ok: true };
+}
+
+export function canAffordResourceCost(sheet, action) {
+  const cost = action?.resourceCost;
+  if (!cost?.resource_id) return true;
+  const pool = (sheet?.resources || []).find((entry) => entry?.id === cost.resource_id);
+  if (!pool || pool.current == null) return true;
+  return Number(pool.current) >= Number(cost.amount ?? 1);
+}
+
+export function resourceCostLabel(action) {
+  const cost = action?.resourceCost;
+  if (!cost?.resource_id) return null;
+  const amount = cost.amount ?? 1;
+  return `${amount} ${cost.resource_id.replace(/-/g, " ")}`;
+}
+
+const PICKER_CATEGORY_ORDER = ["attack", "weapon", "feature", "spell", "combat", "standard", "npc"];
+
+const PICKER_CATEGORY_LABELS = {
+  attack: "Attacks",
+  weapon: "Weapons",
+  feature: "Features",
+  class_feature: "Features",
+  spell: "Spells",
+  combat: "Abilities",
+  standard: "Standard",
+  npc: "NPC",
+};
+
+/** Group turn-menu actions for the picker UI. */
+export function groupActionsForPicker(actions) {
+  const groups = new Map();
+  for (const action of actions || []) {
+    const category = action.category || "combat";
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(action);
+  }
+  return PICKER_CATEGORY_ORDER.filter((category) => groups.has(category)).map((category) => ({
+    category,
+    label: PICKER_CATEGORY_LABELS[category] || category,
+    actions: groups.get(category),
+  }));
 }
 
 export function formatApiErrorDetail(detail, fallback = "Request failed") {

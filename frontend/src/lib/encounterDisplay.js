@@ -82,11 +82,16 @@ export function combatantMoveText(combatant, economy) {
   return speed != null ? `${speed} ft` : null;
 }
 
-export function turnStatusLabels(economy) {
+export function turnStatusLabels(economy, combatants = []) {
   if (!economy) return [];
   const labels = [];
   if (economy.dodging) labels.push("Dodging");
   if (economy.disengaged) labels.push("Disengaged");
   if (economy.hiding) labels.push("Hiding");
+  if (economy.helping_target_id) {
+    const target = combatants.find((c) => c.id === economy.helping_target_id);
+    labels.push(target ? `Helping ${target.name}` : "Helping");
+  }
+  if (economy.readied_action) labels.push(`Readied: ${economy.readied_action}`);
   return labels;
 }

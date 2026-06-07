@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import {
-  collectSheetAttackEntries,
-  collectSheetCombatActions,
-  STANDARD_ACTIONS,
+  collectSheetActionCatalog,
+  resolveStandardActions,
 } from "../../lib/combatActions";
 import {
   ABILITIES,
@@ -416,22 +415,21 @@ const EMPTY_FILTER_MESSAGES = {
   attack: "No attacks on sheet.",
 };
 
-function standardActionsForFilter(filter) {
-  if (filter === "all") return STANDARD_ACTIONS;
-  if (filter === "action") {
-    return STANDARD_ACTIONS.filter((action) => action.actionType === "action");
-  }
-  return [];
-}
-
 function ActionsPanel({ sheet, filter, onShowDetail }) {
-  const attacks = useMemo(() => collectSheetAttackEntries(sheet), [sheet]);
-  const combatActions = useMemo(() => collectSheetCombatActions(sheet), [sheet]);
+  const catalog = useMemo(() => collectSheetActionCatalog(sheet), [sheet]);
+  const attacks = catalog.attacks;
+  const combatActions = useMemo(
+    () => catalog.actions.filter((action) => action.category !== "attack" && action.category !== "weapon"),
+    [catalog.actions]
+  );
   const filteredActions = useMemo(
     () => filterCombatActions(combatActions, filter),
     [combatActions, filter]
   );
-  const standardActions = useMemo(() => standardActionsForFilter(filter), [filter]);
+  const standardActions = useMemo(
+    () => resolveStandardActions(sheet, { filter, mode: "pc" }),
+    [sheet, filter]
+  );
 
   const showAttacks = filter === "all" || filter === "attack";
   const showStandards = standardActions.length > 0;

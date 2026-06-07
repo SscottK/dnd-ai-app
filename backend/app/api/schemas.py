@@ -284,10 +284,14 @@ class TurnEconomySnapshot(BaseModel):
     action_used: bool = False
     bonus_action_used: bool = False
     reaction_used: bool = False
+    extra_action_available: bool = False
+    attacks_remaining: int = 0
     movement_remaining: int | None = None
     dodging: bool = False
     disengaged: bool = False
     hiding: bool = False
+    helping_target_id: str | None = None
+    readied_action: str | None = None
 
 
 class EncounterState(BaseModel):

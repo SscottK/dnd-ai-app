@@ -997,10 +997,10 @@ function InitiativeStatusBadges({ combatant, isYou, isDefeated }) {
   );
 }
 
-function InitiativeCombatantStats({ combatant, isDmView, turnEconomy, isActive }) {
+function InitiativeCombatantStats({ combatant, combatants, isDmView, turnEconomy, isActive }) {
   const conditions = formatConditionsList(combatant.conditions);
   const economy = isActive ? turnEconomy?.[combatant.id] : null;
-  const turnStatuses = turnStatusLabels(economy);
+  const turnStatuses = turnStatusLabels(economy, combatants);
   return (
     <div className="flex w-full flex-col gap-0.5">
       <InitiativeLabeledStat label="Init" value={combatant.initiative} />
@@ -1225,6 +1225,7 @@ function DmCombatantEditor({
 
 function InitiativeCombatantRow({
   combatant,
+  combatants,
   index,
   isActive,
   isYou,
@@ -1253,6 +1254,7 @@ function InitiativeCombatantRow({
         <div className="mt-1 max-w-[220px]">
           <InitiativeCombatantStats
             combatant={combatant}
+            combatants={combatants}
             isDmView={isDmView}
             turnEconomy={turnEconomy}
             isActive={isActive}
@@ -1265,6 +1267,7 @@ function InitiativeCombatantRow({
 
 function InitiativeCombatantCard({
   combatant,
+  combatants,
   index,
   isActive,
   isYou,
@@ -1300,6 +1303,7 @@ function InitiativeCombatantCard({
       </p>
       <InitiativeCombatantStats
         combatant={combatant}
+        combatants={combatants}
         isDmView={isDmView}
         turnEconomy={turnEconomy}
         isActive={isActive}
@@ -1717,6 +1721,7 @@ export function InitiativeWidget({
           canAdjustMovement={isMyTurn}
           activeTurnName={activeCombatant?.name}
           onEncounterUpdate={setEncounter}
+          onSheetRefresh={handleSheetRefresh}
           onError={setActionError}
         />
       )}
@@ -1734,6 +1739,7 @@ export function InitiativeWidget({
           actionSheet={dmActionSheet}
           actionSheetLoading={dmSheetLoading}
           onEncounterUpdate={setEncounter}
+          onSheetRefresh={handleSheetRefresh}
           onError={setActionError}
         />
       )}
@@ -1756,6 +1762,7 @@ export function InitiativeWidget({
               <InitiativeCombatantCard
                 key={combatant.id}
                 combatant={combatant}
+                combatants={encounter.combatants}
                 index={index}
                 isActive={!defeated && activeCombatant?.id === combatant.id}
                 isYou={combatant.character_id === characterId}
@@ -1777,6 +1784,7 @@ export function InitiativeWidget({
               <InitiativeCombatantRow
                 key={combatant.id}
                 combatant={combatant}
+                combatants={encounter.combatants}
                 index={index}
                 isActive={!defeated && activeCombatant?.id === combatant.id}
                 isYou={combatant.character_id === characterId}

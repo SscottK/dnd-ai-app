@@ -30,7 +30,7 @@ _BONUS_ACTION_HINT = re.compile(r"bonus action", re.IGNORECASE)
 _REACTION_HINT = re.compile(r"reaction", re.IGNORECASE)
 _ACTION_HINT = re.compile(r"\baction\b", re.IGNORECASE)
 _HEALING_DICE_RE = re.compile(
-    r"regain hit points equal to (\d+d\d+(?:\s*\+\s*[^.]+)?)",
+    r"regain hit points equal to (\d+d\d+(?:\s*(?:\+|plus)\s*(?:your\s+)?(?:\w+\s+)?level)?)",
     re.IGNORECASE,
 )
 _PASSIVE_TURN_ACTION_NAMES = frozenset(
@@ -58,7 +58,28 @@ def _merge_combat_catalog_entries(by_name: dict[str, dict], payload: dict) -> No
         for entry in payload.get(bucket) or []:
             if not isinstance(entry, dict) or not entry.get("name"):
                 continue
-            by_name[str(entry["name"]).casefold()] = entry
+            key = str(entry["name"]).casefold()
+            previous = by_name.get(key)
+            if previous:
+                merged = dict(previous)
+                merged.update(entry)
+                for field in ("healing_dice", "resource_cost", "requires_option", "option_source"):
+                    if not merged.get(field) and previous.get(field):
+                        merged[field] = previous[field]
+                if not merged.get("healing_dice"):
+                    healing = parse_healing_dice(
+                        str(merged.get("description") or previous.get("description") or "")
+                    )
+                    if healing:
+                        merged["healing_dice"] = healing
+                by_name[key] = merged
+            else:
+                row = dict(entry)
+                if not row.get("healing_dice"):
+                    healing = parse_healing_dice(str(row.get("description") or ""))
+                    if healing:
+                        row["healing_dice"] = healing
+                by_name[key] = row
 
 
 @lru_cache(maxsize=1)
@@ -168,10 +189,13 @@ def infer_targeting(
 
 
 def parse_healing_dice(description: str) -> str | None:
-    match = _HEALING_DICE_RE.search(description or "")
+    text = description or ""
+    match = _HEALING_DICE_RE.search(text)
     if not match:
         return None
-    return re.sub(r"\s+", "", match.group(1).lower())
+    expr = match.group(1).lower()
+    expr = re.sub(r"\s+plus\s+your\s+(\w+\s+)?level", r"+your\1level", expr, flags=re.IGNORECASE)
+    return re.sub(r"\s+", "", expr)
 
 
 def _is_passive_turn_action(name: str) -> bool:

@@ -180,16 +180,21 @@ def use_combat_action(
     if is_incapacitated(actor.conditions):
         raise ValueError("You have the Incapacitated condition and cannot take actions.")
 
+    validate_target_selection(state, actor.id, targeting, target_ids)
+
     ensure_turn_economy(state)
     economy = state.turn_economy.setdefault(actor.id, TurnEconomySnapshot())
     field = _economy_field(action_type)
-    if getattr(economy, field):
+    if action_type == "action" and economy.action_used:
+        if economy.extra_action_available:
+            economy.extra_action_available = False
+        else:
+            raise ValueError("You have already used your action this turn.")
+    elif getattr(economy, field):
         label = action_type.replace("_", " ")
         raise ValueError(f"You have already used your {label} this turn.")
-
-    validate_target_selection(state, actor.id, targeting, target_ids)
-
-    setattr(economy, field, True)
+    else:
+        setattr(economy, field, True)
 
     target_name = None
     if target_ids:

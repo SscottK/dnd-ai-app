@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.api.schemas import EncounterCombatant, EncounterState, UseActionRequest
+from app.services.action_rules import lookup_combat_action
 from app.services.combat_log import append_log
 from app.services.weapon_attacks import clean_action_label
 
@@ -18,11 +19,59 @@ def _effect_key(action_id: str, action_name: str) -> str | None:
         return "disengage"
     if "hide" in aid or clean == "hide":
         return "hide"
+    if "help" in aid or clean == "help":
+        return "help"
+    if "ready" in aid or clean == "ready":
+        return "ready"
+    if "search" in aid or clean == "search":
+        return "search"
+    if "study" in aid or clean == "study":
+        return "study"
+    if "utilize" in aid or clean == "utilize":
+        return "utilize"
+    if "influence" in aid or clean == "influence":
+        return "influence"
     return None
 
 
 def is_standard_turn_effect(action_id: str, action_name: str) -> bool:
     return _effect_key(action_id, action_name) is not None
+
+
+def action_catalog_effect(action_name: str) -> str | None:
+    catalog = lookup_combat_action(clean_action_label(action_name))
+    if not catalog:
+        return None
+    return catalog.get("effect")
+
+
+def skips_action_economy(action_name: str) -> bool:
+    return action_catalog_effect(action_name) == "extra_action"
+
+
+def is_extra_action_effect(action_name: str) -> bool:
+    return skips_action_economy(action_name)
+
+
+def resolve_extra_action_effect(
+    state: EncounterState,
+    *,
+    actor: EncounterCombatant,
+    data: UseActionRequest,
+) -> list[str]:
+    if not is_extra_action_effect(data.action_name):
+        return []
+
+    from app.api.schemas import TurnEconomySnapshot
+
+    economy = state.turn_economy.setdefault(actor.id, TurnEconomySnapshot())
+    economy.extra_action_available = True
+    clean = clean_action_label(data.action_name)
+    message = (
+        f"{actor.name} uses {clean} — you can take one additional action this turn."
+    )
+    append_log(state, message, kind="action", actor=actor.name)
+    return [message]
 
 
 def resolve_standard_combat_effect(
@@ -79,6 +128,59 @@ def resolve_standard_combat_effect(
             f"{actor.name} takes the Hide action — attempting to become unseen "
             "(make a Stealth check)."
         )
+        messages.append(message)
+        append_log(state, message, kind="action", actor=actor.name)
+        return messages
+
+    if effect == "help":
+        if len(data.target_ids) != 1:
+            raise ValueError("Select exactly one ally to Help.")
+        target = next((c for c in state.combatants if c.id == data.target_ids[0]), None)
+        target_name = target.name if target else "ally"
+        economy.helping_target_id = data.target_ids[0]
+        message = (
+            f"{actor.name} Helps {target_name} — the next D20 test they make "
+            "before your next turn has advantage."
+        )
+        messages.append(message)
+        append_log(state, message, kind="action", actor=actor.name)
+        return messages
+
+    if effect == "ready":
+        ready_for = (data.detail or "an action").strip()[:120]
+        economy.readied_action = ready_for
+        message = (
+            f"{actor.name} readies {ready_for} — will act on the chosen trigger "
+            "before their next turn."
+        )
+        messages.append(message)
+        append_log(state, message, kind="action", actor=actor.name)
+        return messages
+
+    if effect == "search":
+        message = f"{actor.name} takes the Search action — making a Perception or Investigation check."
+        messages.append(message)
+        append_log(state, message, kind="action", actor=actor.name)
+        return messages
+
+    if effect == "study":
+        message = f"{actor.name} takes the Study action — making an Arcana, History, or other lore check."
+        messages.append(message)
+        append_log(state, message, kind="action", actor=actor.name)
+        return messages
+
+    if effect == "utilize":
+        message = f"{actor.name} takes the Utilize action — interacting with an object or device."
+        messages.append(message)
+        append_log(state, message, kind="action", actor=actor.name)
+        return messages
+
+    if effect == "influence":
+        if len(data.target_ids) != 1:
+            raise ValueError("Select a creature to Influence.")
+        target = next((c for c in state.combatants if c.id == data.target_ids[0]), None)
+        target_name = target.name if target else "creature"
+        message = f"{actor.name} attempts to Influence {target_name}."
         messages.append(message)
         append_log(state, message, kind="action", actor=actor.name)
         return messages

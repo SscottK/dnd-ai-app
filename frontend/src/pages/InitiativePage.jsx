@@ -14,12 +14,14 @@ import { apiFetch } from "../lib/api";
 import { ConditionsEditor } from "../components/sheet/ConditionsEditor";
 import { formatConditionsList } from "../lib/conditions";
 import {
+  combatantMoveText,
   formatCombatantAc,
   formatCombatantSpeed,
   isDefeatedEnemy,
   parseEncounterPatchResponse,
   sortCombatantsForDisplay,
   sortCombatantsForTurns,
+  turnStatusLabels,
 } from "../lib/encounterDisplay";
 import { DiceRoller } from "../components/DiceRoller";
 
@@ -32,7 +34,12 @@ export function InitiativePage() {
   const { token } = useAuth();
   const [campaignName, setCampaignName] = useState("");
   const [isOwner, setIsOwner] = useState(false);
-  const [encounter, setEncounter] = useState({ round: 1, active_index: 0, combatants: [] });
+  const [encounter, setEncounter] = useState({
+    round: 1,
+    active_index: 0,
+    combatants: [],
+    turn_economy: {},
+  });
   const [roster, setRoster] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -437,6 +444,13 @@ export function InitiativePage() {
                 {displaySorted.map((combatant, index) => {
                   const defeated = isDefeatedEnemy(combatant);
                   const isActive = !defeated && activeCombatant?.id === combatant.id;
+                  const economy = encounter.turn_economy?.[combatant.id];
+                  const moveText = isActive
+                    ? combatantMoveText(combatant, economy)
+                    : formatCombatantSpeed(combatant.speed).replace(/^ · /, "");
+                  const turnStatuses = isActive
+                    ? turnStatusLabels(economy, encounter.combatants)
+                    : [];
                   return (
                   <div
                     key={combatant.id}
@@ -485,7 +499,8 @@ export function InitiativePage() {
                             ? `HP ${combatant.hp}/${combatant.max_hp}`
                             : ""}
                           {formatCombatantAc(combatant, isOwner)}
-                          {formatCombatantSpeed(combatant.speed)}
+                          {moveText ? ` · ${moveText}` : ""}
+                          {turnStatuses.length ? ` · ${turnStatuses.join(", ")}` : ""}
                         </p>
                       )}
                     </div>

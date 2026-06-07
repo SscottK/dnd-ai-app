@@ -153,6 +153,8 @@
       "category": "class_feature",
       "source_class": "Fighter",
       "description": "You have a limited well of physical and mental stamina that you can draw on. As a Bonus Action, you can use it to regain Hit Points equal to 1d10 plus your Fighter level. You can use this feature twice. You regain one expended use when you finish a Short Rest , and you regain all expended uses when you finish a Long Rest . When you reach certain Fighter levels, you gain more uses of this feature, as shown in the Second Wind column of the Fighter Features table .",
+      "healing_dice": "1d10+yourfighterlevel",
+      "resource_cost": { "resource_id": "second-wind", "amount": 1 },
       "min_level": 1
     },
     {
@@ -162,6 +164,8 @@
       "category": "class_feature",
       "source_class": "Fighter",
       "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action, except the Magic action. Once you use this feature, you can’t do so again until you finish a Short or Long Rest . Starting at level 17, you can use it twice before a rest but only once on a turn.",
+      "resource_cost": { "resource_id": "action-surge", "amount": 1 },
+      "effect": "extra_action",
       "min_level": 2
     },
     {

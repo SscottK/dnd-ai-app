@@ -76,6 +76,98 @@ def _casefold_name(value: str) -> str:
     return str(value or "").strip().casefold()
 
 
+_WEAPON_ATTACK_HINTS = re.compile(
+    r"unarmed|talon|bite|claw|fist|slam|kick|punch|hoof|horn|rapier|sword|axe|bow|dagger|mace",
+    re.IGNORECASE,
+)
+
+
+def _is_real_attack_row(raw: dict, sheet: dict) -> bool:
+    """PDF imports often put class features in attacks[] — keep weapon strikes only."""
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return False
+
+    key = _casefold_name(name)
+    if key in _PASSIVE_FEATURE_NAMES or key in _RESOURCE_ONLY_NAMES:
+        return False
+
+    combat_names = {
+        _casefold_name(entry.get("name"))
+        for entry in sheet.get("combat_actions") or []
+        if isinstance(entry, dict) and entry.get("name")
+    }
+    if key in combat_names:
+        return False
+
+    catalog = lookup_combat_action(name)
+    if catalog:
+        if catalog.get("category") == "class_feature":
+            return False
+        if catalog.get("healing_dice") or catalog.get("resource_cost") or catalog.get("effect"):
+            return False
+        if (
+            catalog.get("targeting") == "self"
+            and raw.get("to_hit") is None
+            and not raw.get("damage")
+            and not raw.get("damage_dice")
+        ):
+            return False
+
+    if raw.get("to_hit") is not None or raw.get("damage") or raw.get("damage_dice"):
+        return not (catalog and catalog.get("healing_dice"))
+
+    return bool(_WEAPON_ATTACK_HINTS.search(name))
+
+
+def sanitize_attacks(sheet: dict) -> dict:
+    """Move mislabeled attacks[] rows into combat_actions."""
+    next_sheet = dict(sheet)
+    attacks = next_sheet.get("attacks") or []
+    promoted = [dict(entry) for entry in next_sheet.get("combat_actions") or [] if isinstance(entry, dict)]
+    promoted_names = {_casefold_name(entry.get("name")) for entry in promoted if entry.get("name")}
+
+    kept: list[dict] = []
+    for row in attacks:
+        if not isinstance(row, dict):
+            continue
+        if _is_real_attack_row(row, next_sheet):
+            kept.append(row)
+            continue
+
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        key = _casefold_name(name)
+        if key in promoted_names:
+            continue
+
+        catalog = lookup_combat_action(name)
+        action_type = (
+            (catalog or {}).get("action_type")
+            or infer_primary_action_type(name, str(row.get("description") or ""))
+            or "action"
+        )
+        promoted.append(
+            {
+                "id": row.get("id") or f"promoted-{_slugify(name)}",
+                "name": name,
+                "action_type": action_type,
+                "targeting": (catalog or {}).get("targeting") or "self",
+                "description": str(
+                    row.get("description") or (catalog or {}).get("description") or ""
+                )[:500],
+                "source": "import",
+                "display": ["turn_actions"],
+            }
+        )
+        promoted_names.add(key)
+
+    next_sheet["attacks"] = kept
+    next_sheet["combat_actions"] = promoted
+    return next_sheet
+
+
 def _ability_modifier(score: int | None) -> int:
     if score is None:
         return 0
@@ -390,6 +482,15 @@ def merge_catalog_combat_actions(sheet: dict, classes: list[dict]) -> list[dict]
                 catalog_entry = lookup_combat_action(action_name)
                 if not catalog_entry:
                     continue
+                resource_cost = catalog_entry.get("resource_cost")
+                if not resource_cost:
+                    for spec in class_spec.get("limited_uses") or []:
+                        if _casefold_name(spec.get("name")) == key:
+                            resource_cost = {
+                                "resource_id": str(spec.get("id") or _slugify(action_name)),
+                                "amount": 1,
+                            }
+                            break
                 actions.append(
                     {
                         "id": f"class-{_slugify(class_name)}-{_slugify(action_name)}",
@@ -399,11 +500,7 @@ def merge_catalog_combat_actions(sheet: dict, classes: list[dict]) -> list[dict]
                         "description": str(catalog_entry.get("description") or "")[:500],
                         "source": class_name,
                         "display": ["turn_actions"],
-                        **(
-                            {"resource_cost": catalog_entry["resource_cost"]}
-                            if catalog_entry.get("resource_cost")
-                            else {}
-                        ),
+                        **({"resource_cost": resource_cost} if resource_cost else {}),
                     }
                 )
                 existing.add(key)
@@ -468,7 +565,7 @@ def enrich_sheet_pipeline(
     level: int | None = None,
 ) -> dict[str, Any]:
     """Normalize any parsed sheet into combat-ready structures for all classes."""
-    next_sheet = dict(sheet)
+    next_sheet = sanitize_attacks(dict(sheet))
     classes = normalize_classes(next_sheet, class_name=class_name, level=level)
     next_sheet["classes"] = classes
     next_sheet["resources"] = enrich_resources(next_sheet, classes)

@@ -83,11 +83,17 @@ from app.services.combat_resolution import (
     resolve_attack,
     resolve_attack_profile,
     resolve_self_heal,
+    will_resolve_self_heal,
 )
+from app.services.attack_economy import use_weapon_attack
+from app.services.resource_actions import spend_action_resource
 from app.services.standard_combat_actions import (
     adjust_movement,
+    is_extra_action_effect,
     is_standard_turn_effect,
+    resolve_extra_action_effect,
     resolve_standard_combat_effect,
+    skips_action_economy,
 )
 from app.services.turn_actions import ensure_turn_economy, get_active_combatant, use_combat_action
 from app.services.invite_codes import generate_invite_code
@@ -742,23 +748,51 @@ def use_encounter_action(
         standard_effect = is_standard_turn_effect(
             resolved_data.action_id, resolved_data.action_name
         )
+        extra_action_effect = is_extra_action_effect(resolved_data.action_name)
+        self_heal_effect = will_resolve_self_heal(resolved_data)
+        skip_economy = skips_action_economy(resolved_data.action_name)
+
+        resource_messages = spend_action_resource(
+            session,
+            campaign_id,
+            actor=actor,
+            data=resolved_data,
+        )
+        for message in resource_messages:
+            append_log(state, message, kind="action", actor=actor.name)
 
         log_before = len(state.combat_log)
-        use_combat_action(
-            state,
-            actor=actor,
-            action_id=resolved_data.action_id,
-            action_name=resolved_data.action_name,
-            action_type=resolved_data.action_type,
-            targeting=resolved_data.targeting,
-            target_ids=resolved_data.target_ids,
-            detail=resolved_data.detail,
-            log_usage=not will_resolve_attack and not standard_effect,
-        )
+        if not skip_economy:
+            if will_resolve_attack:
+                use_weapon_attack(
+                    state,
+                    session,
+                    campaign_id,
+                    actor=actor,
+                    data=resolved_data,
+                )
+            else:
+                use_combat_action(
+                    state,
+                    actor=actor,
+                    action_id=resolved_data.action_id,
+                    action_name=resolved_data.action_name,
+                    action_type=resolved_data.action_type,
+                    targeting=resolved_data.targeting,
+                    target_ids=resolved_data.target_ids,
+                    detail=resolved_data.detail,
+                    log_usage=not standard_effect and not self_heal_effect,
+                )
         if will_resolve_attack:
             action_messages = resolve_attack(
                 session,
                 campaign_id,
+                state,
+                actor=actor,
+                data=resolved_data,
+            )
+        elif extra_action_effect:
+            action_messages = resolve_extra_action_effect(
                 state,
                 actor=actor,
                 data=resolved_data,
@@ -783,6 +817,8 @@ def use_encounter_action(
                 ]
             if not action_messages:
                 action_messages = [f"{actor.name} uses {resolved_data.action_name}."]
+        if resource_messages:
+            action_messages = [*resource_messages, *action_messages]
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

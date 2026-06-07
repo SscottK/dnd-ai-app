@@ -40,11 +40,21 @@ def _combat_action_index() -> dict[str, dict]:
 
 @router.get("/combat-actions")
 def list_combat_actions():
-    path = _DATA_DIR / "combat_actions.json"
-    if not path.is_file():
-        return {"_license": "", "standard_actions": [], "class_features": []}
-    with path.open(encoding="utf-8") as handle:
-        return json.load(handle)
+    from app.services.action_rules import _load_combat_catalog
+
+    by_name = _load_combat_catalog()
+    standard_actions = []
+    class_features = []
+    for entry in by_name.values():
+        if entry.get("category") == "standard":
+            standard_actions.append(entry)
+        else:
+            class_features.append(entry)
+    return {
+        "_edition": "merged",
+        "standard_actions": standard_actions,
+        "class_features": class_features,
+    }
 
 
 @router.get("/spells")

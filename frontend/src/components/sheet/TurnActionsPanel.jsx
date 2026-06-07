@@ -8,9 +8,12 @@ import {
   actionHasOptions,
   actionNeedsTarget,
   buildAvailableActions,
+  canAffordResourceCost,
+  groupActionsForPicker,
   resolveOptionAction,
   filterTargetCandidates,
   formatApiErrorDetail,
+  resourceCostLabel,
   targetLabel,
   validateTargetSelection,
 } from "../../lib/combatActions";
@@ -38,6 +41,8 @@ function economyForCombatant(encounter, combatantId) {
       bonus_action_used: false,
       reaction_used: false,
       movement_remaining: null,
+      extra_action_available: false,
+      attacks_remaining: 0,
       dodging: false,
       disengaged: false,
       hiding: false,
@@ -89,6 +94,7 @@ export function TurnActionsPanel({
   isDmProxy = false,
   canAdjustMovement = false,
   onEncounterUpdate,
+  onSheetRefresh,
   onError,
 }) {
   const [step, setStep] = useState("pick_type");
@@ -117,7 +123,7 @@ export function TurnActionsPanel({
     [catalogSheet, actionCatalogMode, rulesReady]
   );
   const economy = economyForCombatant(encounter, actorCombatant?.id);
-  const turnStatuses = turnStatusLabels(economy);
+  const turnStatuses = turnStatusLabels(economy, encounter?.combatants);
   const incapacitated = impliesIncapacitated(actorCombatant?.conditions);
 
   useEffect(() => {
@@ -135,8 +141,19 @@ export function TurnActionsPanel({
     setTargetId("");
   };
 
+  const freeActionFeatures = (available[ACTION_TYPES.action] || []).some(
+    (action) => action.skipsEconomy
+  );
+
   const typeAvailable = (type) => {
-    if (type === ACTION_TYPES.action) return !economy.action_used;
+    if (type === ACTION_TYPES.action) {
+      return (
+        !economy.action_used ||
+        economy.attacks_remaining > 0 ||
+        economy.extra_action_available ||
+        freeActionFeatures
+      );
+    }
     if (type === ACTION_TYPES.bonus_action) return !economy.bonus_action_used;
     if (type === ACTION_TYPES.reaction) return !economy.reaction_used;
     return false;
@@ -201,6 +218,9 @@ export function TurnActionsPanel({
       onEncounterUpdate?.(nextEncounter);
       const messages = payload.action_messages || [];
       setLastOutcome(messages.length ? messages.join(" · ") : `${actorCombatant.name} used ${action.name}.`);
+      if (actorCombatant.character_id) {
+        onSheetRefresh?.();
+      }
       resetFlow();
     } catch (err) {
       onError?.(err.message || "Could not use action.");
@@ -216,6 +236,11 @@ export function TurnActionsPanel({
   };
 
   const handlePickAction = (action) => {
+    if (!canAffordResourceCost(catalogSheet, action)) {
+      const label = resourceCostLabel(action);
+      onError?.(label ? `Not enough resources (${label} required).` : "Not enough resources for this action.");
+      return;
+    }
     setPickedAction(action);
     if (actionHasOptions(action)) {
       setStep("pick_option");
@@ -322,6 +347,18 @@ export function TurnActionsPanel({
   const targetCandidates = pickedAction
     ? filterTargetCandidates(encounter.combatants, actorCombatant.id, pickedAction.targeting)
     : [];
+  const pickerActions = (() => {
+    const list = available[pickedType] || [];
+    if (pickedType !== ACTION_TYPES.action || !economy.action_used) return list;
+    if (economy.attacks_remaining > 0) {
+      return list.filter((action) => action.category === "weapon" || action.category === "attack");
+    }
+    if (!economy.extra_action_available) {
+      return list.filter((action) => action.skipsEconomy);
+    }
+    return list;
+  })();
+  const pickerGroups = groupActionsForPicker(pickerActions);
 
   return (
     <div className="space-y-2 rounded-sm border border-neon-cyan/40 bg-neon-cyan/5 p-2">
@@ -344,8 +381,16 @@ export function TurnActionsPanel({
       )}
 
       <div className="flex flex-wrap gap-1.5 text-[8px] font-black uppercase">
-        <span className={economy.action_used ? "text-ink-faint line-through" : "text-starlight"}>
-          Action {economy.action_used ? "✓" : "○"}
+        <span
+          className={
+            economy.action_used && !economy.extra_action_available
+              ? "text-ink-faint line-through"
+              : "text-starlight"
+          }
+        >
+          Action {economy.action_used && !economy.extra_action_available && economy.attacks_remaining <= 0 ? "✓" : "○"}
+          {economy.extra_action_available ? " (+1)" : ""}
+          {economy.attacks_remaining > 0 ? ` · ${economy.attacks_remaining} atk` : ""}
         </span>
         <span
           className={
@@ -419,33 +464,49 @@ export function TurnActionsPanel({
           <p className="text-[8px] font-mono uppercase text-ink-faint">
             Choose {TYPE_LABELS[pickedType]}
           </p>
-          <div className="max-h-40 space-y-1 overflow-y-auto">
-            {(available[pickedType] || []).length === 0 ? (
+          <div className="max-h-40 space-y-2 overflow-y-auto">
+            {pickerGroups.length === 0 ? (
               <p className="text-[9px] font-mono text-ink-faint">
                 No {TYPE_LABELS[pickedType].toLowerCase()}s available for {actorCombatant.name}.
               </p>
-            ) : null}
-            {(available[pickedType] || []).map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                disabled={busy}
-                onClick={() => handlePickAction(action)}
-                className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
-              >
-                <span className="text-[9px] font-black uppercase text-starlight">{action.name}</span>
-                <span className="text-[8px] font-mono text-ink-faint">
-                  {CATEGORY_LABELS[action.category] || action.category || "Action"}
-                  {" · "}
-                  {targetLabel(action.targeting)}
-                </span>
-                {(action.detail || action.description) && (
-                  <span className="text-[8px] font-mono text-ink-muted line-clamp-2">
-                    {action.detail || action.description}
-                  </span>
-                )}
-              </button>
-            ))}
+            ) : (
+              pickerGroups.map((group) => (
+                <div key={group.category} className="space-y-1">
+                  <p className="text-[8px] font-black uppercase tracking-wider text-ink-faint">
+                    {group.label}
+                  </p>
+                  {group.actions.map((action) => {
+                    const affordable = canAffordResourceCost(catalogSheet, action);
+                    const costLabel = resourceCostLabel(action);
+                    return (
+                      <button
+                        key={action.id}
+                        type="button"
+                        disabled={busy || !affordable}
+                        onClick={() => handlePickAction(action)}
+                        className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
+                      >
+                        <span className="text-[9px] font-black uppercase text-starlight">
+                          {action.name}
+                        </span>
+                        <span className="text-[8px] font-mono text-ink-faint">
+                          {targetLabel(action.targeting)}
+                          {costLabel ? ` · ${costLabel}` : ""}
+                        </span>
+                        {(action.detail || action.description) && (
+                          <span className="text-[8px] font-mono text-ink-muted line-clamp-2">
+                            {action.detail || action.description}
+                          </span>
+                        )}
+                        {!affordable && costLabel && (
+                          <span className="text-[8px] font-mono text-danger">Insufficient {costLabel}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))
+            )}
           </div>
           <button
             type="button"

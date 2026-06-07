@@ -143,6 +143,12 @@ export function enrichRawAction(raw, category = "action") {
   if (catalog?.healing_dice && !next.healing_dice) {
     next.healing_dice = catalog.healing_dice;
   }
+  if (catalog?.resource_cost && !next.resource_cost) {
+    next.resource_cost = catalog.resource_cost;
+  }
+  if (catalog?.effect && !next.effect) {
+    next.effect = catalog.effect;
+  }
 
   return next;
 }

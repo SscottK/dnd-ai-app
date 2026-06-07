@@ -254,6 +254,21 @@ def _apply_healing(combatant: EncounterCombatant, amount: int) -> int | None:
     return before
 
 
+def will_resolve_self_heal(data: UseActionRequest) -> bool:
+    if data.targeting != "self":
+        return False
+    clean_name = clean_action_label(data.action_name)
+    catalog = lookup_combat_action(clean_name) or lookup_spell(clean_name)
+    healing_expr = None
+    if catalog:
+        healing_expr = catalog.get("healing_dice")
+        if not healing_expr:
+            healing_expr = parse_healing_dice(str(catalog.get("description") or ""))
+    if not healing_expr:
+        healing_expr = parse_healing_dice(data.detail or "")
+    return bool(healing_expr)
+
+
 def resolve_self_heal(
     session: Session,
     campaign_id: int,
@@ -265,10 +280,13 @@ def resolve_self_heal(
     if data.targeting != "self":
         return []
 
-    catalog = lookup_combat_action(data.action_name) or lookup_spell(data.action_name)
+    clean_name = clean_action_label(data.action_name)
+    catalog = lookup_combat_action(clean_name) or lookup_spell(clean_name)
     healing_expr = None
     if catalog:
         healing_expr = catalog.get("healing_dice")
+        if not healing_expr:
+            healing_expr = parse_healing_dice(str(catalog.get("description") or ""))
     if not healing_expr:
         healing_expr = parse_healing_dice(data.detail or "")
 
