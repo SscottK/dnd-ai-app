@@ -74,6 +74,19 @@ export function combatantAcText(combatant, isDmView) {
   return String(combatant.ac);
 }
 
-export function combatantMoveText(combatant) {
-  return combatant?.speed != null ? `${combatant.speed} ft` : null;
+export function combatantMoveText(combatant, economy) {
+  const speed = combatant?.speed;
+  const remaining = economy?.movement_remaining;
+  if (remaining != null && speed != null) return `${remaining}/${speed} ft`;
+  if (remaining != null) return `${remaining} ft`;
+  return speed != null ? `${speed} ft` : null;
+}
+
+export function turnStatusLabels(economy) {
+  if (!economy) return [];
+  const labels = [];
+  if (economy.dodging) labels.push("Dodging");
+  if (economy.disengaged) labels.push("Disengaged");
+  if (economy.hiding) labels.push("Hiding");
+  return labels;
 }

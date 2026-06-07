@@ -2,6 +2,12 @@ import json
 import re
 from typing import Any
 
+from app.schemas.character_sheet import (
+    normalize_combat_action_row,
+    normalize_feature_row,
+    normalize_resource_row,
+    normalize_wild_shape_row,
+)
 from app.services.sheet_enrichment import enrich_sheet_pipeline
 
 ABILITY_KEYS = ("str", "dex", "con", "int", "wis", "cha")
@@ -130,17 +136,57 @@ def merge_sheet_on_resync(old_sheet: dict[str, Any], new_sheet: dict[str, Any]) 
     return apply_equipped_overrides(merged)
 
 
+_ARMOR_BASE_AC = {
+    "chain mail": 16,
+    "chain shirt": 13,
+    "plate": 18,
+    "splint": 17,
+    "ring mail": 14,
+    "half plate": 15,
+    "breastplate": 14,
+    "scale mail": 14,
+    "hide": 12,
+    "studded leather": 12,
+    "leather": 11,
+    "padded": 11,
+}
+
+
+def _sanitize_item_ac_bonus(item: dict) -> dict:
+    """ac_bonus is magical +N only — not standard shield/armor AC baked into rules."""
+    entry = dict(item)
+    bonus = entry.get("ac_bonus")
+    if bonus is None:
+        return entry
+    try:
+        bonus = int(bonus)
+    except (TypeError, ValueError):
+        entry.pop("ac_bonus", None)
+        return entry
+
+    name = str(entry.get("name") or "")
+    lowered = re.sub(r"\s*\+\s*\d+\s*", " ", name, flags=re.I).strip().lower()
+    has_magic_suffix = bool(re.search(r"\+\s*\d+", name))
+
+    if "shield" in lowered and not has_magic_suffix and bonus <= 2:
+        entry.pop("ac_bonus", None)
+        return entry
+
+    for label, base_ac in _ARMOR_BASE_AC.items():
+        if label in lowered and not has_magic_suffix and bonus >= base_ac - 10:
+            entry.pop("ac_bonus", None)
+            return entry
+
+    entry["ac_bonus"] = bonus
+    return entry
+
+
 def _ensure_item_ids(items: list[dict]) -> list[dict]:
     result = []
     for index, item in enumerate(items):
-        entry = dict(item)
+        entry = _sanitize_item_ac_bonus(dict(item))
         if not entry.get("id"):
             entry["id"] = f"item-{index}"
-        if entry.get("ac_bonus") is not None:
-            try:
-                entry["ac_bonus"] = int(entry["ac_bonus"])
-            except (TypeError, ValueError):
-                entry.pop("ac_bonus", None)
         result.append(entry)
     return result
 
@@ -217,7 +263,11 @@ def normalize_sheet(
         }
 
     if isinstance(sheet.get("features"), list):
-        base["features"] = _ensure_item_ids(sheet["features"])
+        base["features"] = [
+            row
+            for index, entry in enumerate(sheet["features"])
+            if (row := normalize_feature_row(entry, index=index))
+        ]
 
     if isinstance(sheet.get("attacks"), list):
         base["attacks"] = [
@@ -251,50 +301,23 @@ def normalize_sheet(
 
     if isinstance(sheet.get("combat_actions"), list):
         base["combat_actions"] = [
-            {
-                "id": str(entry.get("id") or f"action-{index}"),
-                "name": str(entry.get("name") or "Action"),
-                "action_type": str(entry.get("action_type") or "action"),
-                "targeting": str(entry.get("targeting") or "self"),
-                "description": str(entry.get("description") or ""),
-                "attack_bonus": entry.get("attack_bonus"),
-                "damage_dice": entry.get("damage_dice"),
-                "resource_cost": entry.get("resource_cost"),
-                "source": entry.get("source"),
-                "display": entry.get("display"),
-                "requires_option": entry.get("requires_option"),
-                "option_source": entry.get("option_source"),
-                "options": entry.get("options"),
-            }
+            row
             for index, entry in enumerate(sheet["combat_actions"])
-            if isinstance(entry, dict) and entry.get("name")
+            if (row := normalize_combat_action_row(entry, index=index))
         ]
 
     if isinstance(sheet.get("wild_shapes"), list):
         base["wild_shapes"] = [
-            {
-                "id": str(entry.get("id") or f"wild-shape-{index}"),
-                "name": str(entry.get("name") or "Beast form"),
-                "cr": entry.get("cr"),
-                "notes": str(entry.get("notes") or ""),
-            }
+            row
             for index, entry in enumerate(sheet["wild_shapes"])
-            if isinstance(entry, dict) and entry.get("name")
+            if (row := normalize_wild_shape_row(entry, index=index))
         ]
 
     if isinstance(sheet.get("resources"), list):
         base["resources"] = [
-            {
-                "id": str(entry.get("id") or f"resource-{index}"),
-                "name": str(entry.get("name") or "Resource"),
-                "current": entry.get("current"),
-                "max": entry.get("max"),
-                "recharge": str(entry.get("recharge") or "long_rest"),
-                "source_class": entry.get("source_class"),
-                "display": entry.get("display") or ["combat_pane"],
-            }
+            row
             for index, entry in enumerate(sheet["resources"])
-            if isinstance(entry, dict) and entry.get("name")
+            if (row := normalize_resource_row(entry))
         ]
 
     if isinstance(sheet.get("classes"), list):

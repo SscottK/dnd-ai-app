@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Quest Terminal"
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.5-flash"
+    gemini_model_fallback: str = "gemini-2.5-flash-lite"
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

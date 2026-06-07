@@ -7,7 +7,9 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "srd-5.2.1"
+_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+_SRD_DIR = _DATA_DIR / "srd-5.2.1"
+_BR2024_COMBAT = _DATA_DIR / "combat_catalog_2024.json"
 
 _SELF_HINTS = re.compile(
     r"self only|\(self only\)|on yourself|you regain|regain hit points|"
@@ -51,26 +53,33 @@ def _slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
-@lru_cache(maxsize=1)
-def _load_combat_catalog() -> dict[str, dict]:
-    path = _DATA_DIR / "combat_actions.json"
-    if not path.is_file():
-        return {}
-    with path.open(encoding="utf-8") as handle:
-        payload = json.load(handle)
-
-    by_name: dict[str, dict] = {}
+def _merge_combat_catalog_entries(by_name: dict[str, dict], payload: dict) -> None:
     for bucket in ("standard_actions", "class_features"):
         for entry in payload.get(bucket) or []:
             if not isinstance(entry, dict) or not entry.get("name"):
                 continue
             by_name[str(entry["name"]).casefold()] = entry
+
+
+@lru_cache(maxsize=1)
+def _load_combat_catalog() -> dict[str, dict]:
+    by_name: dict[str, dict] = {}
+
+    srd_path = _SRD_DIR / "combat_actions.json"
+    if srd_path.is_file():
+        with srd_path.open(encoding="utf-8") as handle:
+            _merge_combat_catalog_entries(by_name, json.load(handle))
+
+    if _BR2024_COMBAT.is_file():
+        with _BR2024_COMBAT.open(encoding="utf-8") as handle:
+            _merge_combat_catalog_entries(by_name, json.load(handle))
+
     return by_name
 
 
 @lru_cache(maxsize=1)
 def _load_spell_catalog() -> dict[str, dict]:
-    path = _DATA_DIR / "spells.json"
+    path = _SRD_DIR / "spells.json"
     if not path.is_file():
         return {}
     with path.open(encoding="utf-8") as handle:

@@ -1,0 +1,263 @@
+{
+  "_source": "https://www.dndbeyond.com/sources/dnd/br-2024",
+  "_edition": "2024",
+  "class_features": [
+    {
+      "name": "Rage",
+      "action_type": "bonus_action",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Barbarian",
+      "description": "You can imbue yourself with a primal power called Rage, a force that grants you extraordinary might and resilience. You can enter it as a Bonus Action if you aren’t wearing Heavy armor. You can enter your Rage the number of times shown for your Barbarian level in the Rages column of the Barbarian Features table. You regain one expended use when you finish a Short Rest , and you regain all expended uses when you finish a Long Rest . While active, your Rage follows the rules below. Damage Resistan",
+      "min_level": 1
+    },
+    {
+      "name": "Instinctive Pounce",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Barbarian",
+      "description": "As part of the Bonus Action you take to enter your Rage, you can move up to half your Speed.",
+      "min_level": 7
+    },
+    {
+      "name": "Bardic Inspiration",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Bard",
+      "description": "You can supernaturally inspire others through words, music, or dance. This inspiration is represented by your Bardic Inspiration die, which is a d6. Using Bardic Inspiration. As a Bonus Action, you can inspire another creature within 60 feet of yourself who can see or hear you. That creature gains one of your Bardic Inspiration dice. A creature can have only one Bardic Inspiration die at a time. Once within the next hour when the creature fails a D20 Test , the creature can roll the Bardic Inspi",
+      "min_level": 1
+    },
+    {
+      "name": "Countercharm",
+      "action_type": "reaction",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Bard",
+      "description": "You can use musical notes or words of power to disrupt mind-influencing effects. If you or a creature within 30 feet of you fails a saving throw against an effect that applies the Charmed or Frightened condition, you can take a Reaction to cause the save to be rerolled, and the new roll has Advantage .",
+      "min_level": 7
+    },
+    {
+      "name": "Channel Divinity",
+      "action_type": "magic_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Cleric",
+      "description": "You can channel divine energy directly from the Outer Planes to fuel magical effects. You start with two such effects: Divine Spark and Turn Undead, each of which is described below. Each time you use this class’s Channel Divinity, choose which Channel Divinity effect from this class to create. You gain additional effect options at higher Cleric levels. You can use this class’s Channel Divinity twice. You regain one of its expended uses when you finish a Short Rest , and you regain all expended ",
+      "min_level": 2
+    },
+    {
+      "name": "Divine Intervention",
+      "action_type": "magic_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Cleric",
+      "description": "You can call on your deity or pantheon to intervene on your behalf. As a Magic action, choose any Cleric spell of level 5 or lower that doesn’t require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. You can’t use this feature again until you finish a Long Rest .",
+      "min_level": 10
+    },
+    {
+      "name": "Wild Companion",
+      "action_type": "magic_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Druid",
+      "description": "You can summon a nature spirit that assumes an animal form to aid you. As a Magic action, you can expend a spell slot or a use of Wild Shape to cast the Find Familiar spell without Material components. When you cast the spell in this way, the familiar is Fey and disappears when you finish a Long Rest .",
+      "min_level": 2
+    },
+    {
+      "name": "Wild Shape",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Druid",
+      "description": "The power of nature allows you to assume the form of an animal. As a Bonus Action, you shape-shift into a Beast form that you have learned for this feature (see “Known Forms” below). You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. You can also leave the form early as a Bonus Action. Number of Uses. You can use Wild Shape twice. You regain one expended use when you finish a Short Rest , and you",
+      "requires_option": true,
+      "option_source": "wild_shapes",
+      "min_level": 2
+    },
+    {
+      "name": "Second Wind",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "You have a limited well of physical and mental stamina that you can draw on. As a Bonus Action, you can use it to regain Hit Points equal to 1d10 plus your Fighter level. You can use this feature twice. You regain one expended use when you finish a Short Rest , and you regain all expended uses when you finish a Long Rest . When you reach certain Fighter levels, you gain more uses of this feature, as shown in the Second Wind column of the Fighter Features table .",
+      "min_level": 1
+    },
+    {
+      "name": "Action Surge",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action, except the Magic action. Once you use this feature, you can’t do so again until you finish a Short or Long Rest . Starting at level 17, you can use it twice before a rest but only once on a turn.",
+      "min_level": 2
+    },
+    {
+      "name": "Tactical Shift",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without provoking Opportunity Attacks .",
+      "min_level": 5
+    },
+    {
+      "name": "Two Extra Attacks",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "You can attack three times instead of once whenever you take the Attack action on your turn.",
+      "min_level": 11
+    },
+    {
+      "name": "Three Extra Attacks",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Fighter",
+      "description": "You can attack four times instead of once whenever you take the Attack action on your turn. Fighter Subclass A Fighter subclass is a specialization that grants you features at certain Fighter levels, as specified in the subclass. This section presents the Champion subclass.",
+      "min_level": 20
+    },
+    {
+      "name": "Flurry of Blows",
+      "action_type": "bonus_action",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Your focus and martial training allow you to harness a well of extraordinary energy within yourself. This energy is represented by Focus Points. Your Monk level determines the number of points you have, as shown in the Focus Points column of the Monk Features table . You can expend these points to enhance or fuel certain Monk features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind, each of which is detailed below. When you expend a Focus Point, it ",
+      "resource_cost": {
+        "resource_id": "focus-points",
+        "amount": 1
+      },
+      "min_level": 2
+    },
+    {
+      "name": "Patient Defense",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Your focus and martial training allow you to harness a well of extraordinary energy within yourself. This energy is represented by Focus Points. Your Monk level determines the number of points you have, as shown in the Focus Points column of the Monk Features table . You can expend these points to enhance or fuel certain Monk features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind, each of which is detailed below. When you expend a Focus Point, it ",
+      "resource_cost": {
+        "resource_id": "focus-points",
+        "amount": 1
+      },
+      "min_level": 2
+    },
+    {
+      "name": "Step of the Wind",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Monk",
+      "description": "Your focus and martial training allow you to harness a well of extraordinary energy within yourself. This energy is represented by Focus Points. Your Monk level determines the number of points you have, as shown in the Focus Points column of the Monk Features table . You can expend these points to enhance or fuel certain Monk features. You start knowing three such features: Flurry of Blows, Patient Defense, and Step of the Wind, each of which is detailed below. When you expend a Focus Point, it ",
+      "resource_cost": {
+        "resource_id": "focus-points",
+        "amount": 1
+      },
+      "min_level": 2
+    },
+    {
+      "name": "Abjure Foes",
+      "action_type": "magic_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Paladin",
+      "description": "As a Magic action, you can expend one use of this class’s Channel Divinity to overwhelm foes with awe. As you present your Holy Symbol or weapon, you can target a number of creatures equal to your Charisma modifier (minimum of one creature) that you can see within 60 feet of yourself. Each target must succeed on a Wisdom saving throw or have the Frightened condition for 1 minute or until it takes any damage. While Frightened in this way, a target can do only one of the following on its turns: mo",
+      "min_level": 9
+    },
+    {
+      "name": "Tireless",
+      "action_type": "magic_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Ranger",
+      "description": "Primal forces now help fuel you on your journeys, granting you the following benefits. Temporary Hit Points. As a Magic action, you can give yourself a number of Temporary Hit Points equal to 1d8 plus your Wisdom modifier (minimum of 1). You can use this action a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest . Decrease Exhaustion. Whenever you finish a Short Rest , your Exhaustion level, if any, decreases by 1.",
+      "min_level": 10
+    },
+    {
+      "name": "Nature’s Veil",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Ranger",
+      "description": "You invoke spirits of nature to magically hide yourself. As a Bonus Action, you can give yourself the Invisible condition until the end of your next turn. You can use this feature a number of times equal to your Wisdom modifier (minimum of once), and you regain all expended uses when you finish a Long Rest .",
+      "min_level": 14
+    },
+    {
+      "name": "Cunning Action",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Rogue",
+      "description": "Your quick thinking and agility allow you to move and act quickly. On your turn, you can take one of the following actions as a Bonus Action: Dash , Disengage , or Hide .",
+      "min_level": 2
+    },
+    {
+      "name": "Steady Aim",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Rogue",
+      "description": "As a Bonus Action, you give yourself Advantage on your next attack roll on the current turn. You can use this feature only if you haven’t moved during this turn, and after you use it, your Speed is 0 until the end of the current turn.",
+      "min_level": 3
+    },
+    {
+      "name": "Uncanny Dodge",
+      "action_type": "reaction",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Rogue",
+      "description": "When an attacker that you can see hits you with an attack roll, you can take a Reaction to halve the attack’s damage against you (round down).",
+      "min_level": 5
+    },
+    {
+      "name": "Devious Strikes",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Rogue",
+      "description": "You’ve practiced new ways to use your Sneak Attack deviously. The following effects are now among your Cunning Strike options. Daze (Cost: 2d6). The target must succeed on a Constitution saving throw, or on its next turn, it can do only one of the following: move or take an action or a Bonus Action. Knock Out (Cost: 6d6). The target must succeed on a Constitution saving throw, or it has the Unconscious condition for 1 minute or until it takes any damage. The Unconscious target repeats the save a",
+      "min_level": 14
+    },
+    {
+      "name": "Innate Sorcery",
+      "action_type": "bonus_action",
+      "targeting": "one_enemy",
+      "category": "class_feature",
+      "source_class": "Sorcerer",
+      "description": "An event in your past left an indelible mark on you, infusing you with simmering magic. As a Bonus Action, you can unleash that magic for 1 minute, during which you gain the following benefits: The spell save DC of your Sorcerer spells increases by 1. You have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses of it when you finish a Long Rest .",
+      "min_level": 1
+    },
+    {
+      "name": "Font of Magic",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Sorcerer",
+      "description": "You can tap into the wellspring of magic within yourself. This wellspring is represented by Sorcery Points, which allow you to create a variety of magical effects. You have 2 Sorcery Points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer Features table . You can’t have more Sorcery Points than the number shown in the table for your level. You regain all expended Sorcery Points when you finish a Long Rest . You can use your Sorcery Points to fu",
+      "min_level": 2
+    },
+    {
+      "name": "Sorcery Incarnate",
+      "action_type": "bonus_action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Sorcerer",
+      "description": "If you have no uses of Innate Sorcery left, you can use it if you spend 2 Sorcery Points when you take the Bonus Action to activate it. In addition, while your Innate Sorcery feature is active, you can use up to two of your Metamagic options on each spell you cast.",
+      "min_level": 7
+    },
+    {
+      "name": "Spell Mastery",
+      "action_type": "action",
+      "targeting": "self",
+      "category": "class_feature",
+      "source_class": "Wizard",
+      "description": "You have achieved such mastery over certain spells that you can cast them at will. Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an action. You always have those spells prepared, and you can cast them at their lowest level without expending a spell slot. To cast either spell at a higher level, you must expend a spell slot. Whenever you finish a Long Rest , you can study your spellbook and replace one of those spells with an eligible spell of the same level fr",
+      "min_level": 18
+    }
+  ]
+}

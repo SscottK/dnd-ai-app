@@ -9,6 +9,7 @@ from app.api.schemas import ChatMessage
 from app.core.config import settings
 from app.core.exceptions import UpstreamAPIError
 from app.services.conversations import RULES_SYSTEM_PROMPT
+from app.services.gemini import _extract_response_text, _primary_model
 
 logger = logging.getLogger("app.services.gemini_stream")
 
@@ -30,9 +31,10 @@ async def gemini_stream(messages: list[ChatMessage]) -> AsyncGenerator[str, None
     """
     prompt = build_prompt_from_messages(messages)
     
+    model = _primary_model()
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.5-flash:streamGenerateContent?key={settings.gemini_api_key}"
+        f"{model}:streamGenerateContent?key={settings.gemini_api_key}"
     )
     
     headers = {"Content-Type": "application/json"}
@@ -69,7 +71,7 @@ async def gemini_stream(messages: list[ChatMessage]) -> AsyncGenerator[str, None
                             if candidate_json:
                                 try:
                                     chunk_data = json.loads(candidate_json)
-                                    text_chunk = chunk_data["candidates"][0]["content"]["parts"][0]["text"]
+                                    text_chunk = _extract_response_text(chunk_data)
                                     yield text_chunk
                                 except (json.JSONDecodeError, KeyError, IndexError):
                                     # Fallback for heartbeat markers or helper protocol frames

@@ -8,6 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from app.schemas.character_sheet import canonical_resource_id
 from app.services.action_rules import enrich_sheet_actions, lookup_combat_action
 from app.services.action_type_inference import infer_primary_action_type
 
@@ -22,9 +23,10 @@ _KI_SPEND_ACTIONS = frozenset(
 _RESOURCE_ONLY_NAMES = frozenset(
     {
         "ki",
+        "focus points",
+        "focus point",
         "sorcery points",
         "metamagic",
-        "lay on hands",
         "channel divinity",
         "bardic inspiration",
     }
@@ -40,7 +42,11 @@ _PASSIVE_FEATURE_NAMES = frozenset(
         "open hand technique",
         "extra attack",
         "slow fall",
+        "deflect attacks",
         "deflect missiles",
+        "weapon mastery",
+        "two extra attacks",
+        "three extra attacks",
     }
 )
 _PASSIVE_FEATURE_HINTS = re.compile(
@@ -105,6 +111,15 @@ def _resolve_max_for_resource(
             return 2
         return 1
 
+    if spec.get("max_at_level"):
+        best = 0
+        table = {int(k): int(v) for k, v in spec["max_at_level"].items()}
+        for threshold, value in sorted(table.items()):
+            if level >= threshold:
+                best = value
+        if best:
+            return best
+
     return int(spec.get("max") or 0)
 
 
@@ -162,7 +177,7 @@ def _normalize_resource_row(entry: dict, *, source_class: str) -> dict | None:
     name = str(entry.get("name") or "").strip()
     if not name:
         return None
-    rid = str(entry.get("id") or _slugify(name))
+    rid = canonical_resource_id(str(entry.get("id") or _slugify(name)))
     try:
         current = int(entry.get("current") if entry.get("current") is not None else entry.get("max"))
     except (TypeError, ValueError):
@@ -202,7 +217,7 @@ def enrich_resources(sheet: dict, classes: list[dict]) -> list[dict]:
         for spec in class_spec.get("resources") or []:
             if level < int(spec.get("min_level") or 1):
                 continue
-            rid = str(spec.get("id") or _slugify(spec.get("name") or ""))
+            rid = canonical_resource_id(str(spec.get("id") or _slugify(spec.get("name") or "")))
             if rid in known_ids:
                 continue
             max_val = _resolve_max_for_resource(spec, level=level, sheet=sheet)
@@ -227,12 +242,9 @@ def enrich_resources(sheet: dict, classes: list[dict]) -> list[dict]:
             rid = str(spec.get("id") or _slugify(spec.get("name") or ""))
             if rid in known_ids:
                 continue
-            max_val = int(spec.get("max") or 1)
-            if spec.get("max_at_level"):
-                table = {int(k): int(v) for k, v in spec["max_at_level"].items()}
-                for threshold, value in sorted(table.items()):
-                    if level >= threshold:
-                        max_val = value
+            max_val = _resolve_max_for_resource(spec, level=level, sheet=sheet)
+            if max_val <= 0:
+                max_val = int(spec.get("max") or 1)
             resources.append(
                 {
                     "id": rid,

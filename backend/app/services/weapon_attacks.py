@@ -55,9 +55,6 @@ def default_damage_dice(item_name: str, ability_mod: int) -> str:
 
 
 def weapon_profile_from_item(sheet: dict, item: dict) -> tuple[int | None, str | None]:
-    if not item.get("equipped"):
-        return None, None
-
     name = str(item.get("name") or "Weapon")
     abilities = sheet.get("abilities") or {}
     prof = sheet.get("proficiency_bonus")
@@ -78,12 +75,12 @@ def weapon_profile_from_item(sheet: dict, item: dict) -> tuple[int | None, str |
     return attack_bonus, damage_dice
 
 
-def find_equipped_weapon(sheet: dict, action_id: str, action_name: str) -> dict | None:
+def find_inventory_weapon(sheet: dict, action_id: str, action_name: str) -> dict | None:
     clean_name = clean_action_label(action_name).casefold()
     weapon_key = action_id.removeprefix("weapon-") if action_id.startswith("weapon-") else ""
 
     for item in sheet.get("inventory") or []:
-        if not isinstance(item, dict) or not item.get("equipped"):
+        if not isinstance(item, dict):
             continue
         item_id = str(item.get("id") or "")
         item_name = str(item.get("name") or "")
@@ -94,3 +91,8 @@ def find_equipped_weapon(sheet: dict, action_id: str, action_name: str) -> dict 
         if clean_name and clean_name in item_name.casefold():
             return item
     return None
+
+
+def find_equipped_weapon(sheet: dict, action_id: str, action_name: str) -> dict | None:
+    """Backward-compatible alias — matches any inventory weapon by id/name."""
+    return find_inventory_weapon(sheet, action_id, action_name)

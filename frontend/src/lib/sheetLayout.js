@@ -356,7 +356,7 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
   const vtt = vttZoneDefault(canvasW, canvasH);
 
   return {
-    widgets: [
+    widgets: ensureWidgetZIndices([
       {
         id: "dm-chat-1",
         type: "dm_rules_chat",
@@ -431,7 +431,7 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         dmNotesTabs: defaultDmNotesTabs(),
         activeNotesTabId: "notes-session",
       },
-    ],
+    ]),
     viewport: { scale: DEFAULT_ZOOM, canvasW, canvasH },
   };
 }
@@ -444,7 +444,7 @@ export function buildDefaultLayout(canvasW, canvasH) {
   const vtt = vttZoneDefault(canvasW, canvasH);
 
   return {
-    widgets: [
+    widgets: ensureWidgetZIndices([
       { id: "combat-1", type: "combat", x: leftX, y: margin, w: colW, h: 220, pinned: false, minimized: false },
       {
         id: "abilities-1",
@@ -518,7 +518,7 @@ export function buildDefaultLayout(canvasW, canvasH) {
         pinned: false,
         minimized: false,
       },
-    ],
+    ]),
     viewport: { scale: DEFAULT_ZOOM, canvasW: canvasW, canvasH: canvasH },
   };
 }
@@ -551,12 +551,29 @@ function ensureVttWidget(widgets, canvasW, canvasH) {
   ];
 }
 
+export function ensureWidgetZIndices(widgets) {
+  return widgets.map((widget, index) => ({
+    ...widget,
+    z: typeof widget.z === "number" ? widget.z : index + 1,
+  }));
+}
+
+export function bringWidgetToFront(widgets, widgetId) {
+  const maxZ = Math.max(0, ...widgets.map((widget) => widget.z ?? 0));
+  const target = widgets.find((widget) => widget.id === widgetId);
+  if (!target || (target.z ?? 0) >= maxZ) return widgets;
+  return widgets.map((widget) =>
+    widget.id === widgetId ? { ...widget, z: maxZ + 1 } : widget
+  );
+}
+
 function normalizeWidget(widget) {
   const normalized = {
     ...widget,
     pinned: widget.pinned ?? false,
     minimized: widget.minimized ?? false,
     expandedH: widget.expandedH ?? widget.h,
+    z: typeof widget.z === "number" ? widget.z : undefined,
   };
   if (widget.type === "initiative") {
     normalized.initiativeOrientation =
@@ -748,10 +765,12 @@ export function hydrateLayout(layout, canvasW = 1280, canvasH = 800) {
   const layoutW = layout.viewport?.canvasW ?? canvasW;
   const layoutH = layout.viewport?.canvasH ?? canvasH;
   return {
-    widgets: clampWidgets(
-      layout.widgets.filter((widget) => widget.type !== "dm_combatants").map(normalizeWidget),
-      layoutW,
-      layoutH
+    widgets: ensureWidgetZIndices(
+      clampWidgets(
+        layout.widgets.filter((widget) => widget.type !== "dm_combatants").map(normalizeWidget),
+        layoutW,
+        layoutH
+      )
     ),
     viewport: {
       scale: layout.viewport?.scale ?? DEFAULT_ZOOM,
@@ -787,7 +806,7 @@ export function parseLayout(layoutJson, canvasW = 1280, canvasH = 800) {
     );
 
     return {
-      widgets,
+      widgets: ensureWidgetZIndices(widgets),
       viewport: {
         scale: parsed.viewport?.scale ?? DEFAULT_ZOOM,
         canvasW: layoutW,

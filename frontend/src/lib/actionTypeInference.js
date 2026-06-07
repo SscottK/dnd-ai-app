@@ -1,7 +1,7 @@
 /** Primary activation economy — mirrors backend action_type_inference.py */
 
 const ACTION_TYPE_OVERRIDES = {
-  "wild shape": "action",
+  "wild shape": "bonus_action",
   "combat wild shape": "bonus_action",
   "end wild shape": "bonus_action",
   "cunning action": "bonus_action",

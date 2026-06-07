@@ -1,103 +1,43 @@
 {
-  "_license": "Game mechanics derived from SRD 5.2.1 (CC-BY 4.0). Level tables are programmatic approximations for enrichment.",
+  "_source": "https://www.dndbeyond.com/sources/dnd/br-2024",
+  "_edition": "2024",
+  "_note": "Generated from br-2024 ingest. Regenerate via build_class_catalog_from_br2024.py",
   "classes": {
-    "Monk": {
-      "resources": [
-        {
-          "id": "ki",
-          "name": "Ki Points",
-          "min_level": 2,
-          "max_formula": "level",
-          "recharge": "short_rest",
-          "aliases": ["ki", "ki points", "ki point"]
-        }
-      ],
-      "actions_by_level": {
-        "2": ["Flurry of Blows", "Patient Defense", "Step of the Wind"],
-        "5": ["Stunning Strike"],
-        "6": ["Ki-Empowered Strikes"]
-      }
-    },
-    "Fighter": {
-      "resources": [],
-      "actions_by_level": {
-        "1": ["Second Wind"],
-        "2": ["Action Surge"]
-      },
-      "limited_uses": [
-        {
-          "id": "second-wind",
-          "name": "Second Wind",
-          "min_level": 1,
-          "max": 1,
-          "recharge": "short_rest"
-        },
-        {
-          "id": "action-surge",
-          "name": "Action Surge",
-          "min_level": 2,
-          "max": 1,
-          "recharge": "short_rest",
-          "max_at_level": { "17": 2 }
-        }
-      ]
-    },
     "Barbarian": {
       "resources": [
         {
           "id": "rage",
           "name": "Rage",
           "min_level": 1,
-          "max_by_level": { "1": 2, "3": 3, "6": 4, "12": 5, "17": 6, "20": 6 },
+          "max_by_level": {
+            "1": 2,
+            "2": 2,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 4,
+            "7": 4,
+            "8": 4,
+            "9": 4,
+            "10": 4,
+            "11": 4,
+            "12": 5,
+            "13": 5,
+            "14": 5,
+            "15": 5,
+            "16": 5,
+            "17": 6,
+            "18": 6,
+            "19": 6,
+            "20": 6
+          },
           "recharge": "long_rest"
         }
       ],
       "actions_by_level": {
-        "1": ["Rage"]
-      }
-    },
-    "Cleric": {
-      "resources": [
-        {
-          "id": "channel-divinity",
-          "name": "Channel Divinity",
-          "min_level": 2,
-          "max_by_level": { "2": 1, "6": 2, "18": 3 },
-          "recharge": "short_rest"
-        }
-      ],
-      "actions_by_level": {
-        "2": ["Channel Divinity"]
-      }
-    },
-    "Paladin": {
-      "resources": [
-        {
-          "id": "lay-on-hands",
-          "name": "Lay on Hands",
-          "min_level": 1,
-          "max_formula": "level_times_5",
-          "recharge": "long_rest"
-        },
-        {
-          "id": "channel-divinity",
-          "name": "Channel Divinity",
-          "min_level": 3,
-          "max": 1,
-          "recharge": "short_rest"
-        }
-      ],
-      "actions_by_level": {
-        "2": ["Lay on Hands"],
-        "3": ["Channel Divinity"]
-      }
-    },
-    "Ranger": {
-      "actions_by_level": {}
-    },
-    "Rogue": {
-      "actions_by_level": {
-        "2": ["Cunning Action"]
+        "1": [
+          "Rage"
+        ]
       }
     },
     "Bard": {
@@ -107,11 +47,269 @@
           "name": "Bardic Inspiration",
           "min_level": 1,
           "max_formula": "charisma_modifier",
-          "recharge": "long_rest"
+          "recharge": "long_rest",
+          "aliases": [
+            "bardic inspiration",
+            "bardic inspiration die"
+          ]
         }
       ],
       "actions_by_level": {
-        "1": ["Bardic Inspiration"]
+        "1": [
+          "Bardic Inspiration"
+        ],
+        "7": [
+          "Countercharm"
+        ]
+      }
+    },
+    "Cleric": {
+      "resources": [
+        {
+          "id": "channel-divinity",
+          "name": "Channel Divinity",
+          "min_level": 2,
+          "max_by_level": {
+            "2": 2,
+            "3": 2,
+            "4": 2,
+            "5": 2,
+            "6": 3,
+            "7": 3,
+            "8": 3,
+            "9": 3,
+            "10": 3,
+            "11": 3,
+            "12": 3,
+            "13": 3,
+            "14": 3,
+            "15": 3,
+            "16": 3,
+            "17": 3,
+            "18": 4,
+            "19": 4,
+            "20": 4
+          },
+          "recharge": "short_rest"
+        }
+      ],
+      "actions_by_level": {
+        "2": [
+          "Channel Divinity"
+        ],
+        "10": [
+          "Divine Intervention"
+        ]
+      }
+    },
+    "Druid": {
+      "resources": [
+        {
+          "id": "wild-shape",
+          "name": "Wild Shape",
+          "min_level": 2,
+          "max_by_level": {
+            "2": 2,
+            "3": 2,
+            "4": 2,
+            "5": 2,
+            "6": 3,
+            "7": 3,
+            "8": 3,
+            "9": 3,
+            "10": 3,
+            "11": 3,
+            "12": 3,
+            "13": 3,
+            "14": 3,
+            "15": 3,
+            "16": 3,
+            "17": 4,
+            "18": 4,
+            "19": 4,
+            "20": 4
+          },
+          "recharge": "short_rest"
+        }
+      ],
+      "actions_by_level": {
+        "2": [
+          "Wild Companion",
+          "Wild Shape"
+        ]
+      }
+    },
+    "Fighter": {
+      "resources": [],
+      "actions_by_level": {
+        "1": [
+          "Second Wind"
+        ],
+        "2": [
+          "Action Surge"
+        ]
+      },
+      "limited_uses": [
+        {
+          "id": "second-wind",
+          "name": "Second Wind",
+          "min_level": 1,
+          "recharge": "short_rest",
+          "max_by_level": {
+            "1": 2,
+            "2": 2,
+            "3": 2,
+            "4": 3,
+            "5": 3,
+            "6": 3,
+            "7": 3,
+            "8": 3,
+            "9": 3,
+            "10": 4,
+            "11": 4,
+            "12": 4,
+            "13": 4,
+            "14": 4,
+            "15": 4,
+            "16": 4,
+            "17": 4,
+            "18": 4,
+            "19": 4,
+            "20": 4
+          }
+        },
+        {
+          "id": "action-surge",
+          "name": "Action Surge",
+          "min_level": 2,
+          "max": 1,
+          "recharge": "short_rest",
+          "max_at_level": {
+            "17": 2
+          }
+        }
+      ]
+    },
+    "Monk": {
+      "resources": [
+        {
+          "id": "focus-points",
+          "name": "Focus Points",
+          "min_level": 2,
+          "max_by_level": {
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14,
+            "15": 15,
+            "16": 16,
+            "17": 17,
+            "18": 18,
+            "19": 19,
+            "20": 20
+          },
+          "recharge": "short_rest",
+          "aliases": [
+            "focus points",
+            "focus point",
+            "ki",
+            "ki points",
+            "ki point"
+          ]
+        }
+      ],
+      "actions_by_level": {
+        "2": [
+          "Flurry of Blows",
+          "Patient Defense",
+          "Step of the Wind"
+        ]
+      }
+    },
+    "Paladin": {
+      "resources": [
+        {
+          "id": "channel-divinity",
+          "name": "Channel Divinity",
+          "min_level": 3,
+          "max_by_level": {
+            "3": 2,
+            "4": 2,
+            "5": 2,
+            "6": 2,
+            "7": 2,
+            "8": 2,
+            "9": 2,
+            "10": 2,
+            "11": 3,
+            "12": 3,
+            "13": 3,
+            "14": 3,
+            "15": 3,
+            "16": 3,
+            "17": 3,
+            "18": 3,
+            "19": 3,
+            "20": 3
+          },
+          "recharge": "short_rest"
+        },
+        {
+          "id": "lay-on-hands",
+          "name": "Lay on Hands",
+          "min_level": 1,
+          "max_formula": "level_times_5",
+          "recharge": "long_rest",
+          "aliases": [
+            "lay on hands",
+            "lay on hands pool"
+          ]
+        }
+      ],
+      "actions_by_level": {
+        "1": [
+          "Lay on Hands"
+        ],
+        "9": [
+          "Abjure Foes"
+        ]
+      }
+    },
+    "Ranger": {
+      "resources": [],
+      "actions_by_level": {
+        "10": [
+          "Tireless"
+        ],
+        "14": [
+          "Nature’s Veil"
+        ]
+      }
+    },
+    "Rogue": {
+      "resources": [],
+      "actions_by_level": {
+        "2": [
+          "Cunning Action"
+        ],
+        "3": [
+          "Steady Aim"
+        ],
+        "5": [
+          "Uncanny Dodge"
+        ],
+        "14": [
+          "Devious Strikes"
+        ]
       }
     },
     "Sorcerer": {
@@ -120,11 +318,35 @@
           "id": "sorcery-points",
           "name": "Sorcery Points",
           "min_level": 2,
-          "max_by_level": { "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "11": 11, "12": 12, "13": 13, "14": 14, "15": 15, "16": 16, "17": 17, "18": 18, "19": 19, "20": 20 },
+          "max_by_level": {
+            "2": 2,
+            "3": 3,
+            "4": 4,
+            "5": 5,
+            "6": 6,
+            "7": 7,
+            "8": 8,
+            "9": 9,
+            "10": 10,
+            "11": 11,
+            "12": 12,
+            "13": 13,
+            "14": 14,
+            "15": 15,
+            "16": 16,
+            "17": 17,
+            "18": 18,
+            "19": 19,
+            "20": 20
+          },
           "recharge": "long_rest"
         }
       ],
-      "actions_by_level": {}
+      "actions_by_level": {
+        "1": [
+          "Innate Sorcery"
+        ]
+      }
     },
     "Warlock": {
       "resources": [
@@ -132,28 +354,36 @@
           "id": "pact-slots",
           "name": "Pact Magic Slots",
           "min_level": 1,
-          "max_formula": "warlock_pact_slots",
+          "max_by_level": {
+            "1": 1,
+            "2": 2,
+            "3": 2,
+            "4": 2,
+            "5": 2,
+            "6": 2,
+            "7": 2,
+            "8": 2,
+            "9": 2,
+            "10": 2,
+            "11": 3,
+            "12": 3,
+            "13": 3,
+            "14": 3,
+            "15": 3,
+            "16": 3,
+            "17": 4,
+            "18": 4,
+            "19": 4,
+            "20": 4
+          },
           "recharge": "short_rest"
         }
       ],
       "actions_by_level": {}
     },
     "Wizard": {
+      "resources": [],
       "actions_by_level": {}
-    },
-    "Druid": {
-      "resources": [
-        {
-          "id": "wild-shape",
-          "name": "Wild Shape",
-          "min_level": 2,
-          "max_by_level": { "2": 2, "4": 2, "8": 2, "10": 2, "12": 2, "16": 2, "20": 2 },
-          "recharge": "short_rest"
-        }
-      ],
-      "actions_by_level": {
-        "2": ["Wild Shape"]
-      }
     }
   }
 }

@@ -62,9 +62,20 @@ export function resolveSkillBonus(skill, sheet) {
 
 export function resolvePassivePerception(sheet) {
   if (sheet?.passive_perception != null) return sheet.passive_perception;
-  const perception = sheet?.skills?.find((skill) => skill.name === "Perception");
-  if (!perception) return null;
-  return 10 + resolveSkillBonus(perception, sheet);
+  return resolvePassiveSkill(sheet, "Perception");
+}
+
+export function resolvePassiveSkill(sheet, skillName) {
+  const overrides = {
+    Perception: "passive_perception",
+    Investigation: "passive_investigation",
+    Insight: "passive_insight",
+  };
+  const overrideKey = overrides[skillName];
+  if (overrideKey && sheet?.[overrideKey] != null) return sheet[overrideKey];
+  const skill = sheet?.skills?.find((entry) => entry.name === skillName);
+  if (!skill) return null;
+  return 10 + resolveSkillBonus(skill, sheet);
 }
 
 export function getInitiativeBonus(sheet) {
@@ -153,10 +164,12 @@ export function parseSheetJson(text) {
       };
     }
     base.inventory = Array.isArray(raw.inventory)
-      ? raw.inventory.map((item) => ({
-          ...item,
-          ac_bonus: item.ac_bonus != null ? Number(item.ac_bonus) : item.ac_bonus,
-        }))
+      ? raw.inventory.map((item) =>
+          sanitizeInventoryAcBonus({
+            ...item,
+            ac_bonus: item.ac_bonus != null ? Number(item.ac_bonus) : item.ac_bonus,
+          })
+        )
       : [];
     base.features = Array.isArray(raw.features) ? raw.features : [];
     base.attacks = Array.isArray(raw.attacks) ? raw.attacks : [];
@@ -227,16 +240,15 @@ function armorDexBonus(armor, dex) {
 function armorBreakdownLines(bestArmor, dex) {
   const { base, dexCap, magicBonus = 0 } = bestArmor.stats;
   const dexBonus = armorDexBonus(bestArmor.stats, dex);
-  const lines = ["Base: 10"];
 
+  // 2024 heavy armor: flat AC from armor; Dex does not apply.
   if (dexCap === 0) {
-    if (dex) lines.push(`DEX: ${formatModifier(dex)}`);
-    const armorIncrement = base - 10 - dex;
-    lines.push(`${bestArmor.item.name}: +${armorIncrement}`);
+    const lines = [`${bestArmor.item.name}: ${base}`];
     if (magicBonus) lines.push(`Magic armor bonus: +${magicBonus}`);
     return lines;
   }
 
+  const lines = ["Base: 10"];
   if (dexBonus) lines.push(`DEX: ${formatModifier(dexBonus)}`);
   lines.push(`${bestArmor.item.name}: +${base - 10}`);
   if (magicBonus) lines.push(`Magic armor bonus: +${magicBonus}`);
@@ -317,11 +329,34 @@ export function parseMagicBonus(...parts) {
   return 0;
 }
 
-function itemMagicBonus(item) {
-  if (item?.ac_bonus != null && !Number.isNaN(Number(item.ac_bonus))) {
-    return Number(item.ac_bonus);
+function sanitizeInventoryAcBonus(item) {
+  if (!item || item.ac_bonus == null) return item;
+  const name = String(item.name || "");
+  const label = stripMagicSuffix(name).toLowerCase();
+  const bonus = Number(item.ac_bonus);
+  if (Number.isNaN(bonus)) return item;
+
+  if (SHIELD_PATTERN.test(label) && !/\+\s*\d+/.test(name) && bonus <= 2) {
+    const { ac_bonus: _drop, ...rest } = item;
+    return rest;
   }
-  return parseMagicBonus(item?.name, item?.notes);
+
+  for (const armor of ARMOR_CATALOG) {
+    if (armor.pattern.test(label) && !/\+\s*\d+/.test(name) && bonus >= armor.base - 10) {
+      const { ac_bonus: _drop, ...rest } = item;
+      return rest;
+    }
+  }
+
+  return item;
+}
+
+function itemMagicBonus(item) {
+  const sanitized = sanitizeInventoryAcBonus(item);
+  if (sanitized?.ac_bonus != null && !Number.isNaN(Number(sanitized.ac_bonus))) {
+    return Number(sanitized.ac_bonus);
+  }
+  return parseMagicBonus(sanitized?.name, sanitized?.notes);
 }
 
 function classifyInventoryItem(itemOrName) {

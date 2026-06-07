@@ -284,6 +284,10 @@ class TurnEconomySnapshot(BaseModel):
     action_used: bool = False
     bonus_action_used: bool = False
     reaction_used: bool = False
+    movement_remaining: int | None = None
+    dodging: bool = False
+    disengaged: bool = False
+    hiding: bool = False
 
 
 class EncounterState(BaseModel):
@@ -327,11 +331,17 @@ class MonsterSearchResponse(BaseModel):
     monsters: list[MonsterSearchEntry] = Field(default_factory=list)
 
 
+class AdjustMovementRequest(BaseModel):
+    combatant_id: str | None = Field(default=None, max_length=64)
+    delta: int = Field(ge=-1000, le=1000)
+
+
 class EncounterUpdate(BaseModel):
     round: int | None = Field(default=None, ge=1)
     active_index: int | None = Field(default=None, ge=0)
     active_combatant_id: str | None = None
     combatants: list[EncounterCombatant] | None = None
+    turn_economy: dict[str, TurnEconomySnapshot] | None = None
 
 
 class EncounterPatchResponse(BaseModel):

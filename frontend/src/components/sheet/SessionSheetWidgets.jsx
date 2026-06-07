@@ -7,6 +7,7 @@ import {
   combatantAcText,
   combatantHpText,
   combatantMoveText,
+  turnStatusLabels,
   isDefeatedEnemy,
   parseEncounterPatchResponse,
   sortCombatantsForDisplay,
@@ -15,6 +16,7 @@ import {
 import { ConditionsEditor } from "./ConditionsEditor";
 import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
 import { NotesPaneWidget } from "./NotesPaneWidget";
+import { PartyMemberSheetModal } from "./PartyMemberSheetModal";
 import {
   INITIATIVE_ORIENTATION_HORIZONTAL,
   INITIATIVE_ORIENTATION_VERTICAL,
@@ -54,7 +56,7 @@ function mergePartyWithEncounter(members, combatants) {
   });
 }
 
-function PartyMemberRow({ member, isYou, token }) {
+function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet }) {
   const hpLabel =
     member.hp != null && member.max_hp != null
       ? `${member.hp}/${member.max_hp}`
@@ -67,18 +69,27 @@ function PartyMemberRow({ member, isYou, token }) {
     .filter(Boolean)
     .join(" · ");
 
+  const openSheet = () => onViewSheet?.(member);
+
   return (
     <li
       className={`flex items-center gap-2 rounded-sm border px-2 py-2 ${
         isYou ? "border-neon-cyan/60 bg-neon-cyan/5" : "border-border bg-void-deep/40"
-      }`}
+      } ${isOwner && onViewSheet ? "hover:border-neon-cyan/40" : ""}`}
     >
       <CombatantAvatar
         portraitUrl={member.portrait_url}
         token={token}
         name={member.character_name}
       />
-      <div className="min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={isOwner && onViewSheet ? openSheet : undefined}
+        disabled={!isOwner || !onViewSheet}
+        className={`min-w-0 flex-1 text-left ${
+          isOwner && onViewSheet ? "cursor-pointer hover:opacity-90" : "cursor-default"
+        }`}
+      >
         <p className="truncate text-[10px] font-black uppercase text-starlight">
           {member.character_name}
           {isYou && <span className="ml-1.5 text-[8px] text-neon-cyan">YOU</span>}
@@ -98,7 +109,17 @@ function PartyMemberRow({ member, isYou, token }) {
             <span className="font-black text-starlight">{speedLabel}</span>
           </span>
         </div>
-      </div>
+      </button>
+      {isOwner && onViewSheet && (
+        <button
+          type="button"
+          onClick={() => onViewSheet(member)}
+          className="shrink-0 rounded-sm border border-neon-cyan/50 px-2 py-1 text-[8px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 lg:text-[9px]"
+          title={`View ${member.character_name}'s sheet`}
+        >
+          Sheet
+        </button>
+      )}
     </li>
   );
 }
@@ -109,6 +130,7 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
   const [error, setError] = useState("");
   const [addingAll, setAddingAll] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [sheetModalMember, setSheetModalMember] = useState(null);
 
   const loadParty = useCallback(async () => {
     if (!token || !campaignId) return;
@@ -221,6 +243,8 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
             member={member}
             isYou={member.character_id === characterId}
             token={token}
+            isOwner={isOwner}
+            onViewSheet={isOwner ? setSheetModalMember : undefined}
           />
         ))}
       </ul>
@@ -231,6 +255,12 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
       >
         Refresh
       </button>
+      <PartyMemberSheetModal
+        open={!!sheetModalMember}
+        characterId={sheetModalMember?.character_id}
+        token={token}
+        onClose={() => setSheetModalMember(null)}
+      />
     </div>
   );
 }
@@ -967,14 +997,23 @@ function InitiativeStatusBadges({ combatant, isYou, isDefeated }) {
   );
 }
 
-function InitiativeCombatantStats({ combatant, isDmView }) {
+function InitiativeCombatantStats({ combatant, isDmView, turnEconomy, isActive }) {
   const conditions = formatConditionsList(combatant.conditions);
+  const economy = isActive ? turnEconomy?.[combatant.id] : null;
+  const turnStatuses = turnStatusLabels(economy);
   return (
     <div className="flex w-full flex-col gap-0.5">
       <InitiativeLabeledStat label="Init" value={combatant.initiative} />
       <InitiativeLabeledStat label="HP" value={combatantHpText(combatant)} />
       <InitiativeLabeledStat label="AC" value={combatantAcText(combatant, isDmView)} />
-      <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant)} />
+      <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant, economy)} />
+      {turnStatuses.length ? (
+        <InitiativeLabeledStat
+          label="Turn"
+          value={turnStatuses.join(", ")}
+          valueClassName="text-neon-magenta"
+        />
+      ) : null}
       {conditions ? (
         <InitiativeLabeledStat label="Cond" value={conditions} valueClassName="text-neon-magenta" />
       ) : null}
@@ -1019,7 +1058,17 @@ function HpStepButtons({ combatant, disabled, onAdjust }) {
   );
 }
 
-function DmCombatantEditor({ combatant, saving, onPatch, onRemove, onClose }) {
+function DmCombatantEditor({
+  combatant,
+  saving,
+  onPatch,
+  onRemove,
+  onClose,
+  isActiveTurn = false,
+  movementRemaining = null,
+  onAdjustMovement,
+  movementBusy = false,
+}) {
   const defeated = combatant.hp != null && combatant.hp <= 0;
   const isEnemy = !combatant.is_pc && !combatant.is_ally;
 
@@ -1114,6 +1163,35 @@ function DmCombatantEditor({ combatant, saving, onPatch, onRemove, onClose }) {
           )}
         </div>
         <HpStepButtons combatant={combatant} disabled={saving} onAdjust={adjustHp} />
+        {isActiveTurn && onAdjustMovement && (
+          <div className="space-y-1">
+            <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">
+              Movement
+              {movementRemaining != null && combatant.speed != null
+                ? ` — ${movementRemaining}/${combatant.speed} ft`
+                : movementRemaining != null
+                  ? ` — ${movementRemaining} ft`
+                  : ""}
+            </p>
+            <div className="flex flex-wrap gap-0.5">
+              {[-30, -15, -10, -5, 5, 10, 15, 30].map((step) => (
+                <button
+                  key={step}
+                  type="button"
+                  disabled={saving || movementBusy}
+                  onClick={() => onAdjustMovement(step)}
+                  className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[8px] font-black uppercase disabled:opacity-30 ${
+                    step < 0
+                      ? "border-danger/50 text-danger hover:bg-danger/10"
+                      : "border-neon-cyan/50 text-neon-cyan hover:bg-neon-cyan/10"
+                  }`}
+                >
+                  {step > 0 ? `+${step}` : step}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <ConditionsEditor
           conditions={combatant.conditions}
           disabled={saving}
@@ -1155,6 +1233,7 @@ function InitiativeCombatantRow({
   isDefeated,
   onSelect,
   token,
+  turnEconomy,
 }) {
   const selectable = isDmView && onSelect;
   return (
@@ -1172,7 +1251,12 @@ function InitiativeCombatantRow({
         </p>
         <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
         <div className="mt-1 max-w-[220px]">
-          <InitiativeCombatantStats combatant={combatant} isDmView={isDmView} />
+          <InitiativeCombatantStats
+            combatant={combatant}
+            isDmView={isDmView}
+            turnEconomy={turnEconomy}
+            isActive={isActive}
+          />
         </div>
       </div>
     </li>
@@ -1189,6 +1273,7 @@ function InitiativeCombatantCard({
   isDefeated,
   onSelect,
   token,
+  turnEconomy,
 }) {
   const selectable = isDmView && onSelect;
   return (
@@ -1213,7 +1298,12 @@ function InitiativeCombatantCard({
       >
         {combatant.name}
       </p>
-      <InitiativeCombatantStats combatant={combatant} isDmView={isDmView} />
+      <InitiativeCombatantStats
+        combatant={combatant}
+        isDmView={isDmView}
+        turnEconomy={turnEconomy}
+        isActive={isActive}
+      />
       <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
     </div>
   );
@@ -1249,6 +1339,7 @@ export function InitiativeWidget({
   const [saving, setSaving] = useState(false);
   const [dmActionSheet, setDmActionSheet] = useState(null);
   const [dmSheetLoading, setDmSheetLoading] = useState(false);
+  const [movementBusy, setMovementBusy] = useState(false);
   const savingRef = useRef(false);
 
   const loadEncounter = useCallback(async () => {
@@ -1439,6 +1530,31 @@ export function InitiativeWidget({
     });
   };
 
+  const adjustMovement = useCallback(
+    async (combatantId, delta) => {
+      if (!token || !campaignId || delta === 0) return;
+      setMovementBusy(true);
+      setActionError("");
+      try {
+        const res = await apiFetch(`/campaigns/${campaignId}/encounter/adjust-movement`, {
+          token,
+          method: "POST",
+          body: { combatant_id: combatantId, delta },
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || "Could not adjust movement");
+        }
+        setEncounter(await res.json());
+      } catch (err) {
+        setActionError(err.message || "Could not adjust movement.");
+      } finally {
+        setMovementBusy(false);
+      }
+    },
+    [token, campaignId]
+  );
+
   const removeCombatant = (id) => {
     const nextCombatants = encounter.combatants.filter((c) => c.id !== id);
     if (selectedId === id) setSelectedId(null);
@@ -1598,9 +1714,9 @@ export function InitiativeWidget({
           encounter={encounter}
           actorCombatant={myCombatant}
           canTakeTurn={isMyTurn}
+          canAdjustMovement={isMyTurn}
           activeTurnName={activeCombatant?.name}
           onEncounterUpdate={setEncounter}
-          onSheetRefresh={handleSheetRefresh}
           onError={setActionError}
         />
       )}
@@ -1612,12 +1728,12 @@ export function InitiativeWidget({
           encounter={encounter}
           actorCombatant={activeCombatant}
           canTakeTurn
+          canAdjustMovement
           isDmProxy
           actionCatalogMode={activeCombatant.character_id ? "pc" : "npc"}
           actionSheet={dmActionSheet}
           actionSheetLoading={dmSheetLoading}
           onEncounterUpdate={setEncounter}
-          onSheetRefresh={handleSheetRefresh}
           onError={setActionError}
         />
       )}
@@ -1648,6 +1764,7 @@ export function InitiativeWidget({
                 isDefeated={defeated}
                 onSelect={isOwner ? handleSelectCombatant : undefined}
                 token={token}
+                turnEconomy={encounter.turn_economy}
               />
             );
           })}
@@ -1668,6 +1785,7 @@ export function InitiativeWidget({
                 isDefeated={defeated}
                 onSelect={isOwner ? handleSelectCombatant : undefined}
                 token={token}
+                turnEconomy={encounter.turn_economy}
               />
             );
           })}
@@ -1682,6 +1800,16 @@ export function InitiativeWidget({
             onPatch={(patch) => updateCombatant(selectedCombatant.id, patch)}
             onRemove={() => removeCombatant(selectedCombatant.id)}
             onClose={() => setSelectedId(null)}
+            isActiveTurn={activeCombatant?.id === selectedCombatant.id}
+            movementRemaining={
+              encounter.turn_economy?.[selectedCombatant.id]?.movement_remaining ?? null
+            }
+            movementBusy={movementBusy}
+            onAdjustMovement={
+              activeCombatant?.id === selectedCombatant.id
+                ? (delta) => adjustMovement(selectedCombatant.id, delta)
+                : undefined
+            }
           />
         </div>
       )}

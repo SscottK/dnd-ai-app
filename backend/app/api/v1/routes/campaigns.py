@@ -20,6 +20,7 @@ from app.api.schemas import (
     EncounterPatchResponse,
     EncounterState,
     EncounterUpdate,
+    AdjustMovementRequest,
     CombatantActionSheetResponse,
     MonsterSearchEntry,
     MonsterSearchResponse,
@@ -83,8 +84,12 @@ from app.services.combat_resolution import (
     resolve_attack_profile,
     resolve_self_heal,
 )
-from app.services.equipment_actions import is_equipment_action, resolve_equipment_action
-from app.services.turn_actions import ensure_turn_economy, use_combat_action
+from app.services.standard_combat_actions import (
+    adjust_movement,
+    is_standard_turn_effect,
+    resolve_standard_combat_effect,
+)
+from app.services.turn_actions import ensure_turn_economy, get_active_combatant, use_combat_action
 from app.services.invite_codes import generate_invite_code
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
@@ -499,6 +504,8 @@ def update_encounter(
         state.combatants = [
             apply_monster_catalog_to_combatant(combatant) for combatant in data.combatants
         ]
+    if data.turn_economy is not None:
+        state.turn_economy = data.turn_economy
 
     log_hp_changes(before, state)
     sync_encounter_combatants_to_characters(session, before, state)
@@ -715,78 +722,67 @@ def use_encounter_action(
     )
 
     try:
-        if is_equipment_action(data.action_id):
-            use_combat_action(
-                state,
-                actor=actor,
+        profile = resolve_attack_profile(
+            session,
+            campaign_id,
+            actor,
+            action_id=resolved_data.action_id,
+            action_name=resolved_data.action_name,
+            detail=resolved_data.detail,
+        )
+        will_resolve_attack = bool(
+            resolved_data.target_ids
+            and is_resolved_attack(
                 action_id=resolved_data.action_id,
                 action_name=resolved_data.action_name,
-                action_type=resolved_data.action_type,
                 targeting=resolved_data.targeting,
-                target_ids=resolved_data.target_ids,
-                detail=resolved_data.detail,
-                log_usage=False,
+                profile=profile,
             )
-            action_messages = resolve_equipment_action(
+        )
+        standard_effect = is_standard_turn_effect(
+            resolved_data.action_id, resolved_data.action_name
+        )
+
+        log_before = len(state.combat_log)
+        use_combat_action(
+            state,
+            actor=actor,
+            action_id=resolved_data.action_id,
+            action_name=resolved_data.action_name,
+            action_type=resolved_data.action_type,
+            targeting=resolved_data.targeting,
+            target_ids=resolved_data.target_ids,
+            detail=resolved_data.detail,
+            log_usage=not will_resolve_attack and not standard_effect,
+        )
+        if will_resolve_attack:
+            action_messages = resolve_attack(
                 session,
                 campaign_id,
                 state,
                 actor=actor,
                 data=resolved_data,
             )
-        else:
-            profile = resolve_attack_profile(
-                session,
-                campaign_id,
-                actor,
-                action_id=resolved_data.action_id,
-                action_name=resolved_data.action_name,
-                detail=resolved_data.detail,
-            )
-            will_resolve_attack = bool(
-                resolved_data.target_ids
-                and is_resolved_attack(
-                    action_id=resolved_data.action_id,
-                    action_name=resolved_data.action_name,
-                    targeting=resolved_data.targeting,
-                    profile=profile,
-                )
-            )
-
-            log_before = len(state.combat_log)
-            use_combat_action(
+        elif standard_effect:
+            action_messages = resolve_standard_combat_effect(
                 state,
                 actor=actor,
-                action_id=resolved_data.action_id,
-                action_name=resolved_data.action_name,
-                action_type=resolved_data.action_type,
-                targeting=resolved_data.targeting,
-                target_ids=resolved_data.target_ids,
-                detail=resolved_data.detail,
-                log_usage=not will_resolve_attack,
+                data=resolved_data,
             )
-            if will_resolve_attack:
-                action_messages = resolve_attack(
-                    session,
-                    campaign_id,
-                    state,
-                    actor=actor,
-                    data=resolved_data,
-                )
-            else:
-                action_messages = resolve_self_heal(
-                    session,
-                    campaign_id,
-                    state,
-                    actor=actor,
-                    data=resolved_data,
-                )
-                if not action_messages:
-                    action_messages = [
-                        entry.message for entry in state.combat_log[log_before:] if entry.message
-                    ]
-                if not action_messages:
-                    action_messages = [f"{actor.name} uses {resolved_data.action_name}."]
+        else:
+            action_messages = resolve_self_heal(
+                session,
+                campaign_id,
+                state,
+                actor=actor,
+                data=resolved_data,
+            )
+            if not action_messages:
+                action_messages = [
+                    entry.message for entry in state.combat_log[log_before:] if entry.message
+                ]
+            if not action_messages:
+                action_messages = [f"{actor.name} uses {resolved_data.action_name}."]
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -797,6 +793,74 @@ def use_encounter_action(
         encounter=build_encounter_response(session, campaign, is_owner=is_owner),
         action_messages=action_messages,
     )
+
+
+@router.post("/{campaign_id}/encounter/adjust-movement", response_model=EncounterState)
+def adjust_encounter_movement(
+    campaign_id: int,
+    data: AdjustMovementRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    state = parse_encounter(campaign)
+
+    if is_owner:
+        if not data.combatant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Specify combatant_id when adjusting movement as DM",
+            )
+        actor = next(
+            (combatant for combatant in state.combatants if combatant.id == data.combatant_id),
+            None,
+        )
+        if actor is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Combatant not found in this encounter",
+            )
+    else:
+        try:
+            _, character = get_member_character(session, campaign_id, current_user.id)
+        except ValueError as exc:
+            if str(exc) == "not_a_member":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Join this campaign with a character to adjust movement",
+                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Character not found",
+            ) from exc
+
+        actor = next(
+            (combatant for combatant in state.combatants if combatant.character_id == character.id),
+            None,
+        )
+        if actor is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="You are not in the current encounter",
+            )
+        if data.combatant_id and data.combatant_id != actor.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only adjust movement for your own character",
+            )
+
+        active = get_active_combatant(state)
+        if active is None or active.id != actor.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You can only adjust movement on your turn",
+            )
+
+    ensure_turn_economy(state)
+    adjust_movement(state, actor=actor, delta=data.delta)
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+    return build_encounter_response(session, campaign, is_owner=is_owner)
 
 
 @router.post("/{campaign_id}/encounter/roll", response_model=EncounterState)

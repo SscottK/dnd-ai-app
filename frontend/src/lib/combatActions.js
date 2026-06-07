@@ -4,12 +4,10 @@
 
 import { enrichRawAction, inferTargeting, overrideActionType } from "./actionRules";
 import { inferPrimaryActionType } from "./actionTypeInference";
+import { abilityModifier, getProficiencyBonus } from "./characterSheet";
+import { ACTION_TYPES as SCHEMA_ACTION_TYPES } from "./sheetSchema";
 
-export const ACTION_TYPES = {
-  action: "action",
-  bonus_action: "bonus_action",
-  reaction: "reaction",
-};
+export const ACTION_TYPES = SCHEMA_ACTION_TYPES;
 
 export const TARGETING = {
   self: "self",
@@ -49,6 +47,7 @@ export const NPC_FALLBACK_ACTIONS = [
 export const STANDARD_ACTIONS = [
   { id: "std-attack", name: "Attack", actionType: ACTION_TYPES.action, targeting: TARGETING.one_enemy, category: "standard" },
   { id: "std-dash", name: "Dash", actionType: ACTION_TYPES.action, targeting: TARGETING.self, category: "standard" },
+  { id: "std-dash-bonus", name: "Dash", actionType: ACTION_TYPES.bonus_action, targeting: TARGETING.self, category: "standard" },
   { id: "std-disengage", name: "Disengage", actionType: ACTION_TYPES.action, targeting: TARGETING.self, category: "standard" },
   { id: "std-dodge", name: "Dodge", actionType: ACTION_TYPES.action, targeting: TARGETING.self, category: "standard" },
   { id: "std-help", name: "Help", actionType: ACTION_TYPES.action, targeting: TARGETING.one_ally_or_self, category: "standard" },
@@ -200,9 +199,162 @@ function isWeaponItem(item) {
   return WEAPON_PATTERN.test(name);
 }
 
+const WEAPON_PROFILES = [
+  { pattern: /rapier/i, dice: "1d8", range: "5 ft Reach", notes: "Martial, Finesse", finesse: true },
+  { pattern: /shortsword|longsword|scimitar|war pick|morningstar/i, dice: "1d8", range: "5 ft Reach", notes: "Martial", finesse: true },
+  { pattern: /greatsword|maul|greataxe|halberd|glaive|pike/i, dice: "1d12", range: "5 ft Reach", notes: "Martial, Heavy" },
+  { pattern: /handaxe|light hammer|sickle|club|dagger|mace|spear/i, dice: "1d6", range: "5 ft Reach", notes: "Simple" },
+  { pattern: /javelin/i, dice: "1d6", range: "30/120 ft", notes: "Simple, Thrown" },
+  { pattern: /shortbow/i, dice: "1d6", range: "80/320 ft", notes: "Simple, Two-Handed" },
+  { pattern: /longbow/i, dice: "1d8", range: "150/600 ft", notes: "Martial, Two-Handed, Heavy" },
+  { pattern: /light crossbow/i, dice: "1d8", range: "80/320 ft", notes: "Simple, Two-Handed, Loading" },
+  { pattern: /crossbow/i, dice: "1d10", range: "100/400 ft", notes: "Martial, Two-Handed, Loading" },
+];
+
+function weaponProfile(name) {
+  const match = WEAPON_PROFILES.find((entry) => entry.pattern.test(name));
+  return (
+    match || {
+      dice: "1d6",
+      range: /bow|crossbow|sling|javelin/i.test(name) ? "80/320 ft" : "5 ft Reach",
+      notes: "",
+      finesse: /rapier|dagger|scimitar|shortsword|whip/i.test(name),
+    }
+  );
+}
+
+function inferDefaultToHit(sheet) {
+  const fromAttack = (sheet?.attacks || []).find((attack) => attack.to_hit != null)?.to_hit;
+  if (fromAttack != null) return fromAttack;
+  const prof = getProficiencyBonus(sheet) ?? 0;
+  const str = abilityModifier(sheet?.abilities?.str) ?? 0;
+  return prof + str;
+}
+
+function formatWeaponDamage(dice, sheet, finesse = false) {
+  if (!dice) return null;
+  const str = abilityModifier(sheet?.abilities?.str) ?? 0;
+  const dex = abilityModifier(sheet?.abilities?.dex) ?? 0;
+  const mod = finesse ? Math.max(str, dex) : str;
+  return mod ? `${dice}+${mod}` : dice;
+}
+
+function isDiceExpression(value) {
+  return /^\d+d\d+([+-]\d+)?$/i.test(String(value || "").trim());
+}
+
+function resolveAttackDamage(raw, sheet, profile) {
+  if (raw.damage && !isDiceExpression(raw.damage)) return raw.damage;
+  const dice = raw.damage_dice || (isDiceExpression(raw.damage) ? raw.damage : null) || profile.dice;
+  return formatWeaponDamage(dice, sheet, profile.finesse);
+}
+
+function mapAttackEntry(raw, sheet) {
+  const name = raw.name;
+  if (!name) return null;
+  const profile = weaponProfile(name);
+  return {
+    id: raw.id || `attack-${slug(name)}`,
+    name,
+    range: raw.range || profile.range,
+    toHit: raw.to_hit ?? raw.attack_bonus ?? null,
+    damage: resolveAttackDamage(raw, sheet, profile),
+    notes: raw.notes || profile.notes || "",
+    description: raw.description || "",
+    actionType: raw.action_type || raw.actionType || ACTION_TYPES.action,
+    category: "attack",
+  };
+}
+
+/** Attack rows for the digital sheet — merges parsed attacks with all inventory weapons. */
+export function collectSheetAttackEntries(sheet) {
+  const entries = [];
+  const seen = new Set();
+  const defaultToHit = inferDefaultToHit(sheet);
+
+  for (const attack of sheet?.attacks || []) {
+    const entry = mapAttackEntry(attack, sheet);
+    if (!entry || seen.has(entry.name.toLowerCase())) continue;
+    seen.add(entry.name.toLowerCase());
+    if (entry.toHit == null) entry.toHit = defaultToHit;
+    entries.push(entry);
+  }
+
+  for (const item of sheet?.inventory || []) {
+    if (!isWeaponItem(item)) continue;
+    const key = String(item.name || "").toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const profile = weaponProfile(item.name);
+    entries.push({
+      id: `weapon-${item.id || slug(item.name)}`,
+      name: item.name,
+      range: item.range || profile.range,
+      toHit: item.to_hit ?? defaultToHit,
+      damage: item.damage || formatWeaponDamage(profile.dice, sheet, profile.finesse),
+      notes: item.notes || profile.notes,
+      description: "",
+      actionType: ACTION_TYPES.action,
+      category: "attack",
+    });
+  }
+
+  return entries;
+}
+
+/** Non-attack sheet actions for the digital sheet Actions tab. */
+export function collectSheetCombatActions(sheet) {
+  const actions = [];
+  const seen = new Set();
+
+  const add = (raw, category = "action") => {
+    const normalized = normalizeCombatAction(raw, actions.length, category);
+    if (!normalized) return;
+    const key = `${normalized.actionType}:${actionNameKey(normalized.name)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    actions.push(normalized);
+  };
+
+  for (const action of sheet?.combat_actions || []) {
+    add(action, npcActionCategory(action));
+  }
+
+  for (const feat of sheet?.features || []) {
+    if (!feat?.action_type || !feat?.targeting) continue;
+    if (isPassiveTurnAction(feat)) continue;
+    add(
+      {
+        id: feat.id || `feat-${feat.name}`,
+        name: feat.name,
+        action_type: feat.action_type,
+        targeting: feat.targeting,
+        description: feat.description,
+      },
+      "feature"
+    );
+  }
+
+  for (const spell of sheet?.spells || []) {
+    if (!spell?.name || spell.prepared === false) continue;
+    add(
+      {
+        id: spell.id || `spell-${spell.name}`,
+        name: spell.name,
+        action_type: spell.action_type || spell.actionType || ACTION_TYPES.action,
+        targeting: spell.targeting,
+        description: spell.description,
+      },
+      "spell"
+    );
+  }
+
+  return actions;
+}
+
 function inventoryWeaponActions(sheet) {
   return (sheet?.inventory || [])
-    .filter((item) => isWeaponItem(item) && item?.equipped)
+    .filter((item) => isWeaponItem(item))
     .map((item, index) => {
       const detail = [item.damage, item.to_hit != null ? `+${item.to_hit} to hit` : null, item.notes]
         .filter(Boolean)
@@ -475,13 +627,6 @@ export function buildAvailableActions(sheet, options = {}) {
     standards
       .filter((action) => action.targeting === TARGETING.self)
       .forEach(add);
-  }
-
-  const canEquip = getEquippableItems(sheet).length > 0;
-  const canUnequip = getUnequippableItems(sheet).length > 0;
-  for (const slot of [ACTION_TYPES.action, ACTION_TYPES.bonus_action]) {
-    if (canEquip) add(equipmentMetaForSlot("equip", slot));
-    if (canUnequip) add(equipmentMetaForSlot("unequip", slot));
   }
 
   return byType;

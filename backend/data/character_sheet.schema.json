@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dnd-ai-app.local/schemas/character_sheet.json",
+  "title": "CharacterSheet",
+  "description": "Canonical sheet_json for PDF import, enrichment, combat UI, and character builder.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "abilities": {
+      "type": "object",
+      "properties": {
+        "str": { "type": ["integer", "null"] },
+        "dex": { "type": ["integer", "null"] },
+        "con": { "type": ["integer", "null"] },
+        "int": { "type": ["integer", "null"] },
+        "wis": { "type": ["integer", "null"] },
+        "cha": { "type": ["integer", "null"] }
+      }
+    },
+    "classes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/classEntry" }
+    },
+    "resources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/resource" }
+    },
+    "combat_actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/combatAction" }
+    },
+    "features": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/feature" }
+    },
+    "wild_shapes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/wildShapeForm" }
+    },
+    "attacks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/attackProfile" }
+    },
+    "spells": { "type": "array" },
+    "inventory": { "type": "array" },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "classEntry": {
+      "type": "object",
+      "required": ["name", "level"],
+      "properties": {
+        "name": { "type": "string" },
+        "level": { "type": "integer", "minimum": 1 },
+        "subclass": { "type": ["string", "null"] }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Canonical slug (e.g. focus-points, wild-shape, rage)."
+        },
+        "name": { "type": "string" },
+        "current": { "type": ["integer", "null"] },
+        "max": { "type": ["integer", "null"] },
+        "recharge": {
+          "type": "string",
+          "enum": ["short_rest", "long_rest", "turn", "none"]
+        },
+        "source_class": { "type": ["string", "null"] },
+        "display": {
+          "type": "array",
+          "items": { "enum": ["combat_pane", "turn_actions", "features_tab"] },
+          "default": ["combat_pane"]
+        }
+      }
+    },
+    "resourceCost": {
+      "type": "object",
+      "required": ["resource_id", "amount"],
+      "properties": {
+        "resource_id": { "type": "string" },
+        "amount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "actionOption": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "combatAction": {
+      "type": "object",
+      "required": ["id", "name", "action_type", "targeting"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "action_type": {
+          "type": "string",
+          "enum": ["action", "bonus_action", "reaction", "magic_action"]
+        },
+        "targeting": {
+          "type": "string",
+          "enum": ["self", "one_enemy", "one_ally", "one_creature", "one_ally_or_self"]
+        },
+        "description": { "type": "string" },
+        "source": { "type": ["string", "null"] },
+        "display": {
+          "type": "array",
+          "items": { "enum": ["combat_pane", "turn_actions", "features_tab"] },
+          "default": ["turn_actions"]
+        },
+        "resource_cost": { "$ref": "#/$defs/resourceCost" },
+        "requires_option": { "type": "boolean" },
+        "option_source": { "enum": ["wild_shapes"] },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actionOption" }
+        },
+        "attack_bonus": { "type": ["integer", "null"] },
+        "damage_dice": { "type": "string" },
+        "category": { "type": "string" },
+        "min_level": { "type": "integer" }
+      }
+    },
+    "feature": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "source": { "type": ["string", "null"] },
+        "display": {
+          "type": "array",
+          "items": { "enum": ["combat_pane", "turn_actions", "features_tab"] },
+          "default": ["features_tab"]
+        },
+        "passive": {
+          "type": "boolean",
+          "description": "True when the feature is not a standalone turn action (Extra Attack, Stunning Strike rider, Monk's Focus container)."
+        },
+        "action_type": {
+          "type": ["string", "null"],
+          "enum": ["action", "bonus_action", "reaction", "magic_action", null]
+        }
+      }
+    },
+    "wildShapeForm": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "cr": { "type": ["string", "null"] },
+        "notes": { "type": "string" }
+      }
+    },
+    "attackProfile": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "to_hit": { "type": ["integer", "null"] },
+        "damage": { "type": "string" },
+        "action_type": {
+          "type": "string",
+          "enum": ["action", "bonus_action", "reaction", "magic_action"],
+          "default": "action"
+        },
+        "targeting": { "type": "string", "default": "one_enemy" },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

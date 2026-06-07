@@ -37,6 +37,7 @@ import {
   appendEncounterDmNotesTab,
   ensurePlaySessionNotesTab,
   clampWidget,
+  bringWidgetToFront,
   buildDefaultLayout,
   buildDmDefaultLayout,
   clampWidgets,
@@ -681,16 +682,33 @@ export function SessionPlayPage() {
     saveLayoutSnapshot(nextLayout);
   };
 
+  const focusWidget = useCallback(
+    (widgetId) => {
+      const prev = layoutRef.current;
+      const nextWidgets = bringWidgetToFront(prev.widgets, widgetId);
+      if (nextWidgets === prev.widgets) return;
+      const nextLayout = { ...prev, widgets: nextWidgets };
+      layoutRef.current = nextLayout;
+      setLayout(nextLayout);
+      saveLayoutSnapshot(nextLayout);
+    },
+    [saveLayoutSnapshot]
+  );
+
   const addWidget = (type) => {
+    const maxZ = Math.max(0, ...layout.widgets.map((widget) => widget.z ?? 0));
     const nextLayout = {
       ...layout,
       widgets: [
         ...layout.widgets,
-        createWidget(
-          type,
-          canvasBoundsRef.current.width || 1280,
-          canvasBoundsRef.current.height || 800
-        ),
+        {
+          ...createWidget(
+            type,
+            canvasBoundsRef.current.width || 1280,
+            canvasBoundsRef.current.height || 800
+          ),
+          z: maxZ + 1,
+        },
       ],
     };
     setLayout(nextLayout);
@@ -1132,7 +1150,9 @@ export function SessionPlayPage() {
           style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
         >
           <div className="relative h-full w-full overflow-hidden">
-            {layout.widgets.map((widget) => (
+            {[...layout.widgets]
+              .sort((left, right) => (left.z ?? 0) - (right.z ?? 0))
+              .map((widget) => (
               <SheetPane
                 key={widget.id}
                 widget={widget}
@@ -1146,6 +1166,7 @@ export function SessionPlayPage() {
                 onTogglePin={togglePin}
                 onToggleMinimize={toggleMinimize}
                 onRemove={removeWidget}
+                onFocus={focusWidget}
               >
                 {renderWidgetBody(widget)}
               </SheetPane>

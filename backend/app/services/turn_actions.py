@@ -53,17 +53,31 @@ def get_active_combatant(state: EncounterState) -> EncounterCombatant | None:
     return ordered[index] if 0 <= index < len(ordered) else ordered[0]
 
 
+def _fresh_turn_economy(combatant: EncounterCombatant) -> TurnEconomySnapshot:
+    return TurnEconomySnapshot(
+        movement_remaining=combatant.speed if combatant.speed is not None else None,
+    )
+
+
 def ensure_turn_economy(state: EncounterState) -> None:
     active = get_active_combatant(state)
     if active is None:
         return
-    if active.id not in state.turn_economy:
-        state.turn_economy[active.id] = TurnEconomySnapshot()
+    economy = state.turn_economy.get(active.id)
+    if economy is None:
+        state.turn_economy[active.id] = _fresh_turn_economy(active)
+        return
+    if economy.movement_remaining is None and active.speed is not None:
+        economy.movement_remaining = active.speed
 
 
 def begin_turn(state: EncounterState, combatant_id: str) -> None:
     """Fresh action economy when a combatant's turn starts."""
-    state.turn_economy[combatant_id] = TurnEconomySnapshot()
+    combatant = _actor_combatant(state, combatant_id)
+    if combatant is None:
+        state.turn_economy[combatant_id] = TurnEconomySnapshot()
+        return
+    state.turn_economy[combatant_id] = _fresh_turn_economy(combatant)
 
 
 def _living_targets(state: EncounterState) -> list[EncounterCombatant]:

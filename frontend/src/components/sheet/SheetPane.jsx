@@ -13,6 +13,7 @@ export function SheetPane({
   onTogglePin,
   onToggleMinimize,
   onRemove,
+  onFocus,
   scale = 1,
   getCanvasBounds,
 }) {
@@ -81,9 +82,14 @@ export function SheetPane({
     };
   }, [getCanvasBounds, onChange, onCommit, onInteractionEnd, scale]);
 
+  const focusPane = () => {
+    onFocus?.(widget.id);
+  };
+
   const startDrag = (event) => {
     if (widget.pinned) return;
     event.preventDefault();
+    focusPane();
     onInteractionStart?.();
     dragRef.current = {
       x: event.clientX,
@@ -97,6 +103,7 @@ export function SheetPane({
     if (widget.pinned || widget.minimized) return;
     event.preventDefault();
     event.stopPropagation();
+    focusPane();
     onInteractionStart?.();
     resizeRef.current = {
       x: event.clientX,
@@ -113,13 +120,15 @@ export function SheetPane({
   return (
     <div
       ref={paneRef}
-      className="absolute z-10 flex flex-col rounded-sm border border-border-bright bg-void-panel"
+      className="absolute flex flex-col rounded-sm border border-border-bright bg-void-panel"
       style={{
         left: widget.x,
         top: widget.y,
         width: widget.w,
         height: displayHeight,
+        zIndex: widget.z ?? 1,
       }}
+      onPointerDown={focusPane}
     >
       <div className="relative z-20 flex shrink-0 items-center gap-1 border-b border-border bg-void-deep/80 px-1 py-1">
         <div

@@ -31,6 +31,9 @@ def _strip_magic_suffix(name: str) -> str:
 
 
 def _item_magic_bonus(item: dict) -> int:
+    from app.services.character_sheet import _sanitize_item_ac_bonus
+
+    item = _sanitize_item_ac_bonus(item)
     if item.get("ac_bonus") is not None:
         try:
             return int(item["ac_bonus"])

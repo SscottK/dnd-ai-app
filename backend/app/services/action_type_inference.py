@@ -26,7 +26,7 @@ _TRAILING_ECONOMY = re.compile(
 
 # Authoritative names where SRD/Open5e text inference is unreliable.
 _ACTION_TYPE_OVERRIDES: dict[str, str] = {
-    "wild shape": "action",
+    "wild shape": "bonus_action",
     "combat wild shape": "bonus_action",
     "end wild shape": "bonus_action",
     "cunning action": "bonus_action",

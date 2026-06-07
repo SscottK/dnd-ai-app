@@ -65,6 +65,25 @@ def can_view_character_portrait(character: Character, user_id: int, session: Ses
     return get_campaign_member_for_user(character.campaign_id, user_id, session) is not None
 
 
+def can_view_character_sheet(character: Character, user_id: int, session: SessionDep) -> bool:
+    """Owner always; campaign DM may view party member sheets."""
+    if character.user_id == user_id:
+        return True
+    if character.campaign_id is None:
+        return False
+    campaign = session.get(Campaign, character.campaign_id)
+    return campaign is not None and campaign.owner_id == user_id
+
+
+def get_viewable_character(
+    character_id: int, current_user: CurrentUser, session: SessionDep
+) -> Character:
+    character = session.get(Character, character_id)
+    if character is None or not can_view_character_sheet(character, current_user.id, session):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
+    return character
+
+
 def photo_to_read(photo: CharacterPhoto, character: Character) -> CharacterPhotoRead:
     return CharacterPhotoRead(
         id=photo.id,
@@ -359,7 +378,7 @@ def clear_character_portrait(character_id: int, current_user: CurrentUser, sessi
 
 @router.get("/{character_id}", response_model=CharacterRead)
 def get_character(character_id: int, current_user: CurrentUser, session: SessionDep):
-    character = get_owned_character(character_id, current_user, session)
+    character = get_viewable_character(character_id, current_user, session)
     return to_character_read(character, session)
 
 

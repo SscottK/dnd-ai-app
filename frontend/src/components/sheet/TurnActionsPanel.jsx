@@ -2,22 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { loadActionRulesCatalog } from "../../lib/actionRules";
 import { impliesIncapacitated } from "../../lib/conditions";
+import { turnStatusLabels } from "../../lib/encounterDisplay";
 import {
   ACTION_TYPES,
-  EQUIP_META_ACTION,
-  UNEQUIP_META_ACTION,
   actionHasOptions,
   actionNeedsTarget,
   buildAvailableActions,
-  equipItemAction,
   resolveOptionAction,
   filterTargetCandidates,
   formatApiErrorDetail,
-  getEquippableItems,
-  getUnequippableItems,
-  isEquipmentMetaAction,
   targetLabel,
-  unequipItemAction,
   validateTargetSelection,
 } from "../../lib/combatActions";
 
@@ -33,7 +27,6 @@ const CATEGORY_LABELS = {
   spell: "Spell",
   feature: "Feature",
   combat: "Ability",
-  equipment: "Equipment",
   npc: "NPC",
   standard: "Standard",
 };
@@ -44,6 +37,10 @@ function economyForCombatant(encounter, combatantId) {
       action_used: false,
       bonus_action_used: false,
       reaction_used: false,
+      movement_remaining: null,
+      dodging: false,
+      disengaged: false,
+      hiding: false,
     }
   );
 }
@@ -53,6 +50,29 @@ function cleanActionName(name) {
     .replace(/\s*★\s*$/, "")
     .split("(")[0]
     .trim();
+}
+
+function MovementStepButtons({ disabled, onAdjust }) {
+  const steps = [-30, -15, -10, -5, 5, 10, 15, 30];
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {steps.map((step) => (
+        <button
+          key={step}
+          type="button"
+          disabled={disabled}
+          onClick={() => onAdjust(step)}
+          className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[8px] font-black uppercase disabled:opacity-30 ${
+            step < 0
+              ? "border-danger/50 text-danger hover:bg-danger/10"
+              : "border-neon-cyan/50 text-neon-cyan hover:bg-neon-cyan/10"
+          }`}
+        >
+          {step > 0 ? `+${step}` : step}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function TurnActionsPanel({
@@ -67,8 +87,8 @@ export function TurnActionsPanel({
   canTakeTurn,
   activeTurnName,
   isDmProxy = false,
+  canAdjustMovement = false,
   onEncounterUpdate,
-  onSheetRefresh,
   onError,
 }) {
   const [step, setStep] = useState("pick_type");
@@ -76,6 +96,7 @@ export function TurnActionsPanel({
   const [pickedAction, setPickedAction] = useState(null);
   const [targetId, setTargetId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [movementBusy, setMovementBusy] = useState(false);
   const [lastOutcome, setLastOutcome] = useState("");
   const [rulesReady, setRulesReady] = useState(false);
 
@@ -96,6 +117,7 @@ export function TurnActionsPanel({
     [catalogSheet, actionCatalogMode, rulesReady]
   );
   const economy = economyForCombatant(encounter, actorCombatant?.id);
+  const turnStatuses = turnStatusLabels(economy);
   const incapacitated = impliesIncapacitated(actorCombatant?.conditions);
 
   useEffect(() => {
@@ -118,6 +140,32 @@ export function TurnActionsPanel({
     if (type === ACTION_TYPES.bonus_action) return !economy.bonus_action_used;
     if (type === ACTION_TYPES.reaction) return !economy.reaction_used;
     return false;
+  };
+
+  const adjustMovement = async (delta) => {
+    if (!token || !campaignId || !actorCombatant || delta === 0) return;
+    setMovementBusy(true);
+    onError?.("");
+    try {
+      const body = { delta };
+      if (isDmProxy) {
+        body.combatant_id = actorCombatant.id;
+      }
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/adjust-movement`, {
+        token,
+        method: "POST",
+        body,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(formatApiErrorDetail(err.detail, "Could not adjust movement"));
+      }
+      onEncounterUpdate?.(await res.json());
+    } catch (err) {
+      onError?.(err.message || "Could not adjust movement.");
+    } finally {
+      setMovementBusy(false);
+    }
   };
 
   const submitAction = async (action, targets = []) => {
@@ -153,9 +201,6 @@ export function TurnActionsPanel({
       onEncounterUpdate?.(nextEncounter);
       const messages = payload.action_messages || [];
       setLastOutcome(messages.length ? messages.join(" · ") : `${actorCombatant.name} used ${action.name}.`);
-      if (action.id.startsWith("equip-") || action.id.startsWith("unequip-")) {
-        onSheetRefresh?.();
-      }
       resetFlow();
     } catch (err) {
       onError?.(err.message || "Could not use action.");
@@ -170,17 +215,6 @@ export function TurnActionsPanel({
     setStep("pick_action");
   };
 
-  const equipmentItemChoices = useMemo(() => {
-    if (!pickedAction || !isEquipmentMetaAction(pickedAction)) return [];
-    if (pickedAction.id === EQUIP_META_ACTION.id) {
-      return getEquippableItems(catalogSheet || {});
-    }
-    if (pickedAction.id === UNEQUIP_META_ACTION.id) {
-      return getUnequippableItems(catalogSheet || {});
-    }
-    return [];
-  }, [pickedAction, catalogSheet]);
-
   const handlePickAction = (action) => {
     setPickedAction(action);
     if (actionHasOptions(action)) {
@@ -189,22 +223,6 @@ export function TurnActionsPanel({
     }
     if (action.requiresOption) {
       onError?.(`No beast forms on file for ${action.name}. Re-sync from PDF or add wild shapes to the sheet.`);
-      return;
-    }
-    if (isEquipmentMetaAction(action)) {
-      const items =
-        action.id === EQUIP_META_ACTION.id
-          ? getEquippableItems(catalogSheet || {})
-          : getUnequippableItems(catalogSheet || {});
-      if (items.length === 0) {
-        onError?.(
-          action.id === EQUIP_META_ACTION.id
-            ? "Nothing in your inventory can be equipped."
-            : "Nothing is currently equipped."
-        );
-        return;
-      }
-      setStep("pick_equipment");
       return;
     }
     if (actionNeedsTarget(action)) {
@@ -261,20 +279,18 @@ export function TurnActionsPanel({
     void submitAction(resolved, []);
   };
 
-  const handlePickEquipmentItem = (item) => {
-    if (!pickedAction) return;
-    const slotType = pickedAction.actionType || pickedType;
-    const resolved =
-      pickedAction.id === EQUIP_META_ACTION.id
-        ? equipItemAction(item, slotType)
-        : unequipItemAction(item, slotType);
-    void submitAction(resolved, []);
-  };
-
   if (!actorCombatant) return null;
 
   const showReaction = !canTakeTurn && typeAvailable(ACTION_TYPES.reaction);
   const showTurnPanel = canTakeTurn && !incapacitated;
+  const movementLabel =
+    economy.movement_remaining != null && actorCombatant.speed != null
+      ? `${economy.movement_remaining}/${actorCombatant.speed} ft`
+      : economy.movement_remaining != null
+        ? `${economy.movement_remaining} ft`
+        : actorCombatant.speed != null
+          ? `${actorCombatant.speed} ft`
+          : "—";
 
   if (!showTurnPanel && !showReaction) {
     if (incapacitated && canTakeTurn) {
@@ -341,7 +357,30 @@ export function TurnActionsPanel({
         <span className={economy.reaction_used ? "text-ink-faint line-through" : "text-starlight"}>
           Reaction {economy.reaction_used ? "✓" : "○"}
         </span>
+        <span className="text-neon-cyan">Move {movementLabel}</span>
       </div>
+
+      {turnStatuses.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {turnStatuses.map((label) => (
+            <span
+              key={label}
+              className="rounded-sm border border-neon-magenta/40 bg-neon-magenta/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-neon-magenta"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {canAdjustMovement && (
+        <div className="space-y-1 rounded-sm border border-border/50 bg-void-deep/30 px-2 py-1.5">
+          <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">
+            Spend movement
+          </p>
+          <MovementStepButtons disabled={movementBusy || busy} onAdjust={adjustMovement} />
+        </div>
+      )}
 
       {step === "pick_type" && (
         <div className="flex flex-wrap gap-1">
@@ -440,46 +479,6 @@ export function TurnActionsPanel({
                 )}
               </button>
             ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setStep("pick_action");
-              setPickedAction(null);
-            }}
-            className="text-[8px] font-black uppercase text-ink-faint hover:text-starlight"
-          >
-            Back
-          </button>
-        </div>
-      )}
-
-      {step === "pick_equipment" && pickedAction && (
-        <div className="space-y-1">
-          <p className="text-[8px] font-mono uppercase text-ink-faint">
-            {pickedAction.id === EQUIP_META_ACTION.id ? "Equip" : "Unequip"} — choose item
-          </p>
-          <div className="max-h-40 space-y-1 overflow-y-auto">
-            {equipmentItemChoices.length === 0 ? (
-              <p className="text-[9px] font-mono text-ink-faint">No items available.</p>
-            ) : (
-              equipmentItemChoices.map((item, index) => (
-                <button
-                  key={item.id || item.name || index}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => handlePickEquipmentItem(item)}
-                  className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
-                >
-                  <span className="text-[9px] font-black uppercase text-starlight">{item.name}</span>
-                  {(item.damage || item.notes) && (
-                    <span className="text-[8px] font-mono text-ink-faint line-clamp-2">
-                      {[item.damage, item.notes].filter(Boolean).join(" · ")}
-                    </span>
-                  )}
-                </button>
-              ))
-            )}
           </div>
           <button
             type="button"
