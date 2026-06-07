@@ -1,20 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  ChevronDown,
+  ChevronUp,
   FileText,
-  LogOut,
+  Hammer,
   MessageSquare,
   Play,
   Plus,
   Radio,
   Scroll,
+  Sparkles,
   Swords,
+  Upload,
   UserMinus,
   UserPlus,
   Users,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch, apiUpload } from "../lib/api";
+import { APP_NAME } from "../constants/branding";
 
 const emptyCharacterForm = {
   name: "",
@@ -29,6 +34,37 @@ const emptyCharacterForm = {
   sheet_json: null,
 };
 
+function StatPill({ children }) {
+  return (
+    <span className="rounded-sm border border-border/60 bg-void-deep/60 px-2 py-0.5 text-xs font-mono text-ink-muted">
+      {children}
+    </span>
+  );
+}
+
+function ActionButton({ children, className = "", ...props }) {
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center justify-center gap-1.5 rounded-sm border px-3 py-2 text-xs font-black uppercase tracking-wide transition sm:text-sm ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+function LinkButton({ to, children, className = "" }) {
+  return (
+    <Link
+      to={to}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-sm border px-3 py-2 text-xs font-black uppercase tracking-wide transition sm:text-sm ${className}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export function DashboardPage() {
   const { token, user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
@@ -42,12 +78,17 @@ export function DashboardPage() {
   const [newCampaignName, setNewCampaignName] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [joinCharacterId, setJoinCharacterId] = useState("");
+  const [showJoinPanel, setShowJoinPanel] = useState(false);
   const [showCharacterForm, setShowCharacterForm] = useState(false);
   const [editingCharacterId, setEditingCharacterId] = useState(null);
   const [characterForm, setCharacterForm] = useState(emptyCharacterForm);
   const [savingCharacter, setSavingCharacter] = useState(false);
 
   const availableCharacters = characters.filter((c) => !c.campaign_id);
+  const liveCampaigns = useMemo(
+    () => campaigns.filter((campaign) => campaign.session_active),
+    [campaigns]
+  );
 
   const loadDashboard = async () => {
     if (!token) return;
@@ -134,6 +175,7 @@ export function DashboardPage() {
 
     setInviteCode("");
     setJoinCharacterId("");
+    setShowJoinPanel(false);
     setError("");
     await loadDashboard();
   };
@@ -197,6 +239,7 @@ export function DashboardPage() {
         pdf_stored_name: draft.pdf_stored_name,
         sheet_json: draft.sheet_json || null,
       });
+      setEditingCharacterId(null);
       setShowCharacterForm(true);
     } catch (err) {
       setError(err.message || "Could not read PDF.");
@@ -329,432 +372,542 @@ export function DashboardPage() {
       .filter(Boolean)
       .join(" · ");
 
+  const inputClass =
+    "w-full rounded-sm border border-border bg-black px-3 py-2.5 text-sm font-mono text-starlight placeholder:text-ink-faint focus:border-neon-cyan focus:outline-none";
+
   return (
-    <div className="h-full overflow-y-auto p-8 bg-void">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-black text-starlight uppercase italic tracking-wider mb-2">
-          Campaigns
-        </h1>
-        <p className="text-sm text-neon-cyan font-mono mb-6">Welcome, {user?.username}.</p>
+    <div className="session-ui h-full overflow-y-auto bg-void">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <header className="mb-8">
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan sm:text-sm">
+            {APP_NAME}
+          </p>
+          <h1 className="mt-1 text-2xl font-black uppercase tracking-wide text-starlight sm:text-3xl">
+            Dashboard
+          </h1>
+          <p className="mt-2 text-sm text-ink-muted sm:text-base">
+            Welcome back, <span className="font-mono text-starlight">{user?.username}</span>.
+            Manage campaigns, characters, and jump into play.
+          </p>
+        </header>
 
         {error && (
-          <p className="text-xs text-danger font-mono mb-4 border-l-2 border-danger pl-2">
+          <p className="mb-6 rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm font-mono text-danger">
             {error}
           </p>
         )}
 
-        <section className="mb-8">
-          <h2 className="flex items-center gap-2 text-sm font-black text-neon-magenta uppercase tracking-widest mb-3">
-            <Users className="w-4 h-4" />
-            My Campaigns
-          </h2>
-
-          <div className="space-y-3 mb-4">
-            <form onSubmit={handleCreateCampaign} className="flex gap-2">
-              <input
-                type="text"
-                value={newCampaignName}
-                onChange={(e) => setNewCampaignName(e.target.value)}
-                placeholder="New campaign name..."
-                className="flex-1 px-3 py-2 border-2 border-neon-magenta bg-black text-neon-cyan text-sm font-mono focus:outline-none focus:border-starlight"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-neon-magenta text-black font-black text-xs uppercase tracking-widest border-2 border-black hover:bg-starlight"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </form>
-
-            <form onSubmit={handleJoinCampaign} className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  placeholder="Invite code..."
-                  className="flex-1 px-3 py-2 border-2 border-neon-cyan bg-black text-neon-cyan text-sm font-mono focus:outline-none focus:border-starlight"
-                />
-                <button
-                  type="submit"
-                  disabled={availableCharacters.length === 0}
-                  className="px-4 py-2 bg-neon-cyan text-black font-black text-xs uppercase tracking-widest border-2 border-black hover:bg-starlight disabled:opacity-40 flex items-center gap-1"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Join
-                </button>
-              </div>
-              <select
-                value={joinCharacterId}
-                onChange={(e) => setJoinCharacterId(e.target.value)}
-                className="w-full px-3 py-2 border-2 border-neon-cyan bg-black text-neon-cyan text-sm font-mono focus:outline-none"
-              >
-                <option value="">Select character to join with...</option>
-                {availableCharacters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.class_name ? ` (${c.class_name})` : ""}
-                  </option>
-                ))}
-              </select>
-              {availableCharacters.length === 0 && (
-                <p className="text-[10px] text-zinc-500 font-mono">
-                  Create a character below before joining a campaign.
-                </p>
-              )}
-            </form>
-          </div>
-
-          {loading ? (
-            <p className="text-xs text-zinc-500 font-mono">Loading campaigns...</p>
-          ) : campaigns.length === 0 ? (
-            <div className="p-6 border-2 border-dashed border-zinc-700 bg-zinc-950/50 text-center">
-              <p className="text-xs text-zinc-500 font-mono">
-                No campaigns yet. Create one or join with an invite code.
-              </p>
+        {liveCampaigns.length > 0 && (
+          <section className="mb-8 rounded-md border border-neon-magenta/50 bg-neon-magenta/10 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Radio className="h-4 w-4 animate-pulse text-neon-magenta" />
+              <h2 className="text-sm font-black uppercase tracking-wide text-starlight sm:text-base">
+                Live now
+              </h2>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {campaigns.map((campaign) => (
+            <div className="mt-3 flex flex-col gap-2">
+              {liveCampaigns.map((campaign) => (
                 <div
                   key={campaign.id}
-                  className="p-4 border-2 border-neon-magenta/50 bg-black"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-border/60 bg-void-panel/80 px-3 py-3"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-black text-starlight uppercase text-sm tracking-wide">
-                        {campaign.name}
-                      </h3>
-                      <p className="text-[10px] text-neon-cyan font-mono mt-1">
-                        Dungeon Master: {campaign.owner_username}
-                        {campaign.is_owner && (
-                          <span className="text-neon-magenta ml-2">(You)</span>
-                        )}
-                      </p>
-                      {!campaign.is_owner && campaign.my_character_name && (
-                        <p className="text-[10px] text-zinc-400 font-mono mt-1">
-                          Playing as: {campaign.my_character_name}
-                        </p>
-                      )}
-                      {campaign.is_owner && campaign.invite_code && (
-                        <p className="text-[10px] text-zinc-500 font-mono mt-1">
-                          Invite code:{" "}
-                          <span className="text-starlight tracking-widest">
-                            {campaign.invite_code}
-                          </span>
-                        </p>
-                      )}
-                      {campaign.session_active && (
-                        <p className="text-[10px] text-neon-magenta font-black uppercase tracking-widest mt-1 flex items-center gap-1">
-                          <Radio className="w-3 h-3 animate-pulse" />
-                          Session live
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      {campaign.is_owner && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleToggleSession(campaign.id, !campaign.session_active)
-                          }
-                          className={`text-[10px] font-black uppercase flex items-center gap-1 ${
-                            campaign.session_active
-                              ? "text-zinc-500 hover:text-danger"
-                              : "text-starlight hover:text-neon-cyan"
-                          }`}
-                        >
-                          <Play className="w-3 h-3" />
-                          {campaign.session_active ? "End Session" : "Start Session"}
-                        </button>
-                      )}
-                      {campaign.is_owner && campaign.session_active && (
-                        <Link
-                          to={`/session/${campaign.id}`}
-                          className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan flex items-center gap-1"
-                        >
-                          <Play className="w-3 h-3" />
-                          Open Session
-                        </Link>
-                      )}
-                      {!campaign.is_owner && campaign.session_active && campaign.my_character_id && (
-                        <Link
-                          to={`/session/${campaign.id}`}
-                          className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan flex items-center gap-1"
-                        >
-                          <Play className="w-3 h-3" />
-                          Join Session
-                        </Link>
-                      )}
-                      <Link
-                        to={`/initiative/${campaign.id}`}
-                        className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight flex items-center gap-1"
-                      >
-                        <Swords className="w-3 h-3" />
-                        Initiative
-                      </Link>
-                      {!campaign.is_owner && (
-                        <button
-                          onClick={() => handleLeaveCampaign(campaign.id)}
-                          className="text-[10px] font-black uppercase text-zinc-500 hover:text-danger flex items-center gap-1"
-                        >
-                          <LogOut className="w-3 h-3" />
-                          Leave
-                        </button>
-                      )}
-                    </div>
+                  <div>
+                    <p className="font-black uppercase text-starlight">{campaign.name}</p>
+                    <p className="text-xs font-mono text-ink-muted sm:text-sm">
+                      {campaign.is_owner
+                        ? "You are DM — open the session playspace"
+                        : campaign.my_character_name
+                          ? `Playing as ${campaign.my_character_name}`
+                          : "Session is active"}
+                    </p>
                   </div>
-
-                  {campaign.is_owner && rosters[campaign.id]?.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-zinc-800 space-y-2">
-                      <p className="text-[10px] text-neon-magenta font-black uppercase tracking-widest">
-                        Party Roster
-                      </p>
-                      {rosters[campaign.id].map((member) => (
-                        <div
-                          key={member.member_id}
-                          className="flex items-center justify-between text-[10px] font-mono text-zinc-400"
-                        >
-                          <span>
-                            <span className="text-starlight">{member.character_name}</span>
-                            {" · "}
-                            {member.username}
-                            {member.class_name ? ` · ${member.class_name}` : ""}
-                            {member.ac != null ? ` · AC ${member.ac}` : ""}
-                            {member.hp != null && member.max_hp != null
-                              ? ` · HP ${member.hp}/${member.max_hp}`
-                              : ""}
-                          </span>
-                          <button
-                            onClick={() => handleKickMember(campaign.id, member.member_id)}
-                            className="text-zinc-600 hover:text-danger flex items-center gap-1 uppercase font-black"
-                          >
-                            <UserMinus className="w-3 h-3" />
-                            Kick
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                  {(campaign.is_owner ||
+                    (campaign.session_active && campaign.my_character_id)) && (
+                    <LinkButton
+                      to={`/session/${campaign.id}`}
+                      className="border-starlight bg-starlight/10 text-starlight hover:bg-starlight/20"
+                    >
+                      <Play className="h-4 w-4" />
+                      {campaign.is_owner ? "Open session" : "Join session"}
+                    </LinkButton>
                   )}
                 </div>
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="flex items-center gap-2 text-sm font-black text-neon-cyan uppercase tracking-widest">
-              <Scroll className="w-4 h-4" />
-              My Characters
-            </h2>
-            <div className="flex items-center gap-3">
-              <label className="text-xs font-black uppercase tracking-widest text-neon-magenta hover:text-starlight cursor-pointer">
-                {parsingPdf ? "Reading PDF..." : "Upload PDF"}
-                <input
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
-                  disabled={parsingPdf}
-                  onChange={handlePdfUpload}
-                />
-              </label>
-              <button
-                onClick={() => {
-                  if (showCharacterForm) resetCharacterForm();
-                  else setShowCharacterForm(true);
-                }}
-                className="text-xs font-black uppercase tracking-widest text-neon-magenta hover:text-starlight"
-              >
-                {showCharacterForm ? "Cancel" : "+ Manual Entry"}
-              </button>
-            </div>
-          </div>
-
-          {showCharacterForm && (
-            <form
-              onSubmit={handleSaveCharacter}
-              className="mb-4 p-4 border-2 border-neon-cyan bg-zinc-950 space-y-3"
-            >
-              <p className="text-[10px] text-zinc-500 font-mono">
-                {editingCharacterId
-                  ? "Update basic stats here. Equip gear and edit notes in a live session."
-                  : "Create a new character. Upload a PDF first or enter details manually."}
-              </p>
-              {characterForm.pdf_stored_name && (
-                <p className="text-[10px] text-starlight font-mono">
-                  PDF loaded — review the fields below, then save.
-                </p>
-              )}
-              {parseWarning && (
-                <p className="text-[10px] text-starlight font-mono border-l-2 border-starlight pl-2">
-                  {parseWarning}
-                </p>
-              )}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  type="text"
-                  required
-                  value={characterForm.name}
-                  onChange={(e) => setCharacterForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Character name *"
-                  className="px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-                />
-                <input
-                  type="text"
-                  value={characterForm.class_name}
-                  onChange={(e) =>
-                    setCharacterForm((f) => ({ ...f, class_name: e.target.value }))
-                  }
-                  placeholder="Class"
-                  className="px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={characterForm.level}
-                  onChange={(e) => setCharacterForm((f) => ({ ...f, level: e.target.value }))}
-                  placeholder="Level"
-                  className="px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  value={characterForm.ac}
-                  onChange={(e) => setCharacterForm((f) => ({ ...f, ac: e.target.value }))}
-                  placeholder="AC"
-                  className="px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  value={characterForm.hp}
-                  onChange={(e) => setCharacterForm((f) => ({ ...f, hp: e.target.value }))}
-                  placeholder="HP"
-                  className="px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  value={characterForm.max_hp}
-                  onChange={(e) => setCharacterForm((f) => ({ ...f, max_hp: e.target.value }))}
-                  placeholder="Max HP"
-                  className="px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-                />
-              </div>
-              <input
-                type="text"
-                value={characterForm.skills}
-                onChange={(e) => setCharacterForm((f) => ({ ...f, skills: e.target.value }))}
-                placeholder="Notable skills (optional)"
-                className="w-full px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-              />
-              <input
-                type="url"
-                value={characterForm.dnd_beyond_url}
-                onChange={(e) =>
-                  setCharacterForm((f) => ({ ...f, dnd_beyond_url: e.target.value }))
-                }
-                placeholder="D&D Beyond link (view only)"
-                className="w-full px-3 py-2 border border-zinc-700 bg-black text-neon-cyan text-sm font-mono"
-              />
-              <button
-                type="submit"
-                disabled={savingCharacter}
-                className="w-full py-2 bg-neon-cyan text-black font-black text-xs uppercase tracking-widest border-2 border-black hover:bg-starlight disabled:opacity-50"
-              >
-                {savingCharacter
-                  ? "Saving..."
-                  : editingCharacterId
-                    ? "Save Changes"
-                    : "Save Character"}
-              </button>
-            </form>
-          )}
-
-          {loading ? (
-            <p className="text-xs text-zinc-500 font-mono">Loading characters...</p>
-          ) : characters.length === 0 ? (
-            <div className="p-6 border-2 border-dashed border-zinc-700 bg-zinc-950/50 text-center">
-              <p className="text-xs text-zinc-500 font-mono">
-                Upload a PDF or add a character manually to get started.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {characters.map((character) => (
-                <div
-                  key={character.id}
-                  className="p-4 border-2 border-neon-cyan/50 bg-black flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <h3 className="font-black text-starlight uppercase text-sm">
-                      {character.name}
-                    </h3>
-                    <p className="text-[10px] text-zinc-400 font-mono mt-1">
-                      {statLine(character) || "No details yet"}
-                    </p>
-                    {character.skills && (
-                      <p className="text-[10px] text-zinc-500 font-mono mt-1">
-                        Skills: {character.skills}
-                      </p>
-                    )}
-                    {character.campaign_name && (
-                      <p className="text-[10px] text-neon-magenta font-mono mt-1">
-                        In campaign: {character.campaign_name}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-3 mt-2">
-                      <Link
-                        to={`/character/${character.id}`}
-                        className="text-[10px] text-starlight hover:text-neon-cyan font-black uppercase inline-flex items-center gap-1"
-                      >
-                        <FileText className="w-3 h-3" />
-                        View PDF
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleEditCharacter(character)}
-                        className="text-[10px] text-neon-cyan hover:text-starlight font-black uppercase"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    {!character.campaign_id && (
-                      <button
-                        onClick={() => handleDeleteCharacter(character.id)}
-                        className="text-[10px] font-black uppercase text-zinc-600 hover:text-danger"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-sm font-black text-starlight uppercase tracking-widest mb-3">
-            Quick Tools
-          </h2>
+        <section className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Link
             to="/chat"
-            className="group block p-6 border-2 border-neon-magenta bg-black hover:bg-neon-magenta/10 transition"
+            className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-magenta/60 hover:bg-neon-magenta/5"
           >
-            <MessageSquare className="w-8 h-8 text-neon-magenta mb-3 group-hover:text-starlight" />
-            <h3 className="font-black text-starlight uppercase tracking-widest text-sm mb-1">
-              Rules AI Chat
-            </h3>
-            <p className="text-xs text-zinc-500 font-mono">
-              Look up spells, monsters, and 5.5e rules on the fly.
-            </p>
+            <MessageSquare className="mb-2 h-5 w-5 text-neon-magenta group-hover:text-starlight" />
+            <h3 className="text-sm font-black uppercase text-starlight">Rules AI</h3>
+            <p className="mt-1 text-xs text-ink-muted sm:text-sm">Spells, monsters, and 5.5e lookups</p>
           </Link>
+          <Link
+            to="/character/build"
+            className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-cyan/60 hover:bg-neon-cyan/5"
+          >
+            <Sparkles className="mb-2 h-5 w-5 text-neon-cyan group-hover:text-starlight" />
+            <h3 className="text-sm font-black uppercase text-starlight">Character builder</h3>
+            <p className="mt-1 text-xs text-ink-muted sm:text-sm">Create a sheet without a PDF</p>
+          </Link>
+          <label className="group cursor-pointer rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-starlight/60 hover:bg-starlight/5">
+            <Upload className="mb-2 h-5 w-5 text-starlight group-hover:text-neon-cyan" />
+            <h3 className="text-sm font-black uppercase text-starlight">
+              {parsingPdf ? "Reading PDF…" : "Import PDF"}
+            </h3>
+            <p className="mt-1 text-xs text-ink-muted sm:text-sm">D&amp;D Beyond character sheet</p>
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              disabled={parsingPdf}
+              onChange={handlePdfUpload}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              resetCharacterForm();
+              setShowCharacterForm(true);
+            }}
+            className="group rounded-md border border-border-bright bg-void-panel p-4 text-left transition hover:border-neon-cyan/60 hover:bg-neon-cyan/5"
+          >
+            <Hammer className="mb-2 h-5 w-5 text-neon-cyan group-hover:text-starlight" />
+            <h3 className="text-sm font-black uppercase text-starlight">Manual entry</h3>
+            <p className="mt-1 text-xs text-ink-muted sm:text-sm">Quick-create basic stats</p>
+          </button>
         </section>
+
+        <div className="grid gap-8 lg:grid-cols-5">
+          <section className="lg:col-span-3">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-black uppercase tracking-wide text-neon-magenta sm:text-lg">
+                  <Users className="h-5 w-5" />
+                  Campaigns
+                </h2>
+                <p className="mt-1 text-xs text-ink-muted sm:text-sm">
+                  {campaigns.length} campaign{campaigns.length === 1 ? "" : "s"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowJoinPanel((open) => !open)}
+                className="inline-flex items-center gap-1 text-xs font-black uppercase text-neon-cyan hover:text-starlight sm:text-sm"
+              >
+                <UserPlus className="h-4 w-4" />
+                Join with code
+                {showJoinPanel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleCreateCampaign}
+              className="mb-4 flex flex-col gap-2 sm:flex-row"
+            >
+              <input
+                type="text"
+                value={newCampaignName}
+                onChange={(e) => setNewCampaignName(e.target.value)}
+                placeholder="New campaign name…"
+                className={inputClass}
+              />
+              <ActionButton
+                type="submit"
+                className="shrink-0 border-neon-magenta bg-neon-magenta text-black hover:bg-starlight"
+              >
+                <Plus className="h-4 w-4" />
+                Create
+              </ActionButton>
+            </form>
+
+            {showJoinPanel && (
+              <form
+                onSubmit={handleJoinCampaign}
+                className="mb-4 space-y-3 rounded-md border border-neon-cyan/40 bg-neon-cyan/5 p-4"
+              >
+                <p className="text-xs font-black uppercase tracking-wide text-neon-cyan sm:text-sm">
+                  Join a campaign
+                </p>
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  placeholder="Invite code"
+                  className={inputClass}
+                />
+                <select
+                  value={joinCharacterId}
+                  onChange={(e) => setJoinCharacterId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">Select character…</option>
+                  {availableCharacters.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.class_name ? ` (${c.class_name})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {availableCharacters.length === 0 && (
+                  <p className="text-xs font-mono text-ink-muted sm:text-sm">
+                    Create a character first — it must not already be in a campaign.
+                  </p>
+                )}
+                <ActionButton
+                  type="submit"
+                  disabled={availableCharacters.length === 0}
+                  className="w-full border-neon-cyan bg-neon-cyan text-black hover:bg-starlight disabled:opacity-40 sm:w-auto"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Join campaign
+                </ActionButton>
+              </form>
+            )}
+
+            {loading ? (
+              <p className="text-sm font-mono text-ink-muted">Loading campaigns…</p>
+            ) : campaigns.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border p-8 text-center">
+                <p className="text-sm font-mono text-ink-muted">
+                  No campaigns yet. Create one above or join with an invite code.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {campaigns.map((campaign) => (
+                  <article
+                    key={campaign.id}
+                    className="rounded-md border border-border-bright bg-void-panel p-4 sm:p-5"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-black uppercase text-starlight sm:text-lg">
+                            {campaign.name}
+                          </h3>
+                          {campaign.is_owner && (
+                            <StatPill>DM</StatPill>
+                          )}
+                          {campaign.session_active && (
+                            <StatPill>
+                              <span className="inline-flex items-center gap-1 text-neon-magenta">
+                                <Radio className="h-3 w-3" />
+                                Live
+                              </span>
+                            </StatPill>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs font-mono text-ink-muted sm:text-sm">
+                          DM: {campaign.owner_username}
+                          {campaign.is_owner ? " (you)" : ""}
+                        </p>
+                        {!campaign.is_owner && campaign.my_character_name && (
+                          <p className="mt-1 text-xs font-mono text-starlight sm:text-sm">
+                            Playing as {campaign.my_character_name}
+                          </p>
+                        )}
+                        {campaign.is_owner && campaign.invite_code && (
+                          <p className="mt-2 text-xs font-mono text-ink-muted sm:text-sm">
+                            Invite:{" "}
+                            <span className="tracking-widest text-starlight">
+                              {campaign.invite_code}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 sm:max-w-[14rem] sm:flex-col sm:items-stretch">
+                        {campaign.is_owner && campaign.session_active && (
+                          <LinkButton
+                            to={`/session/${campaign.id}`}
+                            className="border-starlight bg-starlight/10 text-starlight hover:bg-starlight/20"
+                          >
+                            <Play className="h-4 w-4" />
+                            Open session
+                          </LinkButton>
+                        )}
+                        {!campaign.is_owner &&
+                          campaign.session_active &&
+                          campaign.my_character_id && (
+                            <LinkButton
+                              to={`/session/${campaign.id}`}
+                              className="border-starlight bg-starlight/10 text-starlight hover:bg-starlight/20"
+                            >
+                              <Play className="h-4 w-4" />
+                              Join session
+                            </LinkButton>
+                          )}
+                        <LinkButton
+                          to={`/initiative/${campaign.id}`}
+                          className="border-neon-cyan/60 text-neon-cyan hover:bg-neon-cyan/10"
+                        >
+                          <Swords className="h-4 w-4" />
+                          Initiative
+                        </LinkButton>
+                        {campaign.is_owner && (
+                          <ActionButton
+                            onClick={() =>
+                              handleToggleSession(campaign.id, !campaign.session_active)
+                            }
+                            className={
+                              campaign.session_active
+                                ? "border-border text-ink-muted hover:border-danger hover:text-danger"
+                                : "border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10"
+                            }
+                          >
+                            <Play className="h-4 w-4" />
+                            {campaign.session_active ? "End session" : "Start session"}
+                          </ActionButton>
+                        )}
+                        {!campaign.is_owner && (
+                          <ActionButton
+                            onClick={() => handleLeaveCampaign(campaign.id)}
+                            className="border-border text-ink-muted hover:border-danger hover:text-danger"
+                          >
+                            Leave
+                          </ActionButton>
+                        )}
+                      </div>
+                    </div>
+
+                    {campaign.is_owner && rosters[campaign.id]?.length > 0 && (
+                      <div className="mt-4 border-t border-border pt-4">
+                        <p className="mb-2 text-xs font-black uppercase tracking-wide text-neon-magenta sm:text-sm">
+                          Party roster
+                        </p>
+                        <ul className="space-y-2">
+                          {rosters[campaign.id].map((member) => (
+                            <li
+                              key={member.member_id}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-sm bg-void-deep/50 px-3 py-2 text-xs font-mono text-ink-muted sm:text-sm"
+                            >
+                              <span>
+                                <span className="font-black text-starlight">
+                                  {member.character_name}
+                                </span>
+                                {" · "}
+                                {member.username}
+                                {member.class_name ? ` · ${member.class_name}` : ""}
+                                {member.ac != null ? ` · AC ${member.ac}` : ""}
+                                {member.hp != null && member.max_hp != null
+                                  ? ` · HP ${member.hp}/${member.max_hp}`
+                                  : ""}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleKickMember(campaign.id, member.member_id)}
+                                className="inline-flex items-center gap-1 font-black uppercase text-ink-faint hover:text-danger"
+                              >
+                                <UserMinus className="h-3.5 w-3.5" />
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="lg:col-span-2">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-black uppercase tracking-wide text-neon-cyan sm:text-lg">
+                  <Scroll className="h-5 w-5" />
+                  Characters
+                </h2>
+                <p className="mt-1 text-xs text-ink-muted sm:text-sm">
+                  {characters.length} character{characters.length === 1 ? "" : "s"}
+                </p>
+              </div>
+            </div>
+
+            {showCharacterForm && (
+              <form
+                onSubmit={handleSaveCharacter}
+                className="mb-4 space-y-3 rounded-md border border-neon-cyan/50 bg-void-panel p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-black uppercase text-starlight">
+                    {editingCharacterId ? "Edit character" : "New character"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={resetCharacterForm}
+                    className="text-xs font-black uppercase text-ink-faint hover:text-starlight"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p className="text-xs font-mono text-ink-muted sm:text-sm">
+                  {editingCharacterId
+                    ? "Basic stats only — gear and notes live in session play."
+                    : "Upload a PDF from the quick actions, or fill in details here."}
+                </p>
+                {characterForm.pdf_stored_name && (
+                  <p className="text-xs font-mono text-neon-cyan sm:text-sm">
+                    PDF attached — review fields, then save.
+                  </p>
+                )}
+                {parseWarning && (
+                  <p className="border-l-2 border-starlight pl-2 text-xs font-mono text-starlight sm:text-sm">
+                    {parseWarning}
+                  </p>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    required
+                    value={characterForm.name}
+                    onChange={(e) => setCharacterForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Name *"
+                    className={inputClass}
+                  />
+                  <input
+                    type="text"
+                    value={characterForm.class_name}
+                    onChange={(e) =>
+                      setCharacterForm((f) => ({ ...f, class_name: e.target.value }))
+                    }
+                    placeholder="Class"
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={characterForm.level}
+                    onChange={(e) => setCharacterForm((f) => ({ ...f, level: e.target.value }))}
+                    placeholder="Level"
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    value={characterForm.ac}
+                    onChange={(e) => setCharacterForm((f) => ({ ...f, ac: e.target.value }))}
+                    placeholder="AC"
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    value={characterForm.hp}
+                    onChange={(e) => setCharacterForm((f) => ({ ...f, hp: e.target.value }))}
+                    placeholder="HP"
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    value={characterForm.max_hp}
+                    onChange={(e) => setCharacterForm((f) => ({ ...f, max_hp: e.target.value }))}
+                    placeholder="Max HP"
+                    className={inputClass}
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={characterForm.skills}
+                  onChange={(e) => setCharacterForm((f) => ({ ...f, skills: e.target.value }))}
+                  placeholder="Notable skills (optional)"
+                  className={inputClass}
+                />
+                <input
+                  type="url"
+                  value={characterForm.dnd_beyond_url}
+                  onChange={(e) =>
+                    setCharacterForm((f) => ({ ...f, dnd_beyond_url: e.target.value }))
+                  }
+                  placeholder="D&amp;D Beyond link (optional)"
+                  className={inputClass}
+                />
+                <ActionButton
+                  type="submit"
+                  disabled={savingCharacter}
+                  className="w-full border-neon-cyan bg-neon-cyan text-black hover:bg-starlight disabled:opacity-50"
+                >
+                  {savingCharacter
+                    ? "Saving…"
+                    : editingCharacterId
+                      ? "Save changes"
+                      : "Save character"}
+                </ActionButton>
+              </form>
+            )}
+
+            {loading ? (
+              <p className="text-sm font-mono text-ink-muted">Loading characters…</p>
+            ) : characters.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border p-8 text-center">
+                <p className="text-sm font-mono text-ink-muted">
+                  No characters yet. Import a PDF or use the builder to get started.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {characters.map((character) => (
+                  <article
+                    key={character.id}
+                    className="rounded-md border border-border-bright bg-void-panel p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-black uppercase text-starlight">
+                          {character.name}
+                        </h3>
+                        <p className="mt-1 text-xs font-mono text-ink-muted sm:text-sm">
+                          {statLine(character) || "No combat stats yet"}
+                        </p>
+                        {character.campaign_name ? (
+                          <p className="mt-2 text-xs font-mono text-neon-magenta sm:text-sm">
+                            In {character.campaign_name}
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-xs font-mono text-ink-faint sm:text-sm">
+                            Not in a campaign
+                          </p>
+                        )}
+                      </div>
+                      {!character.campaign_id && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCharacter(character.id)}
+                          className="shrink-0 text-xs font-black uppercase text-ink-faint hover:text-danger"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <LinkButton
+                        to={`/character/${character.id}`}
+                        className="border-border text-starlight hover:border-neon-cyan hover:text-neon-cyan"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Open sheet
+                      </LinkButton>
+                      <ActionButton
+                        onClick={() => handleEditCharacter(character)}
+                        className="border-border text-neon-cyan hover:bg-neon-cyan/10"
+                      >
+                        Edit
+                      </ActionButton>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );

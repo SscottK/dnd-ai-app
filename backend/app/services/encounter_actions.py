@@ -1,11 +1,9 @@
 import json
 import random
 import uuid
-from datetime import datetime, timezone
-
 from sqlmodel import Session, select
 
-from app.api.schemas import CombatLogEntry, EncounterCombatant, EncounterState
+from app.api.schemas import EncounterCombatant, EncounterState
 from app.db.models import Campaign, CampaignMember, Character
 from app.services.conditions import sanitize_conditions_list
 from app.services.encounter_sync import parse_encounter
@@ -36,14 +34,9 @@ def new_combatant_id() -> str:
 
 
 def _append_combat_log(state: EncounterState, message: str, *, kind: str = "event", **fields) -> None:
-    state.combat_log.append(
-        CombatLogEntry(
-            at=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-            message=message,
-            kind=kind,
-            **{key: value for key, value in fields.items() if value is not None},
-        )
-    )
+    from app.services.combat_log import append_log
+
+    append_log(state, message, kind=kind, **fields)
 
 
 def is_enemy(combatant: EncounterCombatant) -> bool:

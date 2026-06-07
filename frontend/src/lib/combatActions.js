@@ -156,9 +156,15 @@ const CATALOG_MANAGED_ACTIONS = new Set(["wild-shape", "combat-wild-shape"]);
 /** Class features the server resolves using sheet attack stats (e.g. Talons). */
 const DELEGATED_ATTACK_ACTIONS = new Set(["flurry-of-blows"]);
 
+export function actionNeedsReadyDetail(action) {
+  if (!action) return false;
+  return action.id === "std-ready" || actionNameKey(action.name) === "ready";
+}
+
 export function canSelectTurnAction(action) {
   if (!action || isPassiveTurnAction(action)) return false;
   if (ON_HIT_RIDERS.has(actionNameKey(action.name))) return false;
+  if (action.actionType === ACTION_TYPES.magic_action) return true;
   if (!actionNeedsTarget(action)) return true;
   if (action.attackBonus != null || action.damageDice) return true;
   if (["weapon", "attack", "spell"].includes(action.category)) return true;
@@ -625,6 +631,17 @@ function collectSheetDerivedActions(sheet) {
  * @param {object|null} sheet
  * @param {{ filter?: string, mode?: 'pc' | 'npc' }} options
  */
+function sheetGrantsBonusStandard(sheet, actionName) {
+  const key = actionNameKey(actionName);
+  return (sheet?.combat_actions || []).some((row) => {
+    if (!row?.name) return false;
+    return (
+      actionNameKey(row.name) === key &&
+      (row.action_type === ACTION_TYPES.bonus_action || row.actionType === ACTION_TYPES.bonus_action)
+    );
+  });
+}
+
 export function resolveStandardActions(sheet, options = {}) {
   const { filter = "all", mode = "pc" } = options;
   if (mode === "npc") return [];
@@ -634,10 +651,18 @@ export function resolveStandardActions(sheet, options = {}) {
   const hasActionSlotActions = catalog.actions.some(
     (action) => action.actionType === ACTION_TYPES.action
   );
+  const hasBonusDash =
+    sheetGrantsBonusStandard(sheet, "Dash") ||
+    sheetGrantsBonusStandard(sheet, "Cunning Action") ||
+    sheetGrantsBonusStandard(sheet, "Step of the Wind");
 
   let standards = hasAttacks
     ? STANDARD_ACTIONS.filter((action) => action.id !== "std-attack")
     : [...STANDARD_ACTIONS];
+
+  if (!hasBonusDash) {
+    standards = standards.filter((action) => action.id !== "std-dash-bonus");
+  }
 
   if (hasActionSlotActions) {
     standards = standards.filter((action) => action.targeting === TARGETING.self);
@@ -664,6 +689,7 @@ export function buildAvailableActions(sheet, options = {}) {
     [ACTION_TYPES.action]: [],
     [ACTION_TYPES.bonus_action]: [],
     [ACTION_TYPES.reaction]: [],
+    [ACTION_TYPES.magic_action]: [],
   };
 
   const seen = new Set();
@@ -672,7 +698,9 @@ export function buildAvailableActions(sheet, options = {}) {
     const key = actionDedupeKey(action);
     if (seen.has(key)) return;
     seen.add(key);
-    if (byType[action.actionType]) byType[action.actionType].push(action);
+    if (byType[action.actionType]) {
+      byType[action.actionType].push(action);
+    }
   };
 
   const derived = collectSheetDerivedActions(sheet || {});

@@ -38,6 +38,16 @@ def _combat_action_index() -> dict[str, dict]:
     return index
 
 
+@router.get("/classes")
+def list_classes():
+    path = Path(__file__).resolve().parents[4] / "data" / "class_catalog.json"
+    if not path.is_file():
+        return {"classes": []}
+    with path.open(encoding="utf-8") as handle:
+        payload = json.load(handle)
+    return {"classes": sorted((payload.get("classes") or {}).keys())}
+
+
 @router.get("/combat-actions")
 def list_combat_actions():
     from app.services.action_rules import _load_combat_catalog

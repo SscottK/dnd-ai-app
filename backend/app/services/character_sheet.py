@@ -408,6 +408,24 @@ def speed_from_character(character: Any) -> int | None:
     return effective_speed_from_sheet(parse_sheet_json(character.sheet_json))
 
 
+def skill_bonus(sheet: dict, skill_name: str) -> int | None:
+    """Look up a skill's total bonus from the sheet, if present."""
+    target = str(skill_name or "").strip().casefold()
+    for row in sheet.get("skills") or []:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("name") or "").strip().casefold() != target:
+            continue
+        bonus = row.get("bonus")
+        if bonus is None:
+            return None
+        try:
+            return int(bonus)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def skills_summary(sheet: dict) -> str | None:
     names = [
         skill["name"]

@@ -20,6 +20,10 @@
 }
 
 @layer base {
+  html {
+    font-size: 100%;
+  }
+
   html,
   body,
   #root {
@@ -28,5 +32,22 @@
 
   body {
     @apply bg-void text-ink antialiased;
+  }
+
+  @media (max-width: 767px) {
+    html {
+      font-size: 106.25%;
+    }
+  }
+}
+
+@layer components {
+  .session-ui {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .session-ui button,
+  .session-ui [role="button"] {
+    touch-action: manipulation;
   }
 }

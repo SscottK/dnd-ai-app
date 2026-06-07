@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { APP_NAME, APP_TAGLINE } from "../constants/branding";
 
 const navLinkClass = ({ isActive }) =>
-  `flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border-b-2 transition ${
+  `flex items-center gap-1.5 px-3 py-2 text-xs font-black uppercase tracking-widest border-b-2 transition sm:text-sm ${
     isActive
       ? "border-neon-magenta text-starlight"
       : "border-transparent text-ink-muted hover:text-ink"
@@ -32,7 +32,7 @@ export function AppLayout() {
           <nav className="flex items-center gap-1">
             <NavLink to="/dashboard" className={navLinkClass} end>
               <LayoutDashboard className="w-3.5 h-3.5" />
-              Campaigns
+              Dashboard
             </NavLink>
             <NavLink to="/chat" className={navLinkClass}>
               <MessageSquare className="w-3.5 h-3.5" />

@@ -3,7 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronDown, FileText, LayoutGrid, Plus, RotateCcw, Save, Swords } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch } from "../lib/api";
+import { useMediaQuery, SESSION_MOBILE_QUERY } from "../hooks/useMediaQuery";
 import { SheetPane } from "../components/sheet/SheetPane";
+import { StackedSessionLayout } from "../components/sheet/StackedSessionLayout";
 import { DetailSlideOver } from "../components/sheet/DetailSlideOver";
 import { FullSheetModal } from "../components/sheet/FullSheetModal";
 import {
@@ -92,6 +94,7 @@ export function SessionPlayPage() {
   const characterId = sessionStatus?.character_id;
   const isDmSession =
     sessionStatus?.session_active && sessionStatus?.is_owner && !sessionStatus?.character_id;
+  const isMobileSession = useMediaQuery(SESSION_MOBILE_QUERY);
 
   useEffect(() => {
     layoutRef.current = layout;
@@ -843,7 +846,7 @@ export function SessionPlayPage() {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       const delta = event.deltaY > 0 ? -0.08 : 0.08;
-      const nextScale = Math.min(1.25, Math.max(0.6, layout.viewport.scale + delta));
+      const nextScale = Math.min(1.25, Math.max(0.75, layout.viewport.scale + delta));
       setViewport({ scale: nextScale }, { save: true });
     };
 
@@ -920,7 +923,7 @@ export function SessionPlayPage() {
           />
         );
       case "vtt_zone":
-        return <VttZoneWidget />;
+        return <VttZoneWidget campaignId={campaignId} />;
       case "party":
         return (
           <PartyWidget
@@ -1015,11 +1018,11 @@ export function SessionPlayPage() {
     );
   }
 
-  const { scale } = layout.viewport;
+  const scale = isMobileSession ? 1 : layout.viewport.scale;
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-      <header className="relative z-50 flex shrink-0 min-w-0 items-center justify-between gap-3 border-b border-border-bright bg-void-deep px-4 py-2">
+    <div className="session-ui flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <header className="relative z-50 flex shrink-0 min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border-bright bg-void-deep px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
         <div className="flex items-center gap-3 min-w-0">
           <Link
             to="/dashboard"
@@ -1028,7 +1031,7 @@ export function SessionPlayPage() {
             <ArrowLeft className="w-3 h-3" />
             Campaigns
           </Link>
-          <h1 className="font-black text-sm text-starlight uppercase truncate">
+          <h1 className="truncate text-sm font-black uppercase text-starlight sm:text-base">
             {isDmSession ? sessionStatus.campaign_name : character.name}
           </h1>
           {isDmSession ? (
@@ -1037,11 +1040,11 @@ export function SessionPlayPage() {
             <span className="text-[10px] text-neon-magenta font-mono hidden sm:inline animate-pulse">LIVE</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {isDmSession && (
             <Link
               to={`/initiative/${campaignId}`}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-black uppercase border border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10"
+              className="flex items-center gap-1 rounded-sm border border-neon-magenta px-2.5 py-1.5 text-xs font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 sm:text-sm"
             >
               <Swords className="w-3 h-3" />
               Tracker
@@ -1051,7 +1054,7 @@ export function SessionPlayPage() {
             <button
               type="button"
               onClick={() => setFullSheetOpen(true)}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-black uppercase border border-zinc-700 text-zinc-400 hover:text-starlight"
+              className="flex items-center gap-1 rounded-sm border border-zinc-700 px-2.5 py-1.5 text-xs font-black uppercase text-zinc-400 hover:text-starlight sm:text-sm"
             >
               <FileText className="w-3 h-3" />
               Full Sheet
@@ -1061,7 +1064,7 @@ export function SessionPlayPage() {
             <button
               type="button"
               onClick={() => setPaneMenuOpen((open) => !open)}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-black uppercase border border-neon-cyan hover:bg-neon-cyan/10"
+              className="flex items-center gap-1 rounded-sm border border-neon-cyan px-2.5 py-1.5 text-xs font-black uppercase hover:bg-neon-cyan/10 sm:text-sm"
             >
               <Plus className="w-3 h-3" />
               Pane
@@ -1096,7 +1099,7 @@ export function SessionPlayPage() {
               type="button"
               disabled={!dirty || saving}
               onClick={() => persistCharacter(buildPatch(character, sheet, layout))}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] font-black uppercase border border-starlight text-starlight disabled:opacity-40"
+              className="flex items-center gap-1 rounded-sm border border-starlight px-2.5 py-1.5 text-xs font-black uppercase text-starlight disabled:opacity-40 sm:text-sm"
             >
               <Save className="w-3 h-3" />
               {saving ? "Saving..." : dirty ? "Save" : "Saved"}
@@ -1117,8 +1120,20 @@ export function SessionPlayPage() {
       )}
 
       <div className="relative isolate min-h-0 min-w-0 flex-1 basis-0">
+        {isMobileSession ? (
+          <StackedSessionLayout
+            widgets={layout.widgets}
+            labels={WIDGET_LABELS}
+            isDmSession={isDmSession}
+            renderBody={renderWidgetBody}
+            onToggleMinimize={toggleMinimize}
+            onTogglePin={togglePin}
+            onRemove={removeWidget}
+            onFocus={focusWidget}
+          />
+        ) : (
         <div ref={canvasRef} className="absolute inset-0 overflow-hidden bg-void">
-        <div className="pointer-events-none absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-sm border border-border-bright bg-void-panel/95 px-3 py-2 font-mono text-[10px]">
+        <div className="pointer-events-none absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-sm border border-border-bright bg-void-panel/95 px-3 py-2 font-mono text-xs sm:text-sm">
           <span className="text-ink-faint uppercase font-black">Zoom</span>
           <span className="text-starlight font-black min-w-[3ch] text-right">
             {Math.round(scale * 100)}%
@@ -1174,6 +1189,7 @@ export function SessionPlayPage() {
           </div>
         </div>
         </div>
+        )}
       </div>
 
       <DetailSlideOver

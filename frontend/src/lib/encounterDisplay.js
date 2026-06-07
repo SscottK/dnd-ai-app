@@ -82,6 +82,22 @@ export function combatantMoveText(combatant, economy) {
   return speed != null ? `${speed} ft` : null;
 }
 
+/** Compact resource line for initiative rows (e.g. "Second Wind 1/1 · Focus 4/7"). */
+export function formatCombatResources(sheet, { limit = 4 } = {}) {
+  const resources = sheet?.resources;
+  if (!Array.isArray(resources) || resources.length === 0) return null;
+  const parts = resources.slice(0, limit).map((entry) => {
+    const name = entry?.name || "Resource";
+    const current = entry?.current ?? "—";
+    const max = entry?.max ?? "—";
+    return `${name} ${current}/${max}`;
+  });
+  if (resources.length > limit) {
+    parts.push(`+${resources.length - limit}`);
+  }
+  return parts.join(" · ");
+}
+
 export function turnStatusLabels(economy, combatants = []) {
   if (!economy) return [];
   const labels = [];

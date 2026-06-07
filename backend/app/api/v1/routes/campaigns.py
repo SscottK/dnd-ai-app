@@ -802,6 +802,8 @@ def use_encounter_action(
                 state,
                 actor=actor,
                 data=resolved_data,
+                session=session,
+                campaign_id=campaign_id,
             )
         else:
             action_messages = resolve_self_heal(

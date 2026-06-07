@@ -17,6 +17,7 @@ import {
   combatantMoveText,
   formatCombatantAc,
   formatCombatantSpeed,
+  formatCombatResources,
   isDefeatedEnemy,
   parseEncounterPatchResponse,
   sortCombatantsForDisplay,
@@ -24,9 +25,36 @@ import {
   turnStatusLabels,
 } from "../lib/encounterDisplay";
 import { DiceRoller } from "../components/DiceRoller";
+import {
+  EncounterCombatLog,
+  TurnActionsPanel,
+} from "../components/sheet/TurnActionsPanel";
 
 function newId() {
   return `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function MovementStepButtons({ disabled, onAdjust }) {
+  const steps = [-30, -15, -10, -5, 5, 10, 15, 30];
+  return (
+    <div className="flex flex-wrap gap-0.5">
+      {steps.map((step) => (
+        <button
+          key={step}
+          type="button"
+          disabled={disabled}
+          onClick={() => onAdjust(step)}
+          className={`min-w-[1.75rem] border px-1 py-0.5 text-[8px] font-black uppercase disabled:opacity-30 ${
+            step < 0
+              ? "border-danger/50 text-danger hover:bg-danger/10"
+              : "border-neon-cyan/50 text-neon-cyan hover:bg-neon-cyan/10"
+          }`}
+        >
+          {step > 0 ? `+${step}` : step}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function InitiativePage() {
@@ -50,6 +78,11 @@ export function InitiativePage() {
   const [monsterAlly, setMonsterAlly] = useState(false);
   const [monsterSuggestions, setMonsterSuggestions] = useState([]);
   const [sessionActive, setSessionActive] = useState(false);
+  const [movementBusy, setMovementBusy] = useState(false);
+  const [activeResourceSheet, setActiveResourceSheet] = useState(null);
+  const [dmActionSheet, setDmActionSheet] = useState(null);
+  const [dmSheetLoading, setDmSheetLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     if (!token || !isOwner || monsterName.trim().length < 2) {
@@ -169,6 +202,78 @@ export function InitiativePage() {
     ? turnSorted.findIndex((c) => c.id === activeCombatant.id)
     : 0;
   const resolvedTurnIndex = turnIndex >= 0 ? turnIndex : 0;
+  const activeEconomy = activeCombatant ? encounter.turn_economy?.[activeCombatant.id] : null;
+
+  useEffect(() => {
+    if (!isOwner || !token || !campaignId || !activeCombatant?.character_id) {
+      setActiveResourceSheet(null);
+      return undefined;
+    }
+    let cancelled = false;
+    void apiFetch(
+      `/campaigns/${campaignId}/encounter/combatants/${activeCombatant.id}/action-sheet`,
+      { token }
+    )
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Load failed");
+        const data = await res.json();
+        if (!cancelled) setActiveResourceSheet(data.sheet || null);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveResourceSheet(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner, token, campaignId, activeCombatant?.id, activeCombatant?.character_id]);
+
+  useEffect(() => {
+    if (!isOwner || !token || !campaignId || !activeCombatant?.id) {
+      setDmActionSheet(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setDmSheetLoading(true);
+    void apiFetch(
+      `/campaigns/${campaignId}/encounter/combatants/${activeCombatant.id}/action-sheet`,
+      { token }
+    )
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Load failed");
+        const data = await res.json();
+        if (!cancelled) setDmActionSheet(data.sheet || {});
+      })
+      .catch(() => {
+        if (!cancelled) setDmActionSheet({});
+      })
+      .finally(() => {
+        if (!cancelled) setDmSheetLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwner, token, campaignId, activeCombatant?.id]);
+
+  const reloadDmActionSheet = useCallback(async () => {
+    if (!isOwner || !token || !campaignId || !activeCombatant?.id) return;
+    setDmSheetLoading(true);
+    try {
+      const res = await apiFetch(
+        `/campaigns/${campaignId}/encounter/combatants/${activeCombatant.id}/action-sheet`,
+        { token }
+      );
+      if (!res.ok) throw new Error("Load failed");
+      const data = await res.json();
+      setDmActionSheet(data.sheet || {});
+      if (activeCombatant.character_id) {
+        setActiveResourceSheet(data.sheet || null);
+      }
+    } catch {
+      setDmActionSheet({});
+    } finally {
+      setDmSheetLoading(false);
+    }
+  }, [isOwner, token, campaignId, activeCombatant?.id, activeCombatant?.character_id]);
 
   const pushEncounter = (next) => {
     setEncounter(next);
@@ -242,16 +347,46 @@ export function InitiativePage() {
     pushEncounter(next);
   };
 
-  const nextTurn = () => {
-    if (!turnSorted.length) return;
-    const nextIndex = (resolvedTurnIndex + 1) % turnSorted.length;
-    const nextRound = nextIndex === 0 ? encounter.round + 1 : encounter.round;
-    pushEncounter({
-      ...encounter,
-      active_index: nextIndex,
-      active_combatant_id: turnSorted[nextIndex]?.id ?? null,
-      round: nextRound,
-    });
+  const nextTurn = async () => {
+    if (!token || !campaignId || !isOwner || !turnSorted.length) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/next-turn`, {
+        token,
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not advance turn");
+      }
+      setEncounter(await res.json());
+    } catch (err) {
+      setError(err.message || "Could not advance turn.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const adjustMovement = async (combatantId, delta) => {
+    if (!token || !campaignId || !isOwner || delta === 0) return;
+    setMovementBusy(true);
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/adjust-movement`, {
+        token,
+        method: "POST",
+        body: { combatant_id: combatantId, delta },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not adjust movement");
+      }
+      setEncounter(await res.json());
+    } catch (err) {
+      setError(err.message || "Could not adjust movement.");
+    } finally {
+      setMovementBusy(false);
+    }
   };
 
   const prevTurn = () => {
@@ -427,9 +562,59 @@ export function InitiativePage() {
         )}
 
         {activeCombatant && (
-          <div className="mb-4 p-4 border-2 border-starlight bg-black">
-            <p className="text-[10px] uppercase text-zinc-500">Active turn</p>
-            <p className="text-xl font-black text-starlight uppercase">{activeCombatant.name}</p>
+          <div className="mb-4 space-y-2 border-2 border-starlight bg-black p-4">
+            <div>
+              <p className="text-[10px] uppercase text-zinc-500">Active turn</p>
+              <p className="text-xl font-black uppercase text-starlight">{activeCombatant.name}</p>
+              <p className="mt-1 text-[10px] font-mono text-zinc-500">
+                {combatantMoveText(activeCombatant, activeEconomy) &&
+                  `Move ${combatantMoveText(activeCombatant, activeEconomy)}`}
+                {turnStatusLabels(activeEconomy, encounter.combatants).length
+                  ? ` · ${turnStatusLabels(activeEconomy, encounter.combatants).join(", ")}`
+                  : ""}
+                {formatCombatResources(activeResourceSheet)
+                  ? ` · ${formatCombatResources(activeResourceSheet)}`
+                  : ""}
+              </p>
+            </div>
+            {isOwner && (
+              <div className="space-y-1">
+                <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500">
+                  Spend movement
+                </p>
+                <MovementStepButtons
+                  disabled={movementBusy || saving}
+                  onAdjust={(delta) => adjustMovement(activeCombatant.id, delta)}
+                />
+              </div>
+            )}
+            {isOwner && activeCombatant && (
+              <div className="space-y-2 border-t border-zinc-800 pt-3">
+                {actionError && (
+                  <p className="text-[9px] font-mono text-danger">{actionError}</p>
+                )}
+                <TurnActionsPanel
+                  campaignId={campaignId}
+                  token={token}
+                  actionSheet={dmActionSheet}
+                  actionSheetLoading={dmSheetLoading}
+                  encounter={encounter}
+                  actorCombatant={activeCombatant}
+                  canTakeTurn
+                  canAdjustMovement
+                  isDmProxy
+                  onEncounterUpdate={setEncounter}
+                  onSheetRefresh={reloadDmActionSheet}
+                  onError={setActionError}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {encounter.combat_log?.length > 0 && (
+          <div className="mb-4">
+            <EncounterCombatLog log={encounter.combat_log} limit={12} />
           </div>
         )}
 
@@ -451,6 +636,8 @@ export function InitiativePage() {
                   const turnStatuses = isActive
                     ? turnStatusLabels(economy, encounter.combatants)
                     : [];
+                  const resourceSummary =
+                    isActive && isOwner ? formatCombatResources(activeResourceSheet) : null;
                   return (
                   <div
                     key={combatant.id}
@@ -501,6 +688,7 @@ export function InitiativePage() {
                           {formatCombatantAc(combatant, isOwner)}
                           {moveText ? ` · ${moveText}` : ""}
                           {turnStatuses.length ? ` · ${turnStatuses.join(", ")}` : ""}
+                          {resourceSummary ? ` · ${resourceSummary}` : ""}
                         </p>
                       )}
                     </div>

@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from sqlmodel import Session
+
 from app.api.schemas import EncounterCombatant, EncounterState, UseActionRequest
+from app.db.models import Character
 from app.services.action_rules import lookup_combat_action
+from app.services.character_sheet import parse_sheet_json, skill_bonus
+from app.services.combat_dice import format_roll_detail, roll_d20
 from app.services.combat_log import append_log
 from app.services.weapon_attacks import clean_action_label
 
@@ -74,11 +79,30 @@ def resolve_extra_action_effect(
     return [message]
 
 
+def _actor_skill_sheet(
+    session: Session | None,
+    campaign_id: int | None,
+    actor: EncounterCombatant,
+) -> dict | None:
+    if session is None or campaign_id is None or not actor.character_id:
+        return None
+    character = session.get(Character, actor.character_id)
+    if character is None or character.campaign_id != campaign_id:
+        return None
+    return parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+
+
 def resolve_standard_combat_effect(
     state: EncounterState,
     *,
     actor: EncounterCombatant,
     data: UseActionRequest,
+    session: Session | None = None,
+    campaign_id: int | None = None,
 ) -> list[str]:
     effect = _effect_key(data.action_id, data.action_name)
     if effect is None:
@@ -124,10 +148,35 @@ def resolve_standard_combat_effect(
 
     if effect == "hide":
         economy.hiding = True
-        message = (
-            f"{actor.name} takes the Hide action — attempting to become unseen "
-            "(make a Stealth check)."
-        )
+        sheet = _actor_skill_sheet(session, campaign_id, actor)
+        stealth_mod = skill_bonus(sheet, "Stealth") if sheet else None
+        if stealth_mod is not None:
+            d20_roll = roll_d20()
+            total = d20_roll + stealth_mod
+            roll_message = format_roll_detail(
+                dice_label=f"{actor.name} Hide — Stealth",
+                rolls=[d20_roll],
+                modifier=stealth_mod,
+                total=total,
+            )
+            messages.append(roll_message)
+            append_log(
+                state,
+                roll_message,
+                kind="roll",
+                actor=actor.name,
+                roller_name=actor.name,
+                dice="d20",
+                result=d20_roll,
+                bonus=stealth_mod,
+                total=total,
+            )
+            message = f"{actor.name} attempts to Hide (Stealth {total})."
+        else:
+            message = (
+                f"{actor.name} takes the Hide action — attempting to become unseen "
+                "(Stealth bonus not on sheet)."
+            )
         messages.append(message)
         append_log(state, message, kind="action", actor=actor.name)
         return messages

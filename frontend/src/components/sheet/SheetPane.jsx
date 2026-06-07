@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { PanelTopClose, PanelTopOpen, Pin, PinOff } from "lucide-react";
-import { MIN_PANE_HEIGHT, clampWidget } from "../../lib/sheetLayout";
+import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH, clampWidget } from "../../lib/sheetLayout";
 
 export function SheetPane({
   widget,
@@ -52,7 +52,7 @@ export function SheetPane({
           clampWidget(
             {
               ...widgetRef.current,
-              w: Math.max(180, Math.round(resizeRef.current.originW + dx)),
+              w: Math.max(MIN_PANE_WIDTH, Math.round(resizeRef.current.originW + dx)),
               h: nextH,
               expandedH: nextH,
             },
@@ -120,7 +120,7 @@ export function SheetPane({
   return (
     <div
       ref={paneRef}
-      className="absolute flex flex-col rounded-sm border border-border-bright bg-void-panel"
+      className="session-ui absolute flex flex-col rounded-sm border border-border-bright bg-void-panel shadow-md"
       style={{
         left: widget.x,
         top: widget.y,
@@ -130,14 +130,14 @@ export function SheetPane({
       }}
       onPointerDown={focusPane}
     >
-      <div className="relative z-20 flex shrink-0 items-center gap-1 border-b border-border bg-void-deep/80 px-1 py-1">
+      <div className="relative z-20 flex shrink-0 items-center gap-1 border-b border-border bg-void-deep/80 px-2 py-1.5 sm:px-3 sm:py-2">
         <div
           onPointerDown={startDrag}
           className={`min-w-0 flex-1 px-1 ${
             widget.pinned ? "cursor-default" : "cursor-grab active:cursor-grabbing"
           }`}
         >
-          <span className="block truncate text-[10px] font-black uppercase tracking-widest text-starlight">
+          <span className="block truncate text-xs font-black uppercase tracking-widest text-starlight sm:text-sm">
             {title}
           </span>
         </div>
@@ -184,7 +184,7 @@ export function SheetPane({
         </div>
       </div>
       {!widget.minimized && (
-        <div className="relative z-0 min-h-0 min-w-0 flex-1 overflow-auto p-2 text-xs font-mono text-ink-muted">
+        <div className="relative z-0 min-h-0 min-w-0 flex-1 overflow-auto p-3 text-sm font-mono text-ink-muted sm:p-4">
           {children}
         </div>
       )}

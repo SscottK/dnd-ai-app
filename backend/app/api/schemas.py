@@ -284,6 +284,7 @@ class TurnEconomySnapshot(BaseModel):
     action_used: bool = False
     bonus_action_used: bool = False
     reaction_used: bool = False
+    magic_action_used: bool = False
     extra_action_available: bool = False
     attacks_remaining: int = 0
     movement_remaining: int | None = None

@@ -7,6 +7,7 @@ import {
   combatantAcText,
   combatantHpText,
   combatantMoveText,
+  formatCombatResources,
   turnStatusLabels,
   isDefeatedEnemy,
   parseEncounterPatchResponse,
@@ -90,12 +91,12 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet }) {
           isOwner && onViewSheet ? "cursor-pointer hover:opacity-90" : "cursor-default"
         }`}
       >
-        <p className="truncate text-[10px] font-black uppercase text-starlight">
+        <p className="truncate text-xs sm:text-sm font-black uppercase text-starlight">
           {member.character_name}
-          {isYou && <span className="ml-1.5 text-[8px] text-neon-cyan">YOU</span>}
+          {isYou && <span className="ml-1.5 text-[11px] sm:text-xs text-neon-cyan">YOU</span>}
         </p>
-        {subtitle && <p className="truncate text-[9px] font-mono text-ink-faint">{subtitle}</p>}
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] font-mono">
+        {subtitle && <p className="truncate text-xs sm:text-sm font-mono text-ink-faint">{subtitle}</p>}
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs sm:text-sm font-mono">
           <span>
             <span className="text-ink-faint">AC </span>
             <span className="font-black text-starlight">{acLabel}</span>
@@ -114,7 +115,7 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet }) {
         <button
           type="button"
           onClick={() => onViewSheet(member)}
-          className="shrink-0 rounded-sm border border-neon-cyan/50 px-2 py-1 text-[8px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 lg:text-[9px]"
+          className="shrink-0 rounded-sm border border-neon-cyan/50 px-2 py-1 text-[11px] sm:text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 lg:text-xs sm:text-sm"
           title={`View ${member.character_name}'s sheet`}
         >
           Sheet
@@ -166,17 +167,17 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
   }, [loadParty]);
 
   if (loading) {
-    return <p className="text-[10px] font-mono text-ink-faint">Loading party...</p>;
+    return <p className="text-xs sm:text-sm font-mono text-ink-faint">Loading party...</p>;
   }
 
   if (error) {
     return (
       <div className="space-y-2">
-        <p className="text-[10px] font-mono text-danger">{error}</p>
+        <p className="text-xs sm:text-sm font-mono text-danger">{error}</p>
         <button
           type="button"
           onClick={loadParty}
-          className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight"
+          className="text-xs sm:text-sm font-black uppercase text-neon-cyan hover:text-starlight"
         >
           Retry
         </button>
@@ -210,7 +211,7 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
 
   if (members.length === 0) {
     return (
-      <p className="text-[10px] font-mono text-ink-faint">
+      <p className="text-xs sm:text-sm font-mono text-ink-faint">
         No characters have joined this campaign yet.
       </p>
     );
@@ -219,7 +220,7 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <p className="text-[9px] font-black uppercase tracking-widest text-ink-faint">
+        <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-ink-faint">
           {members.length} adventurer{members.length === 1 ? "" : "s"}
         </p>
         {isOwner && (
@@ -227,14 +228,14 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
             type="button"
             disabled={addingAll}
             onClick={handleAddAllToInitiative}
-            className="rounded-sm border border-neon-cyan px-2 py-1 text-[8px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+            className="rounded-sm border border-neon-cyan px-2 py-1 text-[11px] sm:text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
           >
             {addingAll ? "Rolling…" : "Add all to initiative"}
           </button>
         )}
       </div>
       {actionMessage && (
-        <p className="shrink-0 text-[9px] font-mono text-neon-cyan">{actionMessage}</p>
+        <p className="shrink-0 text-xs sm:text-sm font-mono text-neon-cyan">{actionMessage}</p>
       )}
       <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
         {members.map((member) => (
@@ -251,7 +252,7 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
       <button
         type="button"
         onClick={loadParty}
-        className="shrink-0 self-start text-[9px] font-black uppercase text-ink-faint hover:text-neon-cyan"
+        className="shrink-0 self-start text-xs sm:text-sm font-black uppercase text-ink-faint hover:text-neon-cyan"
       >
         Refresh
       </button>
@@ -272,9 +273,9 @@ function ClickableRow({ label, value, sub, onClick }) {
       onClick={onClick}
       className="w-full flex items-center justify-between gap-2 px-2 py-1 text-left hover:bg-neon-magenta/10 border border-transparent hover:border-neon-magenta/30"
     >
-      <span className="text-[10px] text-zinc-400 truncate">{label}</span>
+      <span className="text-xs sm:text-sm text-zinc-400 truncate">{label}</span>
       <span className="text-xs font-black text-starlight shrink-0">{value}</span>
-      {sub && <span className="text-[9px] text-zinc-600 shrink-0">{sub}</span>}
+      {sub && <span className="text-xs sm:text-sm text-zinc-600 shrink-0">{sub}</span>}
     </button>
   );
 }
@@ -319,10 +320,10 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
           }
           className="border border-neon-magenta/50 p-2 hover:bg-neon-magenta/5 text-left"
         >
-          <p className="text-[9px] text-zinc-500 uppercase">AC</p>
+          <p className="text-xs sm:text-sm text-zinc-500 uppercase">AC</p>
           <p className="text-2xl font-black text-starlight text-center">{combat.ac ?? "—"}</p>
           {combat.fromEquipment && (
-            <p className="text-[8px] text-ink-faint text-center uppercase">Equipped</p>
+            <p className="text-[11px] sm:text-xs text-ink-faint text-center uppercase">Equipped</p>
           )}
         </button>
         <button
@@ -336,14 +337,14 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
           }
           className="border border-neon-cyan/50 p-2 hover:bg-neon-cyan/5"
         >
-          <p className="text-[9px] text-zinc-500 uppercase">Init</p>
+          <p className="text-xs sm:text-sm text-zinc-500 uppercase">Init</p>
           <p className="text-2xl font-black text-starlight">
             {formatModifier(sheet.initiative_bonus ?? abilityModifier(sheet.abilities?.dex))}
           </p>
         </button>
       </div>
       <div className="border border-starlight/50 p-2">
-        <p className="text-[9px] text-zinc-500 uppercase mb-1">Hit Points</p>
+        <p className="text-xs sm:text-sm text-zinc-500 uppercase mb-1">Hit Points</p>
         <div className="flex items-center justify-center gap-2">
           <input
             type="number"
@@ -370,15 +371,15 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
           />
         </div>
       </div>
-      <div className="flex justify-between text-[10px] font-mono text-zinc-500">
+      <div className="flex justify-between text-xs sm:text-sm font-mono text-zinc-500">
         <span>Speed: {combat.speed != null ? `${combat.speed} ft` : "—"}</span>
         <span>PP: {resolvePassivePerception(sheet) ?? "—"}</span>
       </div>
       {resources.length > 0 && (
         <div className="border border-neon-cyan/40 p-2 space-y-1.5">
-          <p className="text-[9px] text-zinc-500 uppercase">Class Resources</p>
+          <p className="text-xs sm:text-sm text-zinc-500 uppercase">Class Resources</p>
           {resources.map((resource, index) => (
-            <div key={resource.id || index} className="flex items-center justify-between gap-2 text-[10px]">
+            <div key={resource.id || index} className="flex items-center justify-between gap-2 text-xs sm:text-sm">
               <button
                 type="button"
                 onClick={() =>
@@ -423,7 +424,7 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
         </div>
       )}
       {sheet.conditions?.length > 0 && (
-        <p className="text-[10px] text-neon-magenta">{sheet.conditions.join(", ")}</p>
+        <p className="text-xs sm:text-sm text-neon-magenta">{sheet.conditions.join(", ")}</p>
       )}
     </div>
   );
@@ -462,9 +463,9 @@ export function AbilitiesWidget({ sheet, onShowDetail }) {
             }
             className="border border-zinc-800 p-2 text-center hover:border-neon-cyan hover:bg-neon-cyan/5"
           >
-            <p className="text-[9px] text-zinc-500">{ABILITY_LABELS[key]}</p>
+            <p className="text-xs sm:text-sm text-zinc-500">{ABILITY_LABELS[key]}</p>
             <p className="text-lg font-black text-starlight">{formatModifier(mod)}</p>
-            <p className="text-[10px] text-zinc-600">{score ?? "—"}</p>
+            <p className="text-xs sm:text-sm text-zinc-600">{score ?? "—"}</p>
           </button>
         );
       })}
@@ -479,7 +480,7 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-[9px] font-black text-neon-magenta uppercase mb-1">Saving Throws</p>
+        <p className="text-xs sm:text-sm font-black text-neon-magenta uppercase mb-1">Saving Throws</p>
         <div className="space-y-0.5">
           {sheet.saving_throws?.map((save) => {
             const bonus = resolveSaveBonus(save, sheet);
@@ -502,7 +503,7 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
         </div>
       </div>
       <div>
-        <p className="text-[9px] font-black text-neon-cyan uppercase mb-1">Skills</p>
+        <p className="text-xs sm:text-sm font-black text-neon-cyan uppercase mb-1">Skills</p>
         <div className="space-y-0.5 max-h-40 overflow-y-auto">
           {[...proficientSkills, ...otherSkills].map((skill) => {
             const bonus = resolveSkillBonus(skill, sheet);
@@ -563,7 +564,7 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
               ),
             })
           }
-          className="text-[10px] text-neon-cyan hover:text-starlight uppercase font-black"
+          className="text-xs sm:text-sm text-neon-cyan hover:text-starlight uppercase font-black"
         >
           View proficiencies →
         </button>
@@ -702,9 +703,9 @@ export function CharacterPortraitWidget({
         />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/20 p-1.5">
-        <p className="mb-1 text-[8px] font-black uppercase tracking-widest text-ink-faint">Album</p>
+        <p className="mb-1 text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">Album</p>
         {photos.length === 0 ? (
-          <p className="text-[9px] font-mono text-ink-faint">Add photos below, then tap one to set your portrait.</p>
+          <p className="text-xs sm:text-sm font-mono text-ink-faint">Add photos below, then tap one to set your portrait.</p>
         ) : (
           <div className="grid grid-cols-3 gap-1.5">
             {photos.map((photo) => {
@@ -729,7 +730,7 @@ export function CharacterPortraitWidget({
                     />
                   </button>
                   {isActive && (
-                    <span className="pointer-events-none absolute left-0.5 top-0.5 rounded-sm bg-starlight/90 px-1 text-[7px] font-black uppercase text-black">
+                    <span className="pointer-events-none absolute left-0.5 top-0.5 rounded-sm bg-starlight/90 px-1 text-[10px] sm:text-xs font-black uppercase text-black">
                       Portrait
                     </span>
                   )}
@@ -762,13 +763,13 @@ export function CharacterPortraitWidget({
         type="button"
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
-        className="flex shrink-0 items-center justify-center gap-1 rounded-sm border border-neon-cyan px-2 py-1 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+        className="flex shrink-0 items-center justify-center gap-1 rounded-sm border border-neon-cyan px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
       >
         <ImagePlus className="h-3 w-3" />
         Add photo
       </button>
-      {error && <p className="shrink-0 text-center text-[9px] font-mono text-danger">{error}</p>}
-      <p className="shrink-0 text-center text-[8px] font-mono text-ink-faint">
+      {error && <p className="shrink-0 text-center text-xs sm:text-sm font-mono text-danger">{error}</p>}
+      <p className="shrink-0 text-center text-[11px] sm:text-xs font-mono text-ink-faint">
         Up to 24 photos · JPEG, PNG, WebP, GIF · max 4 MB
       </p>
     </div>
@@ -828,7 +829,7 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`flex-1 py-1.5 text-[9px] font-black uppercase ${
+            className={`flex-1 py-1.5 text-xs sm:text-sm font-black uppercase ${
               tab === t.id
                 ? "text-starlight border-b-2 border-neon-magenta"
                 : "text-zinc-600 hover:text-neon-cyan"
@@ -841,12 +842,12 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
       <div className="flex-1 overflow-y-auto">
         {tab === "inventory" && (
           <div className="space-y-1">
-            <p className="mb-1 text-[8px] font-mono leading-relaxed text-ink-faint">
+            <p className="mb-1 text-[11px] sm:text-xs font-mono leading-relaxed text-ink-faint">
               Tap <span className="text-starlight">Equip</span> for worn/wielded gear — saves to your
               digital sheet and updates AC immediately (PDF is not modified).
             </p>
             {sheet.inventory?.length === 0 && (
-              <p className="text-[10px] text-zinc-600">No items parsed yet.</p>
+              <p className="text-xs sm:text-sm text-zinc-600">No items parsed yet.</p>
             )}
             {sheet.inventory?.map((item, index) => {
               const affectsAc = itemAffectsAc(item);
@@ -863,7 +864,7 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
                   <button
                     type="button"
                     onClick={() => updateInventoryItem(index, { equipped: !isEquipped })}
-                    className={`shrink-0 rounded-sm px-1.5 py-1 text-[8px] font-black uppercase tracking-wide ${
+                    className={`shrink-0 rounded-sm px-1.5 py-1 text-[11px] sm:text-xs font-black uppercase tracking-wide ${
                       isEquipped
                         ? "bg-starlight text-black"
                         : "border border-zinc-700 text-zinc-500 hover:border-neon-cyan hover:text-neon-cyan"
@@ -890,12 +891,12 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
                         ),
                       })
                     }
-                    className="min-w-0 flex-1 text-left text-[10px] text-neon-cyan hover:text-starlight truncate"
+                    className="min-w-0 flex-1 text-left text-xs sm:text-sm text-neon-cyan hover:text-starlight truncate"
                   >
                     {item.name}
                   </button>
                   {affectsAc && (
-                    <span className="shrink-0 text-[7px] font-black uppercase text-neon-cyan/80">
+                    <span className="shrink-0 text-[10px] sm:text-xs font-black uppercase text-neon-cyan/80">
                       AC
                     </span>
                   )}
@@ -906,7 +907,7 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
                     onChange={(e) =>
                       updateInventoryItem(index, { qty: parseInt(e.target.value, 10) || 0 })
                     }
-                    className="w-10 shrink-0 text-center bg-black border border-zinc-800 text-[10px]"
+                    className="w-10 shrink-0 text-center bg-black border border-zinc-800 text-xs sm:text-sm"
                   />
                 </div>
               );
@@ -916,7 +917,7 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
         {tab === "features" && (
           <div className="space-y-1">
             {sheet.features?.length === 0 && (
-              <p className="text-[10px] text-zinc-600">No features parsed yet.</p>
+              <p className="text-xs sm:text-sm text-zinc-600">No features parsed yet.</p>
             )}
             {sheet.features?.map((feat, index) => (
               <button
@@ -929,11 +930,11 @@ export function CharacterTabsWidget({ sheet, onSheetChange, onShowDetail }) {
                     body: feat.description || "No description available.",
                   })
                 }
-                className="w-full text-left px-2 py-1.5 text-[10px] text-neon-cyan hover:bg-neon-magenta/10 border border-transparent hover:border-neon-magenta/30"
+                className="w-full text-left px-2 py-1.5 text-xs sm:text-sm text-neon-cyan hover:bg-neon-magenta/10 border border-transparent hover:border-neon-magenta/30"
               >
                 <span className="font-black text-starlight">{feat.name}</span>
                 {feat.source && (
-                  <span className="text-zinc-600 ml-2 text-[9px]">{feat.source}</span>
+                  <span className="text-zinc-600 ml-2 text-xs sm:text-sm">{feat.source}</span>
                 )}
               </button>
             ))}
@@ -948,10 +949,10 @@ function InitiativeLabeledStat({ label, value, valueClassName = "text-starlight"
   if (value == null || value === "") return null;
   return (
     <div className="flex w-full items-baseline justify-between gap-1 leading-tight">
-      <span className="shrink-0 text-[8px] font-black uppercase tracking-wider text-ink-faint">
+      <span className="shrink-0 text-[11px] sm:text-xs font-black uppercase tracking-wider text-ink-faint">
         {label}
       </span>
-      <span className={`truncate text-right text-[10px] font-mono font-black ${valueClassName}`}>
+      <span className={`truncate text-right text-xs sm:text-sm font-mono font-black ${valueClassName}`}>
         {value}
       </span>
     </div>
@@ -988,7 +989,7 @@ function InitiativeStatusBadges({ combatant, isYou, isDefeated }) {
       {badges.map((badge) => (
         <span
           key={badge.key}
-          className={`rounded-sm border border-border/50 px-1 py-0.5 text-[7px] font-black uppercase ${badge.className}`}
+          className={`rounded-sm border border-border/50 px-1 py-0.5 text-[10px] sm:text-xs font-black uppercase ${badge.className}`}
         >
           {badge.label}
         </span>
@@ -997,16 +998,31 @@ function InitiativeStatusBadges({ combatant, isYou, isDefeated }) {
   );
 }
 
-function InitiativeCombatantStats({ combatant, combatants, isDmView, turnEconomy, isActive }) {
+function InitiativeCombatantStats({
+  combatant,
+  combatants,
+  isDmView,
+  turnEconomy,
+  isActive,
+  resourceSheet,
+}) {
   const conditions = formatConditionsList(combatant.conditions);
   const economy = isActive ? turnEconomy?.[combatant.id] : null;
   const turnStatuses = turnStatusLabels(economy, combatants);
+  const resourceSummary = isActive ? formatCombatResources(resourceSheet) : null;
   return (
     <div className="flex w-full flex-col gap-0.5">
       <InitiativeLabeledStat label="Init" value={combatant.initiative} />
       <InitiativeLabeledStat label="HP" value={combatantHpText(combatant)} />
       <InitiativeLabeledStat label="AC" value={combatantAcText(combatant, isDmView)} />
       <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant, economy)} />
+      {resourceSummary ? (
+        <InitiativeLabeledStat
+          label="Uses"
+          value={resourceSummary}
+          valueClassName="text-neon-cyan"
+        />
+      ) : null}
       {turnStatuses.length ? (
         <InitiativeLabeledStat
           label="Turn"
@@ -1045,7 +1061,7 @@ function HpStepButtons({ combatant, disabled, onAdjust }) {
           type="button"
           disabled={disabled || combatant.hp == null}
           onClick={() => onAdjust(step)}
-          className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[8px] font-black uppercase disabled:opacity-30 ${
+          className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[11px] sm:text-xs font-black uppercase disabled:opacity-30 ${
             step < 0
               ? "border-danger/50 text-danger hover:bg-danger/10"
               : "border-neon-cyan/50 text-neon-cyan hover:bg-neon-cyan/10"
@@ -1085,10 +1101,10 @@ function DmCombatantEditor({
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">
+          <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">
             Health &amp; status
           </p>
-          <p className="truncate text-[9px] font-black uppercase text-starlight">
+          <p className="truncate text-xs sm:text-sm font-black uppercase text-starlight">
             {combatant.name}
             {defeated && <span className="ml-1 text-danger">· Defeated</span>}
           </p>
@@ -1105,7 +1121,7 @@ function DmCombatantEditor({
       </div>
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[8px] font-mono uppercase text-ink-faint">Init</span>
+          <span className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">Init</span>
           <input
             type="number"
             value={combatant.initiative}
@@ -1113,9 +1129,9 @@ function DmCombatantEditor({
             onChange={(e) =>
               onPatch({ initiative: parseInt(e.target.value, 10) || 0 })
             }
-            className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-starlight"
+            className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-xs sm:text-sm font-mono text-starlight"
           />
-          <span className="text-[8px] font-mono uppercase text-ink-faint">HP</span>
+          <span className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">HP</span>
           <input
             type="number"
             min="0"
@@ -1129,7 +1145,7 @@ function DmCombatantEditor({
                     : clampCombatantHp(parseInt(e.target.value, 10) || 0, combatant.max_hp),
               })
             }
-            className="w-11 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-starlight"
+            className="w-11 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-xs sm:text-sm font-mono text-starlight"
           />
           <span className="text-ink-faint">/</span>
           <input
@@ -1142,11 +1158,11 @@ function DmCombatantEditor({
                 max_hp: e.target.value === "" ? null : parseInt(e.target.value, 10) || 0,
               })
             }
-            className="w-11 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-ink-muted"
+            className="w-11 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-xs sm:text-sm font-mono text-ink-muted"
           />
           {isEnemy && (
             <>
-              <span className="text-[8px] font-mono uppercase text-ink-faint">AC</span>
+              <span className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">AC</span>
               <input
                 type="number"
                 min="0"
@@ -1157,7 +1173,7 @@ function DmCombatantEditor({
                     ac: e.target.value === "" ? null : parseInt(e.target.value, 10) || 0,
                   })
                 }
-                className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-[10px] font-mono text-starlight"
+                className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-xs sm:text-sm font-mono text-starlight"
               />
             </>
           )}
@@ -1165,7 +1181,7 @@ function DmCombatantEditor({
         <HpStepButtons combatant={combatant} disabled={saving} onAdjust={adjustHp} />
         {isActiveTurn && onAdjustMovement && (
           <div className="space-y-1">
-            <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">
+            <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">
               Movement
               {movementRemaining != null && combatant.speed != null
                 ? ` — ${movementRemaining}/${combatant.speed} ft`
@@ -1180,7 +1196,7 @@ function DmCombatantEditor({
                   type="button"
                   disabled={saving || movementBusy}
                   onClick={() => onAdjustMovement(step)}
-                  className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[8px] font-black uppercase disabled:opacity-30 ${
+                  className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[11px] sm:text-xs font-black uppercase disabled:opacity-30 ${
                     step < 0
                       ? "border-danger/50 text-danger hover:bg-danger/10"
                       : "border-neon-cyan/50 text-neon-cyan hover:bg-neon-cyan/10"
@@ -1199,7 +1215,7 @@ function DmCombatantEditor({
           onChange={(next) => onPatch({ conditions: next })}
         />
         {isEnemy && (
-          <label className="flex items-center gap-1.5 text-[9px] font-mono uppercase text-ink-faint">
+          <label className="flex items-center gap-1.5 text-xs sm:text-sm font-mono uppercase text-ink-faint">
             <input
               type="checkbox"
               checked={Boolean(combatant.is_ally)}
@@ -1214,7 +1230,7 @@ function DmCombatantEditor({
           type="button"
           disabled={saving}
           onClick={onRemove}
-          className="text-[9px] font-black uppercase text-danger hover:underline disabled:opacity-40"
+          className="text-xs sm:text-sm font-black uppercase text-danger hover:underline disabled:opacity-40"
         >
           Remove
         </button>
@@ -1235,12 +1251,13 @@ function InitiativeCombatantRow({
   onSelect,
   token,
   turnEconomy,
+  resourceSheet,
 }) {
   const selectable = isDmView && onSelect;
   return (
     <li
       onClick={selectable ? () => onSelect(combatant.id) : undefined}
-      className={`flex w-full items-center gap-3 rounded-sm border-2 px-3 py-2.5 ${
+      className={`flex w-full items-center gap-3 rounded-sm border-2 px-3 py-3 sm:py-3.5 ${
         selectable ? "cursor-pointer" : ""
       } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
     >
@@ -1251,13 +1268,14 @@ function InitiativeCombatantRow({
           {combatant.name}
         </p>
         <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
-        <div className="mt-1 max-w-[220px]">
+        <div className="mt-1 w-full max-w-full sm:max-w-[280px]">
           <InitiativeCombatantStats
             combatant={combatant}
             combatants={combatants}
             isDmView={isDmView}
             turnEconomy={turnEconomy}
             isActive={isActive}
+            resourceSheet={resourceSheet}
           />
         </div>
       </div>
@@ -1277,12 +1295,13 @@ function InitiativeCombatantCard({
   onSelect,
   token,
   turnEconomy,
+  resourceSheet,
 }) {
   const selectable = isDmView && onSelect;
   return (
     <div
       onClick={selectable ? () => onSelect(combatant.id) : undefined}
-      className={`flex min-w-[112px] max-w-[140px] flex-1 flex-col items-stretch gap-1.5 border-2 p-2 ${
+      className={`flex min-w-[9.5rem] max-w-[11rem] flex-1 flex-col items-stretch gap-2 border-2 p-2.5 sm:min-w-[7.5rem] sm:max-w-[9rem] ${
         selectable ? "cursor-pointer" : ""
       } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
     >
@@ -1296,7 +1315,7 @@ function InitiativeCombatantCard({
         />
       </div>
       <p
-        className="line-clamp-2 min-h-[2rem] text-center text-[9px] font-black uppercase leading-tight text-starlight"
+        className="line-clamp-2 min-h-[2rem] text-center text-xs sm:text-sm font-black uppercase leading-tight text-starlight"
         title={combatant.name}
       >
         {combatant.name}
@@ -1307,10 +1326,18 @@ function InitiativeCombatantCard({
         isDmView={isDmView}
         turnEconomy={turnEconomy}
         isActive={isActive}
+        resourceSheet={resourceSheet}
       />
       <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
     </div>
   );
+}
+
+function resourceSheetForCombatant(combatant, { isActive, characterId, sheet, dmActionSheet, isOwner }) {
+  if (!combatant?.character_id) return null;
+  if (combatant.character_id === characterId) return sheet;
+  if (isOwner && isActive) return dmActionSheet;
+  return null;
 }
 
 export function InitiativeWidget({
@@ -1577,17 +1604,17 @@ export function InitiativeWidget({
   };
 
   if (loading) {
-    return <p className="text-[10px] font-mono text-ink-faint">Loading initiative...</p>;
+    return <p className="text-xs sm:text-sm font-mono text-ink-faint">Loading initiative...</p>;
   }
 
   if (error) {
     return (
       <div className="space-y-2">
-        <p className="text-[10px] font-mono text-danger">{error}</p>
+        <p className="text-xs sm:text-sm font-mono text-danger">{error}</p>
         <button
           type="button"
           onClick={loadEncounter}
-          className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight"
+          className="text-xs sm:text-sm font-black uppercase text-neon-cyan hover:text-starlight"
         >
           Retry
         </button>
@@ -1601,10 +1628,10 @@ export function InitiativeWidget({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border pb-2">
+    <div className="session-ui flex h-full min-h-0 flex-col gap-2 sm:gap-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border pb-2 sm:pb-3">
         <div>
-          <p className="text-[9px] font-black uppercase tracking-widest text-ink-faint">Round</p>
+          <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-ink-faint">Round</p>
           <p className="text-lg font-black text-neon-cyan">{encounter.round}</p>
         </div>
         <div className="flex items-center gap-1">
@@ -1647,11 +1674,11 @@ export function InitiativeWidget({
 
       {!isHorizontal && activeCombatant ? (
         <div className="shrink-0 rounded-sm border border-starlight/60 bg-starlight/5 px-2 py-1.5">
-          <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">Active turn</p>
+          <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">Active turn</p>
           <p className="truncate text-xs font-black uppercase text-starlight">{activeCombatant.name}</p>
         </div>
       ) : !isHorizontal ? (
-        <p className="shrink-0 text-[10px] font-mono text-ink-faint">No active turn yet.</p>
+        <p className="shrink-0 text-xs sm:text-sm font-mono text-ink-faint">No active turn yet.</p>
       ) : null}
 
       {characterId && (
@@ -1661,7 +1688,7 @@ export function InitiativeWidget({
               type="button"
               disabled={submitting}
               onClick={handleAutoRoll}
-              className="flex items-center gap-1 rounded-sm border border-neon-cyan px-2 py-1 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+              className="flex items-center gap-1 rounded-sm border border-neon-cyan px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
             >
               <Dices className="h-3.5 w-3.5" />
               Roll d20{formatModifier(initiativeBonus)}
@@ -1672,13 +1699,13 @@ export function InitiativeWidget({
                 value={manualInit}
                 onChange={(e) => setManualInit(e.target.value)}
                 placeholder="Manual"
-                className="w-16 rounded-sm border border-border bg-black px-2 py-1 text-center text-[10px] font-mono text-starlight"
+                className="w-16 rounded-sm border border-border bg-black px-2 py-1 text-center text-xs sm:text-sm font-mono text-starlight"
                 title="Enter your total initiative if you rolled at the table"
               />
               <button
                 type="submit"
                 disabled={submitting || manualInit === ""}
-                className="rounded-sm border border-border px-2 py-1 text-[10px] font-black uppercase text-ink-muted hover:text-starlight disabled:opacity-40"
+                className="rounded-sm border border-border px-2 py-1 text-xs sm:text-sm font-black uppercase text-ink-muted hover:text-starlight disabled:opacity-40"
               >
                 Set
               </button>
@@ -1688,24 +1715,24 @@ export function InitiativeWidget({
                 type="button"
                 disabled={submitting}
                 onClick={handleEndTurn}
-                className="rounded-sm border border-starlight bg-starlight/10 px-2 py-1 text-[10px] font-black uppercase text-starlight hover:bg-starlight/20 disabled:opacity-40"
+                className="rounded-sm border border-starlight bg-starlight/10 px-2 py-1 text-xs sm:text-sm font-black uppercase text-starlight hover:bg-starlight/20 disabled:opacity-40"
               >
                 End Turn
               </button>
             )}
           </div>
           {myCombatant && (
-            <p className="text-[9px] font-mono text-ink-faint">
+            <p className="text-xs sm:text-sm font-mono text-ink-faint">
               Your initiative: <span className="text-starlight font-black">{myCombatant.initiative}</span>
             </p>
           )}
           {lastRoll && lastRoll.d20 != null && (
-            <p className="text-[9px] font-mono text-neon-cyan">
+            <p className="text-xs sm:text-sm font-mono text-neon-cyan">
               Rolled {lastRoll.d20} {formatModifier(lastRoll.bonus)} ={" "}
               <span className="font-black text-starlight">{lastRoll.total}</span>
             </p>
           )}
-          {actionError && <p className="text-[9px] font-mono text-danger">{actionError}</p>}
+          {actionError && <p className="text-xs sm:text-sm font-mono text-danger">{actionError}</p>}
         </div>
       )}
 
@@ -1749,7 +1776,7 @@ export function InitiativeWidget({
       )}
 
       {displaySorted.length === 0 ? (
-        <p className="text-[10px] font-mono text-ink-faint">
+        <p className="text-xs sm:text-sm font-mono text-ink-faint">
           {isOwner
             ? "Add enemies from Generators or party from the Party pane."
             : "Roll initiative to join the tracker when combat starts."}
@@ -1758,13 +1785,14 @@ export function InitiativeWidget({
         <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto pb-1">
           {displaySorted.map((combatant, index) => {
             const defeated = isDefeatedEnemy(combatant);
+            const isActive = !defeated && activeCombatant?.id === combatant.id;
             return (
               <InitiativeCombatantCard
                 key={combatant.id}
                 combatant={combatant}
                 combatants={encounter.combatants}
                 index={index}
-                isActive={!defeated && activeCombatant?.id === combatant.id}
+                isActive={isActive}
                 isYou={combatant.character_id === characterId}
                 isDmView={isOwner}
                 isSelected={isOwner && selectedId === combatant.id}
@@ -1772,6 +1800,13 @@ export function InitiativeWidget({
                 onSelect={isOwner ? handleSelectCombatant : undefined}
                 token={token}
                 turnEconomy={encounter.turn_economy}
+                resourceSheet={resourceSheetForCombatant(combatant, {
+                  isActive,
+                  characterId,
+                  sheet,
+                  dmActionSheet,
+                  isOwner,
+                })}
               />
             );
           })}
@@ -1780,13 +1815,14 @@ export function InitiativeWidget({
         <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
           {displaySorted.map((combatant, index) => {
             const defeated = isDefeatedEnemy(combatant);
+            const isActive = !defeated && activeCombatant?.id === combatant.id;
             return (
               <InitiativeCombatantRow
                 key={combatant.id}
                 combatant={combatant}
                 combatants={encounter.combatants}
                 index={index}
-                isActive={!defeated && activeCombatant?.id === combatant.id}
+                isActive={isActive}
                 isYou={combatant.character_id === characterId}
                 isDmView={isOwner}
                 isSelected={isOwner && selectedId === combatant.id}
@@ -1794,6 +1830,13 @@ export function InitiativeWidget({
                 onSelect={isOwner ? handleSelectCombatant : undefined}
                 token={token}
                 turnEconomy={encounter.turn_economy}
+                resourceSheet={resourceSheetForCombatant(combatant, {
+                  isActive,
+                  characterId,
+                  sheet,
+                  dmActionSheet,
+                  isOwner,
+                })}
               />
             );
           })}
@@ -1829,7 +1872,7 @@ export function InitiativeWidget({
               type="button"
               disabled={dmBusy}
               onClick={handleEndTurn}
-              className="flex flex-1 items-center justify-center gap-1 rounded-sm border border-starlight px-2 py-1.5 text-[9px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
+              className="flex flex-1 items-center justify-center gap-1 rounded-sm border border-starlight px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
             >
               <ChevronRight className="h-3 w-3" />
               Next turn
@@ -1838,20 +1881,20 @@ export function InitiativeWidget({
               type="button"
               disabled={dmBusy}
               onClick={handleEndCombat}
-              className="flex-1 rounded-sm border border-danger/60 px-2 py-1.5 text-[9px] font-black uppercase text-danger hover:bg-danger/10 disabled:opacity-40"
+              className="flex-1 rounded-sm border border-danger/60 px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-danger hover:bg-danger/10 disabled:opacity-40"
             >
               End combat
             </button>
           </div>
         )}
         {isOwner && saving && (
-          <p className="text-[9px] font-mono text-ink-faint">Saving…</p>
+          <p className="text-xs sm:text-sm font-mono text-ink-faint">Saving…</p>
         )}
         {isOwner && actionError && (
-          <p className="text-[9px] font-mono text-danger">{actionError}</p>
+          <p className="text-xs sm:text-sm font-mono text-danger">{actionError}</p>
         )}
         {!isOwner && (
-          <p className="text-[9px] font-mono text-ink-faint">
+          <p className="text-xs sm:text-sm font-mono text-ink-faint">
             Roll to add yourself · End turn when it is yours
           </p>
         )}
@@ -1860,20 +1903,171 @@ export function InitiativeWidget({
   );
 }
 
-export function VttZoneWidget() {
+function loadVttState(campaignId) {
+  try {
+    const raw = localStorage.getItem(`vtt-zone-${campaignId}`);
+    return raw ? JSON.parse(raw) : { embedUrl: "", tokens: [] };
+  } catch {
+    return { embedUrl: "", tokens: [] };
+  }
+}
+
+function saveVttState(campaignId, state) {
+  localStorage.setItem(`vtt-zone-${campaignId}`, JSON.stringify(state));
+}
+
+export function VttZoneWidget({ campaignId }) {
+  const [embedUrl, setEmbedUrl] = useState("");
+  const [tokens, setTokens] = useState([]);
+  const [newTokenName, setNewTokenName] = useState("");
+  const [showEmbed, setShowEmbed] = useState(false);
+
+  useEffect(() => {
+    if (!campaignId) return;
+    const saved = loadVttState(campaignId);
+    setEmbedUrl(saved.embedUrl || "");
+    setTokens(saved.tokens || []);
+    setShowEmbed(Boolean(saved.embedUrl));
+  }, [campaignId]);
+
+  const persist = (nextEmbed, nextTokens) => {
+    if (!campaignId) return;
+    saveVttState(campaignId, { embedUrl: nextEmbed, tokens: nextTokens });
+  };
+
+  const addToken = () => {
+    const name = newTokenName.trim();
+    if (!name) return;
+    const next = [
+      ...tokens,
+      {
+        id: `t-${Date.now()}`,
+        name,
+        x: Math.floor(Math.random() * 8),
+        y: Math.floor(Math.random() * 6),
+      },
+    ];
+    setTokens(next);
+    setNewTokenName("");
+    persist(embedUrl, next);
+  };
+
+  const moveToken = (id, dx, dy) => {
+    const next = tokens.map((token) => {
+      if (token.id !== id) return token;
+      return {
+        ...token,
+        x: Math.max(0, Math.min(11, (token.x || 0) + dx)),
+        y: Math.max(0, Math.min(7, (token.y || 0) + dy)),
+      };
+    });
+    setTokens(next);
+    persist(embedUrl, next);
+  };
+
+  const applyEmbed = () => {
+    setShowEmbed(Boolean(embedUrl.trim()));
+    persist(embedUrl.trim(), tokens);
+  };
+
+  if (showEmbed && embedUrl.trim()) {
+    return (
+      <div className="flex h-full min-h-[120px] flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">VTT embed</p>
+          <button
+            type="button"
+            onClick={() => setShowEmbed(false)}
+            className="text-[11px] sm:text-xs font-black uppercase text-neon-cyan hover:underline"
+          >
+            Grid view
+          </button>
+        </div>
+        <iframe
+          title="External VTT"
+          src={embedUrl.trim()}
+          className="min-h-[140px] flex-1 rounded-sm border border-border bg-black"
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-full min-h-[120px] flex-col items-center justify-center rounded-sm border border-dashed border-border bg-void-deep/40 p-4 text-center">
-      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-ink-faint">VTT Zone</p>
-      <p className="mt-2 max-w-xs text-[10px] font-mono text-ink-faint">
-        Run combat on your Godot VTT. Resize this pane to frame the space you keep clear on your desk.
-      </p>
+    <div className="flex h-full min-h-[120px] flex-col gap-2 rounded-sm border border-dashed border-border bg-void-deep/40 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-ink-faint">Battle grid</p>
+        <span className="text-[11px] sm:text-xs font-mono text-ink-faint">12×8 · local</span>
+      </div>
+      <div
+        className="relative grid flex-1 gap-px rounded-sm border border-border/60 bg-border/20"
+        style={{ gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gridTemplateRows: "repeat(8, minmax(0, 1fr))" }}
+      >
+        {Array.from({ length: 96 }).map((_, index) => {
+          const x = index % 12;
+          const y = Math.floor(index / 12);
+          const here = tokens.filter((token) => token.x === x && token.y === y);
+          return (
+            <div
+              key={index}
+              className="relative min-h-[14px] bg-void-deep/50"
+              title={here.map((t) => t.name).join(", ")}
+            >
+              {here.map((token) => (
+                <button
+                  key={token.id}
+                  type="button"
+                  onClick={() => moveToken(token.id, 1, 0)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    moveToken(token.id, -1, 0);
+                  }}
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-neon-cyan/20 text-[6px] font-black uppercase text-neon-cyan"
+                  title={`${token.name} — click →, right-click ←`}
+                >
+                  {token.name.slice(0, 2)}
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1">
+        <input
+          value={newTokenName}
+          onChange={(e) => setNewTokenName(e.target.value)}
+          placeholder="Token name"
+          className="min-w-0 flex-1 rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-starlight"
+        />
+        <button
+          type="button"
+          onClick={addToken}
+          className="shrink-0 rounded-sm border border-neon-cyan px-2 py-1 text-[11px] sm:text-xs font-black uppercase text-neon-cyan"
+        >
+          Add
+        </button>
+      </div>
+      <div className="flex gap-1">
+        <input
+          value={embedUrl}
+          onChange={(e) => setEmbedUrl(e.target.value)}
+          placeholder="Godot / VTT embed URL (optional)"
+          className="min-w-0 flex-1 rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-starlight"
+        />
+        <button
+          type="button"
+          onClick={applyEmbed}
+          className="shrink-0 rounded-sm border border-border px-2 py-1 text-[11px] sm:text-xs font-black uppercase text-ink-faint"
+        >
+          Embed
+        </button>
+      </div>
     </div>
   );
 }
 
 export function EmptySheetHint({ character, onOpenFullSheet }) {
   return (
-    <div className="p-3 text-center text-[10px] font-mono text-zinc-500 border border-dashed border-zinc-700">
+    <div className="p-3 text-center text-xs sm:text-sm font-mono text-zinc-500 border border-dashed border-zinc-700">
       <p className="mb-2">Sheet data not loaded yet.</p>
       {character.pdf_url ? (
         <button

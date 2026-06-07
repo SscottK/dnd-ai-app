@@ -14,7 +14,7 @@ from app.services.combat_log import append_log
 
 _INCAPACITATING = frozenset({"Paralyzed", "Stunned", "Unconscious", "Petrified"})
 
-VALID_ACTION_TYPES = frozenset({"action", "bonus_action", "reaction"})
+VALID_ACTION_TYPES = frozenset({"action", "bonus_action", "reaction", "magic_action"})
 VALID_TARGETING = frozenset(
     {"self", "one_enemy", "one_ally", "one_creature", "one_ally_or_self"}
 )
@@ -152,6 +152,8 @@ def _economy_field(action_type: str) -> str:
         return "bonus_action_used"
     if action_type == "reaction":
         return "reaction_used"
+    if action_type == "magic_action":
+        return "magic_action_used"
     raise ValueError("Invalid action type.")
 
 

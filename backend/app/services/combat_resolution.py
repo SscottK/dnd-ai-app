@@ -11,7 +11,7 @@ from sqlmodel import Session
 from app.api.schemas import EncounterCombatant, EncounterState, UseActionRequest
 from app.db.models import Character
 from app.services.character_sheet import parse_sheet_json
-from app.services.combat_dice import format_roll_detail, roll_d20, roll_dice_expression
+from app.services.combat_dice import format_roll_detail, roll_d20_check, roll_dice_expression
 from app.services.combat_log import append_log
 from app.services.action_rules import lookup_combat_action, lookup_spell, parse_healing_dice
 from app.services.monster_catalog import lookup_monster
@@ -25,6 +25,24 @@ from app.services.weapon_attacks import (
 _DIRECT_ATTACK_PREFIXES = ("weapon-", "attack-", "std-attack", "npc-attack")
 _SPELL_ATTACK_PREFIX = "spell-"
 _MULTI_ATTACK_ACTIONS = {"flurry of blows": 2}
+
+
+def _helped_by_advantage(state: EncounterState, actor_id: str) -> bool:
+    for economy in state.turn_economy.values():
+        if economy.helping_target_id == actor_id:
+            return True
+    return False
+
+
+def _consume_help_for_actor(state: EncounterState, actor_id: str) -> None:
+    for economy in state.turn_economy.values():
+        if economy.helping_target_id == actor_id:
+            economy.helping_target_id = None
+
+
+def _target_is_dodging(state: EncounterState, target_id: str) -> bool:
+    economy = state.turn_economy.get(target_id)
+    return bool(economy and economy.dodging)
 _ON_HIT_RIDERS = frozenset({"stunning strike"})
 _MELEE_ATTACK_HINTS = ("unarmed", "talon", "fist", "claw", "bite", "slam", "kick")
 _TO_HIT_RE = re.compile(r"\+(\d+)\s+to\s+hit", re.IGNORECASE)
@@ -385,6 +403,8 @@ def resolve_attack(
             strike_count=strike_count,
         )
         messages.extend(strike_messages)
+        if strike_index == 0 and _helped_by_advantage(state, actor.id):
+            _consume_help_for_actor(state, actor.id)
     return messages
 
 
@@ -405,13 +425,29 @@ def _resolve_attack_strike(
         else f"{clean_name} ({strike_index + 1}/{strike_count})"
     )
 
-    attack_roll = roll_d20()
+    advantage = _helped_by_advantage(state, actor.id)
+    disadvantage = _target_is_dodging(state, target.id)
+    attack_roll, d20_rolls = roll_d20_check(
+        advantage=advantage,
+        disadvantage=disadvantage,
+    )
     attack_total = attack_roll + int(profile.attack_bonus)
     target_ac = target.ac
 
+    roll_tags = []
+    if advantage and not disadvantage:
+        roll_tags.append("advantage")
+    elif disadvantage and not advantage:
+        roll_tags.append("disadvantage")
+    tag_text = f" ({', '.join(roll_tags)})" if roll_tags else ""
+    dice_label = (
+        f"{actor.name} attacks {target.name} with {strike_label} — d20{tag_text}"
+    )
+    if len(d20_rolls) > 1:
+        dice_label += f" [{', '.join(str(value) for value in d20_rolls)} → {attack_roll}]"
     roll_message = (
         format_roll_detail(
-            dice_label=f"{actor.name} attacks {target.name} with {strike_label} — d20",
+            dice_label=dice_label,
             rolls=[attack_roll],
             modifier=int(profile.attack_bonus),
             total=attack_total,

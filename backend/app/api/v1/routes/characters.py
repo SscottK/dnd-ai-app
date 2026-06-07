@@ -445,16 +445,26 @@ def create_character(data: CharacterCreate, current_user: CurrentUser, session: 
             )
         pdf_path = f"{current_user.id}/{data.pdf_stored_name}"
 
+    sheet = parse_sheet_json(
+        data.sheet_json or "{}",
+        class_name=data.class_name,
+        level=data.level,
+    )
+    parsed_ac = sheet.get("authoritative_ac")
+    enriched = enrich_sheet_ac(sheet, parsed_ac)
+    computed_ac = compute_sheet_ac(enriched, parsed_ac)
+    skills_line = data.skills or skills_summary(enriched)
+
     character = Character(
         user_id=current_user.id,
         name=data.name.strip(),
         class_name=data.class_name,
         level=data.level,
-        ac=data.ac,
+        ac=computed_ac if computed_ac is not None else data.ac,
         hp=data.hp,
         max_hp=data.max_hp,
-        skills=data.skills,
-        sheet_json=data.sheet_json or "{}",
+        skills=skills_line,
+        sheet_json=sheet_to_json(enriched),
         pdf_path=pdf_path,
         dnd_beyond_url=data.dnd_beyond_url,
     )

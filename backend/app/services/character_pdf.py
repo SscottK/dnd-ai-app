@@ -92,7 +92,7 @@ Rules:
 - Parse character notes/backstory from NOTES, CHARACTER BACKSTORY, and ADDITIONAL NOTES sections into sheet.notes.
 - classes: every class on the sheet with name, level, and subclass (if shown). Multiclass = multiple entries.
 - resources: every spendable pool or use tracker visible on the sheet (Focus Points for Monk, Sorcery Points, Rage, Wild Shape uses, Channel Divinity, Bardic Inspiration, Lay on Hands pool, spell slots, Heroic Inspiration, etc.) with id (canonical slug: focus-points, wild-shape, rage, channel-divinity, bardic-inspiration, lay-on-hands, sorcery-points), name, current, max, recharge (short_rest|long_rest|turn), source_class.
-- Features: passive or narrative class/race/background features (Unarmored Defense, Martial Arts rules text). Do NOT put spendable ki options only in features — also list them in combat_actions.
+- Features: passive or narrative class/race/background features (Unarmored Defense, Martial Arts rules text). Mark purely passive features with "passive": true (Extra Attack, Martial Arts, Unarmored Defense). Do NOT put spendable ki options only in features — also list them in combat_actions.
 - attacks: every weapon/unarmed attack from WEAPON ATTACKS & CANTRIPS or ACTIONS with name, to_hit bonus, damage dice, action_type (usually action), targeting (usually one_enemy).
 - spells: prepared/known spells with name, level (0 for cantrips), action_type, targeting, prepared boolean, short description.
 - wild_shapes: every beast form listed on the sheet for Wild Shape (or similar transform features) with name, cr if shown, and notes.

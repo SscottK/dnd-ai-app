@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { loadActionRulesCatalog } from "../../lib/actionRules";
 import { impliesIncapacitated } from "../../lib/conditions";
-import { turnStatusLabels } from "../../lib/encounterDisplay";
+import { formatCombatResources, turnStatusLabels } from "../../lib/encounterDisplay";
 import {
   ACTION_TYPES,
   actionHasOptions,
+  actionNeedsReadyDetail,
   actionNeedsTarget,
   buildAvailableActions,
   canAffordResourceCost,
@@ -22,6 +23,7 @@ const TYPE_LABELS = {
   [ACTION_TYPES.action]: "Action",
   [ACTION_TYPES.bonus_action]: "Bonus Action",
   [ACTION_TYPES.reaction]: "Reaction",
+  [ACTION_TYPES.magic_action]: "Magic",
 };
 
 const CATEGORY_LABELS = {
@@ -43,6 +45,7 @@ function economyForCombatant(encounter, combatantId) {
       movement_remaining: null,
       extra_action_available: false,
       attacks_remaining: 0,
+      magic_action_used: false,
       dodging: false,
       disengaged: false,
       hiding: false,
@@ -67,7 +70,7 @@ function MovementStepButtons({ disabled, onAdjust }) {
           type="button"
           disabled={disabled}
           onClick={() => onAdjust(step)}
-          className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[8px] font-black uppercase disabled:opacity-30 ${
+          className={`min-w-[1.75rem] rounded-sm border px-1 py-0.5 text-[11px] sm:text-xs font-black uppercase disabled:opacity-30 ${
             step < 0
               ? "border-danger/50 text-danger hover:bg-danger/10"
               : "border-neon-cyan/50 text-neon-cyan hover:bg-neon-cyan/10"
@@ -101,6 +104,7 @@ export function TurnActionsPanel({
   const [pickedType, setPickedType] = useState(null);
   const [pickedAction, setPickedAction] = useState(null);
   const [targetId, setTargetId] = useState("");
+  const [readyDetail, setReadyDetail] = useState("");
   const [busy, setBusy] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
   const [lastOutcome, setLastOutcome] = useState("");
@@ -132,6 +136,7 @@ export function TurnActionsPanel({
     setPickedType(null);
     setPickedAction(null);
     setTargetId("");
+    setReadyDetail("");
   }, [actorCombatant?.id, canTakeTurn]);
 
   const resetFlow = () => {
@@ -139,6 +144,7 @@ export function TurnActionsPanel({
     setPickedType(null);
     setPickedAction(null);
     setTargetId("");
+    setReadyDetail("");
   };
 
   const freeActionFeatures = (available[ACTION_TYPES.action] || []).some(
@@ -156,6 +162,7 @@ export function TurnActionsPanel({
     }
     if (type === ACTION_TYPES.bonus_action) return !economy.bonus_action_used;
     if (type === ACTION_TYPES.reaction) return !economy.reaction_used;
+    if (type === ACTION_TYPES.magic_action) return !economy.magic_action_used;
     return false;
   };
 
@@ -191,7 +198,7 @@ export function TurnActionsPanel({
     onError?.("");
     setLastOutcome("");
     try {
-      const rawDetail = action.detail || null;
+      const rawDetail = action.readyDetail ?? action.detail ?? null;
       const body = {
         action_id: action.id,
         action_name: cleanActionName(action.name),
@@ -242,6 +249,11 @@ export function TurnActionsPanel({
       return;
     }
     setPickedAction(action);
+    if (actionNeedsReadyDetail(action)) {
+      setReadyDetail("");
+      setStep("pick_detail");
+      return;
+    }
     if (actionHasOptions(action)) {
       setStep("pick_option");
       return;
@@ -320,7 +332,7 @@ export function TurnActionsPanel({
   if (!showTurnPanel && !showReaction) {
     if (incapacitated && canTakeTurn) {
       return (
-        <p className="text-[9px] font-mono text-danger">
+        <p className="text-xs sm:text-sm font-mono text-danger">
           Incapacitated — {actorCombatant.name} cannot take actions, bonus actions, or reactions.
         </p>
       );
@@ -328,7 +340,7 @@ export function TurnActionsPanel({
     if (!canTakeTurn && activeTurnName) {
       return (
         <div className="rounded-sm border border-border/60 bg-void-deep/30 px-2 py-1.5">
-          <p className="text-[9px] font-mono text-ink-faint">
+          <p className="text-xs sm:text-sm font-mono text-ink-faint">
             Waiting — <span className="font-black text-starlight">{activeTurnName}</span>
             {"'s turn"}
           </p>
@@ -340,7 +352,7 @@ export function TurnActionsPanel({
 
   if (actionSheetLoading) {
     return (
-      <p className="text-[9px] font-mono text-ink-faint">Loading actions for {actorCombatant.name}…</p>
+      <p className="text-xs sm:text-sm font-mono text-ink-faint">Loading actions for {actorCombatant.name}…</p>
     );
   }
 
@@ -359,10 +371,17 @@ export function TurnActionsPanel({
     return list;
   })();
   const pickerGroups = groupActionsForPicker(pickerActions);
+  const resourceSummary = formatCombatResources(catalogSheet);
+
+  const handleConfirmReadyDetail = () => {
+    if (!pickedAction) return;
+    const detail = readyDetail.trim() || "an action";
+    void submitAction({ ...pickedAction, readyDetail: detail }, []);
+  };
 
   return (
-    <div className="space-y-2 rounded-sm border border-neon-cyan/40 bg-neon-cyan/5 p-2">
-      <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">
+    <div className="session-ui space-y-2 rounded-sm border border-neon-cyan/40 bg-neon-cyan/5 p-2.5 sm:space-y-3 sm:p-3">
+      <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">
         {isDmProxy ? (
           <>
             DM acting as <span className="text-starlight">{actorCombatant.name}</span>
@@ -375,12 +394,12 @@ export function TurnActionsPanel({
       </p>
 
       {lastOutcome && step === "pick_type" && (
-        <p className="rounded-sm border border-neon-cyan/30 bg-neon-cyan/10 px-2 py-1 text-[9px] font-mono text-neon-cyan">
+        <p className="rounded-sm border border-neon-cyan/30 bg-neon-cyan/10 px-2 py-1 text-xs sm:text-sm font-mono text-neon-cyan">
           {lastOutcome}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-1.5 text-[8px] font-black uppercase">
+      <div className="flex flex-wrap gap-1.5 text-[11px] sm:text-xs font-black uppercase">
         <span
           className={
             economy.action_used && !economy.extra_action_available
@@ -402,6 +421,15 @@ export function TurnActionsPanel({
         <span className={economy.reaction_used ? "text-ink-faint line-through" : "text-starlight"}>
           Reaction {economy.reaction_used ? "✓" : "○"}
         </span>
+        {(available[ACTION_TYPES.magic_action] || []).length > 0 && (
+          <span
+            className={
+              economy.magic_action_used ? "text-ink-faint line-through" : "text-starlight"
+            }
+          >
+            Magic {economy.magic_action_used ? "✓" : "○"}
+          </span>
+        )}
         <span className="text-neon-cyan">Move {movementLabel}</span>
       </div>
 
@@ -410,7 +438,7 @@ export function TurnActionsPanel({
           {turnStatuses.map((label) => (
             <span
               key={label}
-              className="rounded-sm border border-neon-magenta/40 bg-neon-magenta/10 px-1.5 py-0.5 text-[8px] font-black uppercase text-neon-magenta"
+              className="rounded-sm border border-neon-magenta/40 bg-neon-magenta/10 px-1.5 py-0.5 text-[11px] sm:text-xs font-black uppercase text-neon-magenta"
             >
               {label}
             </span>
@@ -418,9 +446,16 @@ export function TurnActionsPanel({
         </div>
       )}
 
+      {resourceSummary && (
+        <p className="text-[11px] sm:text-xs font-mono text-neon-cyan">
+          <span className="font-black uppercase text-ink-faint">Uses </span>
+          {resourceSummary}
+        </p>
+      )}
+
       {canAdjustMovement && (
         <div className="space-y-1 rounded-sm border border-border/50 bg-void-deep/30 px-2 py-1.5">
-          <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">
+          <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">
             Spend movement
           </p>
           <MovementStepButtons disabled={movementBusy || busy} onAdjust={adjustMovement} />
@@ -430,16 +465,19 @@ export function TurnActionsPanel({
       {step === "pick_type" && (
         <div className="flex flex-wrap gap-1">
           {showTurnPanel &&
-            [ACTION_TYPES.action, ACTION_TYPES.bonus_action].map((type) => {
+            [ACTION_TYPES.action, ACTION_TYPES.bonus_action, ACTION_TYPES.magic_action].map((type) => {
               const actions = available[type] || [];
-              const enabled = typeAvailable(type) && (type === ACTION_TYPES.action || actions.length > 0);
+              const enabled =
+                typeAvailable(type) &&
+                actions.length > 0 &&
+                (type === ACTION_TYPES.action || type === ACTION_TYPES.bonus_action || type === ACTION_TYPES.magic_action);
               return (
                 <button
                   key={type}
                   type="button"
                   disabled={!enabled || busy}
                   onClick={() => handlePickType(type)}
-                  className="rounded-sm border border-starlight px-2 py-1 text-[9px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
+                  className="rounded-sm border border-starlight px-2 py-1 text-xs sm:text-sm font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
                 >
                   {TYPE_LABELS[type]}
                   {actions.length > 0 ? ` (${actions.length})` : ""}
@@ -451,7 +489,7 @@ export function TurnActionsPanel({
               type="button"
               disabled={busy || (available[ACTION_TYPES.reaction] || []).length === 0}
               onClick={() => handlePickType(ACTION_TYPES.reaction)}
-              className="rounded-sm border border-neon-magenta px-2 py-1 text-[9px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+              className="rounded-sm border border-neon-magenta px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
             >
               Reaction
             </button>
@@ -461,18 +499,18 @@ export function TurnActionsPanel({
 
       {step === "pick_action" && pickedType && (
         <div className="space-y-1">
-          <p className="text-[8px] font-mono uppercase text-ink-faint">
+          <p className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">
             Choose {TYPE_LABELS[pickedType]}
           </p>
           <div className="max-h-40 space-y-2 overflow-y-auto">
             {pickerGroups.length === 0 ? (
-              <p className="text-[9px] font-mono text-ink-faint">
+              <p className="text-xs sm:text-sm font-mono text-ink-faint">
                 No {TYPE_LABELS[pickedType].toLowerCase()}s available for {actorCombatant.name}.
               </p>
             ) : (
               pickerGroups.map((group) => (
                 <div key={group.category} className="space-y-1">
-                  <p className="text-[8px] font-black uppercase tracking-wider text-ink-faint">
+                  <p className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-ink-faint">
                     {group.label}
                   </p>
                   {group.actions.map((action) => {
@@ -486,20 +524,20 @@ export function TurnActionsPanel({
                         onClick={() => handlePickAction(action)}
                         className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
                       >
-                        <span className="text-[9px] font-black uppercase text-starlight">
+                        <span className="text-xs sm:text-sm font-black uppercase text-starlight">
                           {action.name}
                         </span>
-                        <span className="text-[8px] font-mono text-ink-faint">
+                        <span className="text-[11px] sm:text-xs font-mono text-ink-faint">
                           {targetLabel(action.targeting)}
                           {costLabel ? ` · ${costLabel}` : ""}
                         </span>
                         {(action.detail || action.description) && (
-                          <span className="text-[8px] font-mono text-ink-muted line-clamp-2">
+                          <span className="text-[11px] sm:text-xs font-mono text-ink-muted line-clamp-2">
                             {action.detail || action.description}
                           </span>
                         )}
                         {!affordable && costLabel && (
-                          <span className="text-[8px] font-mono text-danger">Insufficient {costLabel}</span>
+                          <span className="text-[11px] sm:text-xs font-mono text-danger">Insufficient {costLabel}</span>
                         )}
                       </button>
                     );
@@ -511,7 +549,7 @@ export function TurnActionsPanel({
           <button
             type="button"
             onClick={resetFlow}
-            className="text-[8px] font-black uppercase text-ink-faint hover:text-starlight"
+            className="text-[11px] sm:text-xs font-black uppercase text-ink-faint hover:text-starlight"
           >
             Back
           </button>
@@ -520,7 +558,7 @@ export function TurnActionsPanel({
 
       {step === "pick_option" && pickedAction && (
         <div className="space-y-1">
-          <p className="text-[8px] font-mono uppercase text-ink-faint">
+          <p className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">
             {pickedAction.name} — choose form
           </p>
           <div className="max-h-40 space-y-1 overflow-y-auto">
@@ -532,9 +570,9 @@ export function TurnActionsPanel({
                 onClick={() => handlePickOption(option)}
                 className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
               >
-                <span className="text-[9px] font-black uppercase text-starlight">{option.name}</span>
+                <span className="text-xs sm:text-sm font-black uppercase text-starlight">{option.name}</span>
                 {(option.notes || option.cr) && (
-                  <span className="text-[8px] font-mono text-ink-faint line-clamp-2">
+                  <span className="text-[11px] sm:text-xs font-mono text-ink-faint line-clamp-2">
                     {[option.cr ? `CR ${option.cr}` : null, option.notes].filter(Boolean).join(" · ")}
                   </span>
                 )}
@@ -547,23 +585,56 @@ export function TurnActionsPanel({
               setStep("pick_action");
               setPickedAction(null);
             }}
-            className="text-[8px] font-black uppercase text-ink-faint hover:text-starlight"
+            className="text-[11px] sm:text-xs font-black uppercase text-ink-faint hover:text-starlight"
           >
             Back
           </button>
         </div>
       )}
 
+      {step === "pick_detail" && pickedAction && (
+        <div className="space-y-1">
+          <p className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">
+            What are you readying?
+          </p>
+          <input
+            type="text"
+            value={readyDetail}
+            disabled={busy}
+            onChange={(e) => setReadyDetail(e.target.value)}
+            placeholder="e.g. Fire Bolt when the goblin moves"
+            className="w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-starlight"
+          />
+          <div className="flex gap-1">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleConfirmReadyDetail}
+              className="flex-1 rounded-sm border border-neon-cyan px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+            >
+              Ready
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep("pick_action")}
+              className="rounded-sm border border-border px-2 py-1 text-xs sm:text-sm font-black uppercase text-ink-faint"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+
       {step === "pick_target" && pickedAction && (
         <div className="space-y-1">
-          <p className="text-[8px] font-mono text-ink-muted">
+          <p className="text-[11px] sm:text-xs font-mono text-ink-muted">
             <span className="font-black text-starlight">{pickedAction.name}</span>
             {" — "}
             {targetLabel(pickedAction.targeting)}
           </p>
           <div className="max-h-28 space-y-1 overflow-y-auto">
             {targetCandidates.length === 0 ? (
-              <p className="text-[9px] font-mono text-danger">
+              <p className="text-xs sm:text-sm font-mono text-danger">
                 No valid targets ({targetLabel(pickedAction.targeting)}).
               </p>
             ) : (
@@ -573,7 +644,7 @@ export function TurnActionsPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => setTargetId(combatant.id)}
-                  className={`w-full rounded-sm border px-2 py-1 text-left text-[9px] font-black uppercase ${
+                  className={`w-full rounded-sm border px-2 py-1 text-left text-xs sm:text-sm font-black uppercase ${
                     targetId === combatant.id
                       ? "border-starlight bg-starlight/10 text-starlight"
                       : "border-border/60 text-ink hover:border-neon-cyan/40"
@@ -589,14 +660,14 @@ export function TurnActionsPanel({
               type="button"
               disabled={!targetId || busy}
               onClick={handleConfirmTarget}
-              className="flex-1 rounded-sm border border-neon-cyan px-2 py-1 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+              className="flex-1 rounded-sm border border-neon-cyan px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
             >
               Confirm
             </button>
             <button
               type="button"
               onClick={() => setStep("pick_action")}
-              className="rounded-sm border border-border px-2 py-1 text-[9px] font-black uppercase text-ink-faint"
+              className="rounded-sm border border-border px-2 py-1 text-xs sm:text-sm font-black uppercase text-ink-faint"
             >
               Back
             </button>
@@ -607,18 +678,36 @@ export function TurnActionsPanel({
   );
 }
 
+function formatLogEntry(entry) {
+  if (entry.kind === "roll" && entry.dice && entry.result != null) {
+    const bonus = entry.bonus ? ` ${entry.bonus > 0 ? "+" : ""}${entry.bonus}` : "";
+    const total =
+      entry.total != null && entry.total !== entry.result ? ` = ${entry.total}` : "";
+    return `${entry.dice}: ${entry.result}${bonus}${total} — ${entry.message}`;
+  }
+  return entry.message;
+}
+
 export function EncounterCombatLog({ log, limit = 8 }) {
   const entries = (log || []).slice(-limit).reverse();
   if (!entries.length) return null;
 
   return (
     <div className="shrink-0 space-y-1 rounded-sm border border-border/60 bg-void-deep/40 p-2">
-      <p className="text-[8px] font-black uppercase tracking-widest text-ink-faint">Combat log</p>
+      <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">Combat log</p>
       <ul className="max-h-24 space-y-0.5 overflow-y-auto">
         {entries.map((entry, index) => (
-          <li key={`${entry.at}-${index}`} className="text-[9px] font-mono text-ink-muted">
-            <span className={entry.kind === "action" || entry.kind === "hp" ? "text-neon-cyan" : "text-ink-faint"}>
-              {entry.message}
+          <li key={`${entry.at}-${index}`} className="text-xs sm:text-sm font-mono text-ink-muted">
+            <span
+              className={
+                entry.kind === "roll"
+                  ? "text-neon-magenta"
+                  : entry.kind === "action" || entry.kind === "hp"
+                    ? "text-neon-cyan"
+                    : "text-ink-faint"
+              }
+            >
+              {formatLogEntry(entry)}
             </span>
           </li>
         ))}

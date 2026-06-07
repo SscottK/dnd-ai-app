@@ -37,7 +37,7 @@ function PaneTabs({ tabs, active, onChange }) {
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
-          className={`px-2 py-1 text-[9px] font-black uppercase tracking-wider ${
+          className={`px-3 py-2 text-xs font-black uppercase tracking-wider sm:text-sm ${
             active === tab.id
               ? "border-b-2 border-neon-cyan text-starlight"
               : "text-ink-faint hover:text-ink-muted"
@@ -88,7 +88,7 @@ function GeneratorPanel({ title, fields, buildPrompt, token }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <form onSubmit={handleGenerate} className="shrink-0 space-y-2">
-        <p className="text-[9px] font-black uppercase tracking-widest text-ink-faint">{title}</p>
+        <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-ink-faint">{title}</p>
         {fields.map((field) => (
           <label key={field.key} className="block">
             <span className="text-[8px] font-mono uppercase text-ink-faint">{field.label}</span>
@@ -96,7 +96,7 @@ function GeneratorPanel({ title, fields, buildPrompt, token }) {
               <select
                 value={form[field.key]}
                 onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+                className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
               >
                 {field.options.map((opt) => (
                   <option key={opt} value={opt}>
@@ -110,7 +110,7 @@ function GeneratorPanel({ title, fields, buildPrompt, token }) {
                 onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
                 rows={field.rows || 2}
                 placeholder={field.placeholder}
-                className="mt-0.5 w-full resize-none rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+                className="mt-0.5 w-full resize-none rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
               />
             ) : (
               <input
@@ -118,7 +118,7 @@ function GeneratorPanel({ title, fields, buildPrompt, token }) {
                 value={form[field.key]}
                 onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
                 placeholder={field.placeholder}
-                className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+                className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
               />
             )}
           </label>
@@ -126,27 +126,27 @@ function GeneratorPanel({ title, fields, buildPrompt, token }) {
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-1 rounded-sm border border-neon-magenta px-2 py-1.5 text-[10px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-1 rounded-sm border border-neon-magenta px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
         >
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
           Generate
         </button>
       </form>
-      {error && <p className="shrink-0 text-[9px] font-mono text-danger">{error}</p>}
+      {error && <p className="shrink-0 text-xs sm:text-sm font-mono text-danger">{error}</p>}
       <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/40 p-2">
         {result ? (
-          <div className="text-[10px] text-ink-muted [&_p]:mb-2">
+          <div className="text-xs sm:text-sm text-ink-muted [&_p]:mb-2">
             <MarkdownRenderer content={result} />
           </div>
         ) : (
-          <p className="text-[9px] font-mono text-ink-faint">Output appears here — copy into your notes or tracker.</p>
+          <p className="text-xs sm:text-sm font-mono text-ink-faint">Output appears here — copy into your notes or tracker.</p>
         )}
       </div>
       {result && (
         <button
           type="button"
           onClick={handleCopy}
-          className="shrink-0 flex items-center justify-center gap-1 rounded-sm border border-border px-2 py-1 text-[9px] font-black uppercase text-ink-muted hover:text-starlight"
+          className="shrink-0 flex items-center justify-center gap-1 rounded-sm border border-border px-2 py-1 text-xs sm:text-sm font-black uppercase text-ink-muted hover:text-starlight"
         >
           <Copy className="h-3 w-3" />
           {copied ? "Copied" : "Copy"}
@@ -242,13 +242,13 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
   };
 
   if (booting) {
-    return <p className="text-[10px] font-mono text-ink-faint">Starting rules assistant...</p>;
+    return <p className="text-xs sm:text-sm font-mono text-ink-faint">Starting rules assistant...</p>;
   }
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="flex shrink-0 items-center justify-between gap-2">
-        <div className="flex items-center gap-1 text-[9px] font-black uppercase text-ink-faint">
+        <div className="flex items-center gap-1 text-xs sm:text-sm font-black uppercase text-ink-faint">
           <MessageSquare className="h-3 w-3 text-neon-cyan" />
           5e Rules
         </div>
@@ -262,14 +262,14 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/40 p-2">
         {messages.length === 0 && !streamedReply && (
-          <p className="text-[9px] font-mono text-ink-faint">
+          <p className="text-xs sm:text-sm font-mono text-ink-faint">
             Ask rules questions, encounter balance, or spell clarifications.
           </p>
         )}
         {messages.map((msg, index) => (
           <div
             key={`${msg.role}-${index}`}
-            className={`rounded-sm px-2 py-1 text-[10px] ${
+            className={`rounded-sm px-2 py-1 text-xs sm:text-sm ${
               msg.role === "user"
                 ? "ml-4 border border-neon-cyan/30 bg-neon-cyan/5 text-ink"
                 : "mr-2 border border-border text-ink-muted"
@@ -279,7 +279,7 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
           </div>
         ))}
         {streamedReply && (
-          <div className="mr-2 rounded-sm border border-border px-2 py-1 text-[10px] text-ink-muted">
+          <div className="mr-2 rounded-sm border border-border px-2 py-1 text-xs sm:text-sm text-ink-muted">
             <MarkdownRenderer content={streamedReply} />
           </div>
         )}
@@ -289,7 +289,7 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask the rules..."
-          className="min-w-0 flex-1 rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+          className="min-w-0 flex-1 rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
         />
         <button
           type="submit"
@@ -366,14 +366,14 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <form onSubmit={handleGenerate} className="shrink-0 space-y-2">
-        <p className="text-[9px] font-black uppercase tracking-widest text-ink-faint">Encounter generator</p>
+        <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-ink-faint">Encounter generator</p>
         <label className="block">
           <span className="text-[8px] font-mono uppercase text-ink-faint">Party level</span>
           <input
             type="number"
             value={form.partyLevel}
             onChange={(e) => setForm((prev) => ({ ...prev, partyLevel: e.target.value }))}
-            className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+            className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
           />
         </label>
         <label className="block">
@@ -381,7 +381,7 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
           <select
             value={form.difficulty}
             onChange={(e) => setForm((prev) => ({ ...prev, difficulty: e.target.value }))}
-            className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+            className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
           >
             {["Easy", "Medium", "Hard", "Deadly"].map((opt) => (
               <option key={opt} value={opt}>
@@ -397,31 +397,31 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
             onChange={(e) => setForm((prev) => ({ ...prev, setting: e.target.value }))}
             rows={2}
             placeholder="e.g. flooded mine, ambush at the bridge"
-            className="mt-0.5 w-full resize-none rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+            className="mt-0.5 w-full resize-none rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
           />
         </label>
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-1 rounded-sm border border-neon-magenta px-2 py-1.5 text-[10px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-1 rounded-sm border border-neon-magenta px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
         >
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
           Generate
         </button>
       </form>
-      {error && <p className="shrink-0 text-[9px] font-mono text-danger">{error}</p>}
+      {error && <p className="shrink-0 text-xs sm:text-sm font-mono text-danger">{error}</p>}
       <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/40 p-2">
         {summary ? (
-          <p className="mb-2 text-[10px] font-mono text-ink-muted">{summary}</p>
+          <p className="mb-2 text-xs sm:text-sm font-mono text-ink-muted">{summary}</p>
         ) : (
-          <p className="text-[9px] font-mono text-ink-faint">Generated enemies appear here with stats.</p>
+          <p className="text-xs sm:text-sm font-mono text-ink-faint">Generated enemies appear here with stats.</p>
         )}
         {enemies.length > 0 && (
           <ul className="space-y-1">
             {enemies.map((enemy, index) => (
               <li
                 key={`${enemy.name}-${index}`}
-                className="rounded-sm border border-border/60 px-2 py-1 text-[9px] font-mono text-ink"
+                className="rounded-sm border border-border/60 px-2 py-1 text-xs sm:text-sm font-mono text-ink"
               >
                 <span className="font-black text-starlight">
                   {enemy.name}
@@ -441,7 +441,7 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
           type="button"
           disabled={adding}
           onClick={handleAddToTracker}
-          className="shrink-0 rounded-sm border border-starlight bg-starlight/10 px-2 py-1.5 text-[10px] font-black uppercase text-starlight hover:bg-starlight/20 disabled:opacity-40"
+          className="shrink-0 rounded-sm border border-starlight bg-starlight/10 px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-starlight hover:bg-starlight/20 disabled:opacity-40"
         >
           {adding ? "Adding..." : added ? "Added to tracker" : "Add enemies to tracker"}
         </button>

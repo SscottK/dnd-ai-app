@@ -2,6 +2,64 @@ import { normalizeNotesText } from "./notesFormat";
 
 export const DEFAULT_ZOOM = 1;
 export const MIN_PANE_HEIGHT = 32;
+export const MIN_PANE_WIDTH = 260;
+export const SESSION_MOBILE_MAX_WIDTH = 767;
+
+/** DM panes surface first on narrow stacked layout. */
+export const DM_MOBILE_STACK_ORDER = [
+  "initiative",
+  "party",
+  "dm_generators",
+  "dm_notes",
+  "dm_rules_chat",
+  "dm_toolbox",
+  "vtt_zone",
+];
+
+export const PLAYER_MOBILE_STACK_ORDER = [
+  "initiative",
+  "combat",
+  "character_tabs",
+  "party",
+  "player_notes",
+  "vtt_zone",
+  "abilities",
+  "skills_saves",
+  "character_portrait",
+];
+
+const MOBILE_PANE_MIN_HEIGHTS = {
+  initiative: 420,
+  party: 180,
+  dm_generators: 300,
+  dm_notes: 280,
+  dm_rules_chat: 320,
+  dm_toolbox: 200,
+  vtt_zone: 240,
+  combat: 220,
+  character_tabs: 360,
+  player_notes: 260,
+  abilities: 200,
+  skills_saves: 240,
+  character_portrait: 200,
+};
+
+export function mobilePaneMinHeight(type) {
+  return MOBILE_PANE_MIN_HEIGHTS[type] || 220;
+}
+
+export function sortWidgetsForMobileStack(widgets, { isDm = false } = {}) {
+  const order = isDm ? DM_MOBILE_STACK_ORDER : PLAYER_MOBILE_STACK_ORDER;
+  const rank = (type) => {
+    const index = order.indexOf(type);
+    return index === -1 ? 100 + (type || "").charCodeAt(0) : index;
+  };
+  return [...(widgets || [])].sort((left, right) => rank(left.type) - rank(right.type));
+}
+
+function dmSideColumnWidth(canvasW) {
+  return Math.min(440, Math.max(MIN_PANE_WIDTH, Math.round(canvasW * 0.3)));
+}
 
 export const INITIATIVE_ORIENTATION_VERTICAL = "vertical";
 export const INITIATIVE_ORIENTATION_HORIZONTAL = "horizontal";
@@ -271,7 +329,7 @@ export function clampWidget(widget, canvasW, canvasH) {
   if (!canvasW || !canvasH) return widget;
 
   const height = widget.minimized ? MIN_PANE_HEIGHT : Math.min(Math.max(120, widget.h), canvasH);
-  const width = Math.min(Math.max(180, widget.w), canvasW);
+  const width = Math.min(Math.max(MIN_PANE_WIDTH, widget.w), canvasW);
   const maxX = Math.max(0, canvasW - width);
   const maxY = Math.max(0, canvasH - height);
 
@@ -350,10 +408,12 @@ export function writeStoredDmLayout(campaignId, layout) {
 
 export function buildDmDefaultLayout(canvasW, canvasH) {
   const margin = 16;
-  const colW = 300;
+  const colW = dmSideColumnWidth(canvasW);
   const leftX = margin;
   const rightX = Math.max(margin, canvasW - margin - colW);
   const vtt = vttZoneDefault(canvasW, canvasH);
+  const initiativeH = Math.min(520, Math.max(380, Math.round(canvasH * 0.52)));
+  const partyH = Math.min(200, Math.max(150, Math.round(canvasH * 0.18)));
 
   return {
     widgets: ensureWidgetZIndices([
@@ -363,7 +423,7 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         x: leftX,
         y: margin,
         w: colW,
-        h: 240,
+        h: Math.min(300, Math.max(240, Math.round(canvasH * 0.28))),
         pinned: false,
         minimized: false,
       },
@@ -373,7 +433,7 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         x: leftX,
         y: 264,
         w: colW,
-        h: 280,
+        h: Math.min(340, Math.max(260, Math.round(canvasH * 0.32))),
         pinned: false,
         minimized: false,
         dmGeneratorsTab: "encounter",
@@ -384,7 +444,7 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         x: leftX,
         y: 560,
         w: colW,
-        h: Math.min(200, Math.max(140, canvasH - 576)),
+        h: Math.min(220, Math.max(160, Math.round(canvasH * 0.2))),
         pinned: false,
         minimized: false,
       },
@@ -404,7 +464,7 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         x: rightX,
         y: margin,
         w: colW,
-        h: 400,
+        h: initiativeH,
         pinned: false,
         minimized: false,
         initiativeOrientation: INITIATIVE_ORIENTATION_VERTICAL,
@@ -413,9 +473,9 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         id: "party-dm-1",
         type: "party",
         x: rightX,
-        y: 432,
+        y: margin + initiativeH + 12,
         w: colW,
-        h: 160,
+        h: partyH,
         pinned: false,
         minimized: false,
       },
@@ -423,9 +483,9 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         id: "dm-notes-1",
         type: "dm_notes",
         x: rightX,
-        y: 608,
+        y: margin + initiativeH + 12 + partyH + 12,
         w: colW,
-        h: Math.min(360, Math.max(200, canvasH - 624)),
+        h: Math.min(400, Math.max(240, canvasH - (margin + initiativeH + 200))),
         pinned: false,
         minimized: false,
         dmNotesTabs: defaultDmNotesTabs(),
@@ -819,22 +879,23 @@ export function parseLayout(layoutJson, canvasW = 1280, canvasH = 800) {
 }
 
 export function createWidget(type, canvasW, canvasH) {
+  const sideW = dmSideColumnWidth(canvasW);
   const defaults = {
-    combat: { w: 280, h: 240 },
-    abilities: { w: 300, h: 200 },
-    skills_saves: { w: 300, h: 380 },
-    character_tabs: { w: 300, h: 280 },
-    character_portrait: { w: 300, h: 200 },
-    player_notes: { w: 320, h: 360 },
+    combat: { w: sideW, h: 260 },
+    abilities: { w: sideW, h: 220 },
+    skills_saves: { w: sideW, h: 400 },
+    character_tabs: { w: sideW, h: 320 },
+    character_portrait: { w: sideW, h: 220 },
+    player_notes: { w: sideW, h: 380 },
     vtt_zone: vttZoneDefault(canvasW, canvasH),
-    initiative: { w: 300, h: 400 },
-    party: { w: 280, h: 220 },
-    dm_rules_chat: { w: 300, h: 240 },
-    dm_generators: { w: 300, h: 280 },
-    dm_toolbox: { w: 300, h: 180 },
-    dm_notes: { w: 320, h: 320 },
+    initiative: { w: sideW, h: Math.min(480, Math.max(380, Math.round(canvasH * 0.5))) },
+    party: { w: sideW, h: 200 },
+    dm_rules_chat: { w: sideW, h: 280 },
+    dm_generators: { w: sideW, h: 320 },
+    dm_toolbox: { w: sideW, h: 200 },
+    dm_notes: { w: sideW, h: 360 },
   };
-  const size = defaults[type] || { w: 280, h: 280 };
+  const size = defaults[type] || { w: sideW, h: 300 };
   const widget = {
     id: `${type}-${Date.now()}`,
     type,
