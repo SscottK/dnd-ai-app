@@ -450,15 +450,17 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
   );
 }
 
-export function DmNotesWidget({ tabs, activeTabId, onChange }) {
+export function DmNotesWidget({ tabs, closedTabs, activeTabId, onChange }) {
   return (
     <NotesPaneWidget
       tabs={tabs}
+      closedTabs={closedTabs}
       activeTabId={activeTabId}
       onChange={onChange}
       tabsKey="dmNotesTabs"
+      closedTabsKey="closedNotesTabs"
       activeKey="activeNotesTabId"
-      hint="Double-click a tab name to rename · saved with layout"
+      hint="Close tabs to archive · reopen from archive icon · auto-saved"
     />
   );
 }

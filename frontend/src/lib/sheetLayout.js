@@ -489,6 +489,7 @@ export function buildDmDefaultLayout(canvasW, canvasH) {
         pinned: false,
         minimized: false,
         dmNotesTabs: defaultDmNotesTabs(),
+        closedNotesTabs: [],
         activeNotesTabId: "notes-session",
       },
     ]),
@@ -566,6 +567,7 @@ export function buildDefaultLayout(canvasW, canvasH) {
         pinned: false,
         minimized: false,
         playerNotesTabs: defaultPlayerNotesTabs(),
+        closedNotesTabs: [],
         activeNotesTabId: "notes-session",
       },
       {
@@ -627,6 +629,15 @@ export function bringWidgetToFront(widgets, widgetId) {
   );
 }
 
+function normalizeNotesTabList(tabs, fallback) {
+  const source = Array.isArray(tabs) && tabs.length ? tabs : fallback();
+  return source.map((tab) => ({
+    id: tab.id || `notes-${Date.now()}`,
+    title: tab.title || "Notes",
+    content: tab.content || "",
+  }));
+}
+
 function normalizeWidget(widget) {
   const normalized = {
     ...widget,
@@ -645,32 +656,22 @@ function normalizeWidget(widget) {
     normalized.dmGeneratorsTab = widget.dmGeneratorsTab === "npc" ? "npc" : "encounter";
   }
   if (widget.type === "dm_notes") {
-    const tabs =
-      Array.isArray(widget.dmNotesTabs) && widget.dmNotesTabs.length
-        ? widget.dmNotesTabs.map((tab) => ({
-            id: tab.id || `notes-${Date.now()}`,
-            title: tab.title || "Notes",
-            content: tab.content || "",
-          }))
-        : defaultDmNotesTabs();
+    const tabs = normalizeNotesTabList(widget.dmNotesTabs, defaultDmNotesTabs);
     normalized.dmNotesTabs = tabs;
-    normalized.activeNotesTabId = tabs.some((tab) => tab.id === widget.activeNotesTabId)
-      ? widget.activeNotesTabId
-      : tabs[0].id;
+    normalized.closedNotesTabs = normalizeNotesTabList(widget.closedNotesTabs, () => []);
+    normalized.activeNotesTabId =
+      tabs.length && tabs.some((tab) => tab.id === widget.activeNotesTabId)
+        ? widget.activeNotesTabId
+        : tabs[0]?.id ?? null;
   }
   if (widget.type === "player_notes") {
-    const tabs =
-      Array.isArray(widget.playerNotesTabs) && widget.playerNotesTabs.length
-        ? widget.playerNotesTabs.map((tab) => ({
-            id: tab.id || `notes-${Date.now()}`,
-            title: tab.title || "Notes",
-            content: tab.content || "",
-          }))
-        : defaultPlayerNotesTabs();
+    const tabs = normalizeNotesTabList(widget.playerNotesTabs, defaultPlayerNotesTabs);
     normalized.playerNotesTabs = tabs;
-    normalized.activeNotesTabId = tabs.some((tab) => tab.id === widget.activeNotesTabId)
-      ? widget.activeNotesTabId
-      : tabs[0].id;
+    normalized.closedNotesTabs = normalizeNotesTabList(widget.closedNotesTabs, () => []);
+    normalized.activeNotesTabId =
+      tabs.length && tabs.some((tab) => tab.id === widget.activeNotesTabId)
+        ? widget.activeNotesTabId
+        : tabs[0]?.id ?? null;
   }
   return normalized;
 }
@@ -716,13 +717,21 @@ function ensurePlayerNotesWidget(widgets, canvasW, canvasH) {
       pinned: false,
       minimized: false,
       playerNotesTabs: defaultPlayerNotesTabs(),
+      closedNotesTabs: [],
       activeNotesTabId: "notes-session",
     },
   ];
 }
 
 /** Keep player-written notes on re-sync; optionally fill Character tab from PDF notes. */
-export function mergePlayerNotesOnResync(layout, preservedTabs, pdfNotes, canvasW, canvasH) {
+export function mergePlayerNotesOnResync(
+  layout,
+  preservedTabs,
+  pdfNotes,
+  canvasW,
+  canvasH,
+  preservedClosedTabs = []
+) {
   const trimmedPdfNotes = normalizeNotesText(pdfNotes);
   let widgets = ensurePlayerNotesWidget(layout.widgets || [], canvasW, canvasH);
   const notesWidget = widgets.find((widget) => widget.type === "player_notes");
@@ -731,7 +740,11 @@ export function mergePlayerNotesOnResync(layout, preservedTabs, pdfNotes, canvas
   const incomingTabs = notesWidget.playerNotesTabs?.length
     ? notesWidget.playerNotesTabs
     : defaultPlayerNotesTabs();
+  const incomingClosed = notesWidget.closedNotesTabs || [];
   const preservedById = Object.fromEntries((preservedTabs || []).map((tab) => [tab.id, tab]));
+  const preservedClosedById = Object.fromEntries(
+    (preservedClosedTabs || []).map((tab) => [tab.id, tab])
+  );
 
   const nextTabs = incomingTabs.map((tab) => {
     const preserved = preservedById[tab.id];
@@ -750,9 +763,20 @@ export function mergePlayerNotesOnResync(layout, preservedTabs, pdfNotes, canvas
     }
   }
 
-  const changed = JSON.stringify(nextTabs) !== JSON.stringify(incomingTabs);
+  const nextClosed = incomingClosed.map((tab) => preservedClosedById[tab.id] || tab);
+  for (const preserved of preservedClosedTabs || []) {
+    if (!nextClosed.some((tab) => tab.id === preserved.id)) {
+      nextClosed.push(preserved);
+    }
+  }
+
+  const changed =
+    JSON.stringify(nextTabs) !== JSON.stringify(incomingTabs) ||
+    JSON.stringify(nextClosed) !== JSON.stringify(incomingClosed);
   const nextWidgets = widgets.map((widget) =>
-    widget.id === notesWidget.id ? { ...widget, playerNotesTabs: nextTabs } : widget
+    widget.id === notesWidget.id
+      ? { ...widget, playerNotesTabs: nextTabs, closedNotesTabs: nextClosed }
+      : widget
   );
 
   return {
@@ -909,10 +933,18 @@ export function createWidget(type, canvasW, canvasH) {
     ...(type === "initiative" ? { initiativeOrientation: INITIATIVE_ORIENTATION_VERTICAL } : {}),
     ...(type === "dm_generators" ? { dmGeneratorsTab: "encounter" } : {}),
     ...(type === "dm_notes"
-      ? { dmNotesTabs: defaultDmNotesTabs(), activeNotesTabId: "notes-session" }
+      ? {
+          dmNotesTabs: defaultDmNotesTabs(),
+          closedNotesTabs: [],
+          activeNotesTabId: "notes-session",
+        }
       : {}),
     ...(type === "player_notes"
-      ? { playerNotesTabs: defaultPlayerNotesTabs(), activeNotesTabId: "notes-session" }
+      ? {
+          playerNotesTabs: defaultPlayerNotesTabs(),
+          closedNotesTabs: [],
+          activeNotesTabId: "notes-session",
+        }
       : {}),
   };
   return clampWidget(widget, canvasW, canvasH);

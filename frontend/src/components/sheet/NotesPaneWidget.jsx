@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { ArchiveRestore, Plus, X } from "lucide-react";
 import { normalizeNotesText, parseNotesToBlocks } from "../../lib/notesFormat";
 
 export function NotesFormattedBody({ content }) {
@@ -56,29 +56,54 @@ export function NotesFormattedBody({ content }) {
 
 export function NotesPaneWidget({
   tabs,
+  closedTabs = [],
   activeTabId,
   onChange,
   tabsKey,
+  closedTabsKey = "closedNotesTabs",
   activeKey,
   hint = "Double-click a tab name to rename",
   formattedPreview = false,
 }) {
   const [localTabs, setLocalTabs] = useState(tabs);
+  const [localClosedTabs, setLocalClosedTabs] = useState(closedTabs);
   const [editingTabId, setEditingTabId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editingContent, setEditingContent] = useState(false);
+  const [closedMenuOpen, setClosedMenuOpen] = useState(false);
   const saveTimer = useRef(null);
+  const flushRef = useRef(null);
+  const closedMenuRef = useRef(null);
 
   useEffect(() => {
     setLocalTabs(tabs);
   }, [tabs]);
 
+  useEffect(() => {
+    setLocalClosedTabs(closedTabs);
+  }, [closedTabs]);
+
   const activeTab = localTabs.find((tab) => tab.id === activeTabId) || localTabs[0];
 
-  const persistTabs = (nextTabs, nextActiveId = activeTabId, immediate = false) => {
+  const persistAll = (
+    nextTabs,
+    nextClosedTabs,
+    nextActiveId = activeTabId,
+    immediate = false
+  ) => {
     setLocalTabs(nextTabs);
+    setLocalClosedTabs(nextClosedTabs);
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    const write = () => onChange({ [tabsKey]: nextTabs, [activeKey]: nextActiveId });
+
+    const write = () =>
+      onChange({
+        [tabsKey]: nextTabs,
+        [closedTabsKey]: nextClosedTabs,
+        [activeKey]: nextActiveId,
+      });
+
+    flushRef.current = write;
+
     if (immediate) {
       write();
       return;
@@ -88,25 +113,57 @@ export function NotesPaneWidget({
 
   useEffect(
     () => () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        flushRef.current?.();
+      }
     },
     []
   );
 
+  useEffect(() => {
+    if (!closedMenuOpen) return undefined;
+    const handlePointer = (event) => {
+      if (closedMenuRef.current && !closedMenuRef.current.contains(event.target)) {
+        setClosedMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointer);
+    return () => document.removeEventListener("mousedown", handlePointer);
+  }, [closedMenuOpen]);
+
   const addTab = () => {
     const id = `notes-${Date.now()}`;
     const nextTabs = [...localTabs, { id, title: "New tab", content: "" }];
-    persistTabs(nextTabs, id, true);
+    persistAll(nextTabs, localClosedTabs, id, true);
     setEditingTabId(id);
     setEditTitle("New tab");
     setEditingContent(true);
+    setClosedMenuOpen(false);
   };
 
-  const removeTab = (id) => {
-    if (localTabs.length <= 1) return;
+  const closeTab = (id) => {
+    const closing = localTabs.find((tab) => tab.id === id);
+    if (!closing) return;
+
     const nextTabs = localTabs.filter((tab) => tab.id !== id);
-    const nextActive = activeTabId === id ? nextTabs[0].id : activeTabId;
-    persistTabs(nextTabs, nextActive, true);
+    const nextClosed = [...localClosedTabs, closing];
+    const nextActive =
+      activeTabId === id ? nextTabs[0]?.id ?? null : activeTabId;
+
+    persistAll(nextTabs, nextClosed, nextActive, true);
+    if (activeTabId === id) setEditingContent(false);
+  };
+
+  const reopenTab = (id) => {
+    const restoring = localClosedTabs.find((tab) => tab.id === id);
+    if (!restoring) return;
+
+    const nextClosed = localClosedTabs.filter((tab) => tab.id !== id);
+    const nextTabs = [...localTabs, restoring];
+    persistAll(nextTabs, nextClosed, id, true);
+    setClosedMenuOpen(false);
+    setEditingContent(false);
   };
 
   const startRename = (tab) => {
@@ -116,8 +173,9 @@ export function NotesPaneWidget({
 
   const commitRename = (id) => {
     const title = editTitle.trim() || "Notes";
-    persistTabs(
+    persistAll(
       localTabs.map((tab) => (tab.id === id ? { ...tab, title } : tab)),
+      localClosedTabs,
       activeTabId,
       true
     );
@@ -125,16 +183,20 @@ export function NotesPaneWidget({
   };
 
   const updateContent = (content) => {
-    persistTabs(
+    if (!activeTab) return;
+    persistAll(
       localTabs.map((tab) => (tab.id === activeTab.id ? { ...tab, content } : tab)),
+      localClosedTabs,
       activeTabId
     );
   };
 
   const formatActiveTab = () => {
-    const formatted = normalizeNotesText(activeTab?.content || "");
-    persistTabs(
+    if (!activeTab) return;
+    const formatted = normalizeNotesText(activeTab.content || "");
+    persistAll(
       localTabs.map((tab) => (tab.id === activeTab.id ? { ...tab, content: formatted } : tab)),
+      localClosedTabs,
       activeTabId,
       true
     );
@@ -163,7 +225,7 @@ export function NotesPaneWidget({
               <button
                 type="button"
                 onClick={() => {
-                  persistTabs(localTabs, tab.id, true);
+                  persistAll(localTabs, localClosedTabs, tab.id, true);
                   setEditingContent(false);
                 }}
                 onDoubleClick={() => startRename(tab)}
@@ -177,16 +239,14 @@ export function NotesPaneWidget({
                 {tab.title}
               </button>
             )}
-            {localTabs.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeTab(tab.id)}
-                className="px-0.5 text-ink-faint hover:text-danger"
-                title="Close tab"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => closeTab(tab.id)}
+              className="px-0.5 text-ink-faint hover:text-danger"
+              title="Close tab (saved — reopen from archive)"
+            >
+              <X className="h-3 w-3" />
+            </button>
           </div>
         ))}
         <button
@@ -197,25 +257,79 @@ export function NotesPaneWidget({
         >
           <Plus className="h-3 w-3" />
         </button>
+        {localClosedTabs.length > 0 && (
+          <div className="relative shrink-0" ref={closedMenuRef}>
+            <button
+              type="button"
+              onClick={() => setClosedMenuOpen((open) => !open)}
+              className="flex items-center gap-0.5 rounded-sm border border-border px-1.5 py-1 text-[9px] font-black uppercase text-ink-muted hover:border-neon-cyan/50 hover:text-neon-cyan"
+              title="Reopen closed notes"
+            >
+              <ArchiveRestore className="h-3 w-3" />
+              <span>{localClosedTabs.length}</span>
+            </button>
+            {closedMenuOpen && (
+              <div className="absolute right-0 top-full z-50 mt-1 min-w-[140px] rounded-sm border border-border bg-void-panel py-1 shadow-lg">
+                <p className="px-2 py-1 text-[8px] font-black uppercase tracking-wide text-ink-faint">
+                  Closed notes
+                </p>
+                {localClosedTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => reopenTab(tab.id)}
+                    className="block w-full truncate px-2 py-1.5 text-left text-[10px] font-mono text-ink-muted hover:bg-neon-cyan/10 hover:text-starlight"
+                    title={tab.title}
+                  >
+                    {tab.title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {showEditor ? (
+      {!activeTab ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-border/60 bg-void-deep/30 p-4 text-center">
+          <p className="text-[10px] font-mono text-ink-muted">All note tabs are closed.</p>
+          {localClosedTabs.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => reopenTab(localClosedTabs[localClosedTabs.length - 1].id)}
+              className="inline-flex items-center gap-1 rounded-sm border border-neon-cyan/50 px-2 py-1 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
+            >
+              <ArchiveRestore className="h-3 w-3" />
+              Reopen last note
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={addTab}
+              className="inline-flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-[9px] font-black uppercase text-starlight hover:border-neon-cyan/50"
+            >
+              <Plus className="h-3 w-3" />
+              New tab
+            </button>
+          )}
+        </div>
+      ) : showEditor ? (
         <textarea
-          value={activeTab?.content || ""}
+          value={activeTab.content || ""}
           onChange={(e) => updateContent(e.target.value)}
           placeholder="Session notes, backstory, loot, NPCs..."
           className="min-h-0 flex-1 resize-none rounded-sm border border-border bg-black p-2 text-[11px] font-mono leading-relaxed text-ink"
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto rounded-sm border border-border/60 bg-void-deep/30 p-2">
-          <NotesFormattedBody content={activeTab?.content || ""} />
+          <NotesFormattedBody content={activeTab.content || ""} />
         </div>
       )}
 
       <div className="flex shrink-0 items-center justify-between gap-2">
         <p className="text-[8px] font-mono text-ink-faint">{hint}</p>
         <div className="flex gap-1">
-          {formattedPreview && (
+          {formattedPreview && activeTab && (
             <>
               <button
                 type="button"

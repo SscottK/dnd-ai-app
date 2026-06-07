@@ -754,6 +754,7 @@ export function SessionPlayPage() {
       (widget) => widget.type === "player_notes"
     );
     const preservedNotesTabs = preservedNotesWidget?.playerNotesTabs || [];
+    const preservedClosedNotesTabs = preservedNotesWidget?.closedNotesTabs || [];
     const preservedEquippedOverrides = sheetRef.current?.equipped_overrides || {};
 
     setSyncing(true);
@@ -803,7 +804,8 @@ export function SessionPlayPage() {
         preservedNotesTabs,
         sheetData.notes,
         canvasW,
-        canvasH
+        canvasH,
+        preservedClosedNotesTabs
       );
 
       if (notesMerge.changed || notesMigrated) {
@@ -918,6 +920,7 @@ export function SessionPlayPage() {
         return (
           <PlayerNotesWidget
             tabs={widget.playerNotesTabs || []}
+            closedTabs={widget.closedNotesTabs || []}
             activeTabId={widget.activeNotesTabId}
             onChange={(patch) => updateWidgetMeta(widget.id, patch)}
           />
@@ -971,6 +974,7 @@ export function SessionPlayPage() {
         return (
           <DmNotesWidget
             tabs={widget.dmNotesTabs || []}
+            closedTabs={widget.closedNotesTabs || []}
             activeTabId={widget.activeNotesTabId}
             onChange={(patch) => updateWidgetMeta(widget.id, patch)}
           />
