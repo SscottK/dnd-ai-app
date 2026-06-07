@@ -522,10 +522,10 @@ export function DmGeneratorsWidget({
   );
 }
 
-export function DmToolboxWidget({ campaignId, token }) {
+export function DmToolboxWidget({ campaignId, token, rollerLabel }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto [&>div]:border-border [&>div]:bg-void-deep/40">
-      <DiceRoller campaignId={campaignId} token={token} rollerName="DM" />
+      <DiceRoller campaignId={campaignId} token={token} rollerLabel={rollerLabel} />
     </div>
   );
 }

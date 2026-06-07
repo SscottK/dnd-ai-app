@@ -59,7 +59,7 @@ function MovementStepButtons({ disabled, onAdjust }) {
 
 export function InitiativePage() {
   const { campaignId } = useParams();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [campaignName, setCampaignName] = useState("");
   const [isOwner, setIsOwner] = useState(false);
   const [encounter, setEncounter] = useState({
@@ -870,7 +870,7 @@ export function InitiativePage() {
           </section>
 
           <aside className="space-y-4">
-            <DiceRoller campaignId={campaignId} token={token} rollerName="DM" />
+            <DiceRoller campaignId={campaignId} token={token} rollerLabel={user?.username} />
           </aside>
         </div>
       </div>

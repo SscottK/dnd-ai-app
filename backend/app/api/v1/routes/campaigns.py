@@ -909,7 +909,7 @@ def log_dice_roll(
     session: SessionDep,
 ):
     campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
-    roller_name = (data.roller_name or "").strip() or current_user.username
+    roller_name = current_user.username
     state = parse_encounter(campaign)
     if not state.combatants:
         raise HTTPException(

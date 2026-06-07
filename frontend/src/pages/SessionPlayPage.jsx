@@ -8,6 +8,7 @@ import { SheetPane } from "../components/sheet/SheetPane";
 import { StackedSessionLayout } from "../components/sheet/StackedSessionLayout";
 import { DetailSlideOver } from "../components/sheet/DetailSlideOver";
 import { FullSheetModal } from "../components/sheet/FullSheetModal";
+import { DiceRoller } from "../components/DiceRoller";
 import {
   DmGeneratorsWidget,
   DmNotesWidget,
@@ -63,7 +64,7 @@ const WIDGET_LABELS = Object.fromEntries(WIDGET_TYPES.map((w) => [w.type, w.labe
 
 export function SessionPlayPage() {
   const { campaignId } = useParams();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [sessionStatus, setSessionStatus] = useState(null);
   const [character, setCharacter] = useState(null);
   const [sheet, setSheet] = useState(parseSheetJson(null));
@@ -927,6 +928,14 @@ export function SessionPlayPage() {
             onChange={(patch) => updateWidgetMeta(widget.id, patch)}
           />
         );
+      case "dice_roller":
+        return (
+          <DiceRoller
+            campaignId={campaignId}
+            token={token}
+            rollerLabel={user?.username}
+          />
+        );
       case "vtt_zone":
         return <VttZoneWidget campaignId={campaignId} />;
       case "party":
@@ -982,7 +991,13 @@ export function SessionPlayPage() {
           />
         );
       case "dm_toolbox":
-        return <DmToolboxWidget campaignId={campaignId} token={token} />;
+        return (
+          <DmToolboxWidget
+            campaignId={campaignId}
+            token={token}
+            rollerLabel={user?.username}
+          />
+        );
       default:
         return <p className="text-zinc-600 text-[10px]">Legacy pane — remove and add a new one.</p>;
     }

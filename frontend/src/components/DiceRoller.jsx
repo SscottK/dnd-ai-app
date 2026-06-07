@@ -8,7 +8,7 @@ function rollDie(sides) {
   return Math.floor(Math.random() * sides) + 1;
 }
 
-export function DiceRoller({ campaignId, token, rollerName }) {
+export function DiceRoller({ campaignId, token, rollerLabel }) {
   const [lastRoll, setLastRoll] = useState(null);
   const [error, setError] = useState("");
 
@@ -27,7 +27,6 @@ export function DiceRoller({ campaignId, token, rollerName }) {
         body: {
           dice: label,
           result,
-          roller_name: rollerName || undefined,
         },
       });
       if (!res.ok) {
@@ -46,6 +45,9 @@ export function DiceRoller({ campaignId, token, rollerName }) {
         <span className="text-[10px] font-black uppercase tracking-widest text-starlight">
           Dice
         </span>
+        {rollerLabel && (
+          <span className="text-[8px] font-mono text-ink-faint truncate">as {rollerLabel}</span>
+        )}
       </div>
       <div className="flex flex-wrap gap-1">
         {DICE.map((die) => (
