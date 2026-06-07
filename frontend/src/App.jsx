@@ -4,7 +4,6 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AppLayout } from "./layouts/AppLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
-import { CharacterBuilderPage } from "./pages/CharacterBuilderPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ChatPage } from "./pages/ChatPage";
 import { CharacterViewPage } from "./pages/CharacterViewPage";
@@ -32,7 +31,7 @@ export default function App() {
             }
           >
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/character/build" element={<CharacterBuilderPage />} />
+            <Route path="/character/build" element={<Navigate to="/dashboard" replace />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/character/:characterId" element={<CharacterViewPage />} />
             <Route path="/session/:campaignId" element={<SessionPlayPage />} />

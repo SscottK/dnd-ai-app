@@ -446,14 +446,17 @@ export function DashboardPage() {
             <h3 className="text-sm font-black uppercase text-starlight">Rules AI</h3>
             <p className="mt-1 text-xs text-ink-muted sm:text-sm">Spells, monsters, and 5.5e lookups</p>
           </Link>
-          <Link
-            to="/character/build"
-            className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-cyan/60 hover:bg-neon-cyan/5"
+          <div
+            aria-disabled="true"
+            className="relative cursor-not-allowed rounded-md border border-border/50 bg-void-panel/50 p-4 opacity-60"
           >
-            <Sparkles className="mb-2 h-5 w-5 text-neon-cyan group-hover:text-starlight" />
-            <h3 className="text-sm font-black uppercase text-starlight">Character builder</h3>
-            <p className="mt-1 text-xs text-ink-muted sm:text-sm">Create a sheet without a PDF</p>
-          </Link>
+            <span className="absolute right-3 top-3 rounded-sm border border-border/60 bg-void-deep/80 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-ink-muted sm:text-xs">
+              Coming soon
+            </span>
+            <Sparkles className="mb-2 h-5 w-5 text-ink-muted" />
+            <h3 className="text-sm font-black uppercase text-ink-muted">Character builder</h3>
+            <p className="mt-1 text-xs text-ink-faint sm:text-sm">Create a sheet without a PDF</p>
+          </div>
           <label className="group cursor-pointer rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-starlight/60 hover:bg-starlight/5">
             <Upload className="mb-2 h-5 w-5 text-starlight group-hover:text-neon-cyan" />
             <h3 className="text-sm font-black uppercase text-starlight">
@@ -849,7 +852,7 @@ export function DashboardPage() {
             ) : characters.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-8 text-center">
                 <p className="text-sm font-mono text-ink-muted">
-                  No characters yet. Import a PDF or use the builder to get started.
+                  No characters yet. Import a PDF or add stats manually to get started.
                 </p>
               </div>
             ) : (
