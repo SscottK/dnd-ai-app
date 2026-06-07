@@ -801,6 +801,45 @@ export function resolveCombatStats(character, sheet) {
   };
 }
 
+function parseBoundedInt(raw, { min = 1, max = 30 } = {}) {
+  if (raw === "" || raw == null) return null;
+  const parsed = parseInt(String(raw), 10);
+  if (Number.isNaN(parsed)) return null;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+export function setAbilityScore(sheet, ability, rawValue) {
+  return {
+    ...sheet,
+    abilities: {
+      ...sheet.abilities,
+      [ability]: parseBoundedInt(rawValue, { min: 1, max: 30 }),
+    },
+  };
+}
+
+export function setProficiencyBonus(sheet, rawValue) {
+  if (rawValue === "" || rawValue == null) {
+    return { ...sheet, proficiency_bonus: null };
+  }
+  const parsed = parseInt(String(rawValue), 10);
+  return {
+    ...sheet,
+    proficiency_bonus: Number.isNaN(parsed) ? null : Math.min(12, Math.max(2, parsed)),
+  };
+}
+
+export function setSheetSpeed(sheet, rawValue) {
+  if (rawValue === "" || rawValue == null) {
+    return { ...sheet, speed: null };
+  }
+  const parsed = parseInt(String(rawValue), 10);
+  return {
+    ...sheet,
+    speed: Number.isNaN(parsed) ? null : Math.max(0, parsed),
+  };
+}
+
 export function hasSheetData(sheet) {
   const abilityCount = ABILITIES.filter((k) => sheet.abilities?.[k] != null).length;
   return (

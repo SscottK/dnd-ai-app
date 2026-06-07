@@ -16,6 +16,7 @@ import {
 } from "../../lib/encounterDisplay";
 import { ConditionsEditor } from "./ConditionsEditor";
 import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
+import { AbilityScoresGrid } from "./AbilityScoresGrid";
 import { NotesPaneWidget } from "./NotesPaneWidget";
 import { PartyMemberSheetModal } from "./PartyMemberSheetModal";
 import {
@@ -430,46 +431,15 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
   );
 }
 
-export function AbilitiesWidget({ sheet, onShowDetail }) {
+export function AbilitiesWidget({ sheet, onShowDetail, onSheetChange }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {ABILITIES.map((key) => {
-        const score = sheet.abilities?.[key];
-        const mod = abilityModifier(score);
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() =>
-              onShowDetail({
-                title: ABILITY_LABELS[key],
-                subtitle: "Ability Score",
-                body: (
-                  <div className="space-y-2">
-                    <p>
-                      Score: <span className="text-starlight">{score ?? "—"}</span>
-                    </p>
-                    <p>
-                      Modifier: <span className="text-starlight">{formatModifier(mod)}</span>
-                    </p>
-                    {sheet.proficiency_bonus != null && (
-                      <p className="text-zinc-500 text-xs">
-                        Proficiency bonus: +{sheet.proficiency_bonus}
-                      </p>
-                    )}
-                  </div>
-                ),
-              })
-            }
-            className="border border-zinc-800 p-2 text-center hover:border-neon-cyan hover:bg-neon-cyan/5"
-          >
-            <p className="text-xs sm:text-sm text-zinc-500">{ABILITY_LABELS[key]}</p>
-            <p className="text-lg font-black text-starlight">{formatModifier(mod)}</p>
-            <p className="text-xs sm:text-sm text-zinc-600">{score ?? "—"}</p>
-          </button>
-        );
-      })}
-    </div>
+    <AbilityScoresGrid
+      sheet={sheet}
+      compact
+      readOnly={!onSheetChange}
+      onShowDetail={onShowDetail}
+      onChange={onSheetChange}
+    />
   );
 }
 

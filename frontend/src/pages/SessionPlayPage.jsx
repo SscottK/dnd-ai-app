@@ -889,7 +889,9 @@ export function SessionPlayPage() {
           sheetPanePlaceholder
         );
       case "abilities":
-        return guard(<AbilitiesWidget sheet={sheet} onShowDetail={showDetail} />);
+        return guard(
+          <AbilitiesWidget sheet={sheet} onShowDetail={showDetail} onSheetChange={onSheetChange} />
+        );
       case "skills_saves":
         return guard(<SkillsSavesWidget sheet={sheet} onShowDetail={showDetail} />);
       case "character_tabs":

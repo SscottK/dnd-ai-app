@@ -5,9 +5,7 @@ import {
   resolveStandardActions,
 } from "../../lib/combatActions";
 import {
-  ABILITIES,
   ABILITY_LABELS,
-  abilityModifier,
   formatModifier,
   getInitiativeBonus,
   getProficiencyBonus,
@@ -17,7 +15,10 @@ import {
   resolveSaveBonus,
   resolveSkillBonus,
   setInventoryItemEquipped,
+  setProficiencyBonus,
+  setSheetSpeed,
 } from "../../lib/characterSheet";
+import { AbilityScoresGrid } from "./AbilityScoresGrid";
 
 const ACTION_FILTERS = [
   { id: "all", label: "All" },
@@ -82,36 +83,6 @@ function DetailPanel({ detail, onClose }) {
           {typeof detail.body === "string" ? <p>{detail.body}</p> : detail.body}
         </div>
       </div>
-    </div>
-  );
-}
-
-function AbilityRow({ sheet, onShowDetail }) {
-  return (
-    <div className="grid grid-cols-6 gap-2 lg:gap-3">
-      {ABILITIES.map((key) => {
-        const score = sheet.abilities?.[key];
-        const mod = abilityModifier(score);
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() =>
-              onShowDetail({
-                title: ABILITY_LABELS[key],
-                body: `Score ${score ?? "—"} · Modifier ${formatModifier(mod)}`,
-              })
-            }
-            className="flex flex-col items-center rounded-sm border border-zinc-800 bg-black/40 px-1 py-2 hover:border-neon-cyan/50 lg:py-3"
-          >
-            <span className="text-xs font-black uppercase text-zinc-600">{ABILITY_LABELS[key]}</span>
-            <span className="text-xl font-black leading-none text-starlight lg:text-2xl">
-              {formatModifier(mod)}
-            </span>
-            <span className="text-sm tabular-nums text-zinc-600">{score ?? "—"}</span>
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -258,8 +229,35 @@ function CombatStrip({
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-4 gap-2">
-        <StatPill label="Prof" value={prof != null ? `+${prof}` : "—"} />
-        <StatPill label="Speed" value={combat.speed != null ? `${combat.speed}` : "—"} />
+        {readOnly || !onSheetChange ? (
+          <StatPill label="Prof" value={prof != null ? `+${prof}` : "—"} />
+        ) : (
+          <label className="rounded-sm border border-zinc-800 px-2 py-2 text-center focus-within:border-neon-cyan/50">
+            <p className="text-[10px] font-black uppercase text-zinc-600 lg:text-xs">Prof</p>
+            <input
+              type="number"
+              min={2}
+              max={12}
+              value={sheet.proficiency_bonus ?? ""}
+              onChange={(e) => onSheetChange(setProficiencyBonus(sheet, e.target.value))}
+              className="w-full border-0 bg-transparent text-center text-base font-black tabular-nums text-starlight focus:outline-none lg:text-lg"
+            />
+          </label>
+        )}
+        {readOnly || !onSheetChange ? (
+          <StatPill label="Speed" value={combat.speed != null ? `${combat.speed}` : "—"} />
+        ) : (
+          <label className="rounded-sm border border-zinc-800 px-2 py-2 text-center focus-within:border-neon-cyan/50">
+            <p className="text-[10px] font-black uppercase text-zinc-600 lg:text-xs">Speed</p>
+            <input
+              type="number"
+              min={0}
+              value={sheet.speed ?? ""}
+              onChange={(e) => onSheetChange(setSheetSpeed(sheet, e.target.value))}
+              className="w-full border-0 bg-transparent text-center text-base font-black tabular-nums text-starlight focus:outline-none lg:text-lg"
+            />
+          </label>
+        )}
         <StatPill
           label="Init"
           value={formatModifier(init)}
@@ -646,7 +644,12 @@ export function DigitalCharacterSheet({
           )}
         </div>
 
-        <AbilityRow sheet={sheet} onShowDetail={setDetail} />
+        <AbilityScoresGrid
+          sheet={sheet}
+          readOnly={readOnly}
+          onShowDetail={setDetail}
+          onChange={readOnly ? undefined : onSheetChange}
+        />
 
         <div className="grid gap-3 lg:grid-cols-12 lg:gap-4">
           <div className="lg:col-span-2 xl:col-span-2">
