@@ -512,3 +512,35 @@ class CampaignNotesSummary(BaseModel):
 
 class AllNotesResponse(BaseModel):
     campaigns: list[CampaignNotesSummary]
+
+
+class UserNoteRead(BaseModel):
+    id: int
+    title: str
+    content: str
+    campaign_id: int | None = None
+    campaign_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserNoteCreate(BaseModel):
+    title: str = Field(default="New note", min_length=1, max_length=120)
+    content: str = ""
+    campaign_id: int | None = None
+
+
+class UserNoteUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    content: str | None = None
+    campaign_id: int | None = None
+
+
+class NoteCampaignOption(BaseModel):
+    id: int
+    name: str
+
+
+class UserNotesPageResponse(BaseModel):
+    notes: list[UserNoteRead]
+    campaigns: list[NoteCampaignOption]

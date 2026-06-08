@@ -89,3 +89,58 @@ export async function deleteCampaignNoteTab(campaignId, token, tabId) {
   }
   return response.json();
 }
+
+export async function fetchUserNotesPage(token) {
+  const response = await apiFetch("/notes/entries", { token });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not load notes.");
+  }
+  return response.json();
+}
+
+export async function createUserNote(token, { title, content = "", campaignId = null }) {
+  const response = await apiFetch("/notes/entries", {
+    token,
+    method: "POST",
+    body: {
+      title,
+      content,
+      campaign_id: campaignId,
+    },
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not create note.");
+  }
+  return response.json();
+}
+
+export async function updateUserNote(token, noteId, patch) {
+  const body = {};
+  if (patch.title !== undefined) body.title = patch.title;
+  if (patch.content !== undefined) body.content = patch.content;
+  if (patch.campaignId !== undefined) body.campaign_id = patch.campaignId;
+
+  const response = await apiFetch(`/notes/entries/${noteId}`, {
+    token,
+    method: "PATCH",
+    body,
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not save note.");
+  }
+  return response.json();
+}
+
+export async function deleteUserNote(token, noteId) {
+  const response = await apiFetch(`/notes/entries/${noteId}`, {
+    token,
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not delete note.");
+  }
+}

@@ -169,3 +169,16 @@ class UserCampaignNotes(SQLModel, table=True):
 
     user: Optional[User] = Relationship()
     campaign: Optional[Campaign] = Relationship()
+
+
+class UserNote(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    campaign_id: Optional[int] = Field(default=None, foreign_key="campaign.id", index=True)
+    title: str = Field(max_length=120)
+    content: str = Field(default="")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    user: Optional[User] = Relationship()
+    campaign: Optional[Campaign] = Relationship()

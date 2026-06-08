@@ -9,10 +9,15 @@ from app.api.schemas import (
     CampaignNotesDocument,
     CampaignNotesSummary,
     CampaignNotesUpdate,
+    NoteCampaignOption,
     NoteTab,
     NoteTabCreate,
+    UserNoteCreate,
+    UserNoteRead,
+    UserNoteUpdate,
+    UserNotesPageResponse,
 )
-from app.db.models import Campaign, UserCampaignNotes
+from app.db.models import Campaign, CampaignMember, UserCampaignNotes, UserNote
 from app.services.campaign_membership import get_campaign_for_member_or_owner
 from app.services.campaign_notes import (
     default_notes_document,
@@ -22,6 +27,12 @@ from app.services.campaign_notes import (
     parse_notes_document,
     save_notes_document,
     utc_now,
+)
+from app.services.user_notes import (
+    create_user_note,
+    delete_user_note,
+    list_user_notes,
+    update_user_note,
 )
 
 router = APIRouter()
@@ -60,6 +71,37 @@ def _doc_from_update(data: CampaignNotesUpdate) -> dict:
     }
 
 
+def _accessible_campaigns(session: SessionDep, user_id: int) -> list[Campaign]:
+    memberships = session.exec(
+        select(CampaignMember).where(CampaignMember.user_id == user_id)
+    ).all()
+    owned = session.exec(select(Campaign).where(Campaign.owner_id == user_id)).all()
+    campaigns: dict[int, Campaign] = {
+        campaign.id: campaign for campaign in owned if campaign.id is not None
+    }
+    for membership in memberships:
+        campaign = session.get(Campaign, membership.campaign_id)
+        if campaign and campaign.id is not None:
+            campaigns[campaign.id] = campaign
+    return sorted(campaigns.values(), key=lambda campaign: campaign.name.lower())
+
+
+def _note_to_read(session: SessionDep, note: UserNote) -> UserNoteRead:
+    campaign_name = None
+    if note.campaign_id is not None:
+        campaign = session.get(Campaign, note.campaign_id)
+        campaign_name = campaign.name if campaign else None
+    return UserNoteRead(
+        id=note.id,
+        title=note.title,
+        content=note.content,
+        campaign_id=note.campaign_id,
+        campaign_name=campaign_name,
+        created_at=note.created_at,
+        updated_at=note.updated_at,
+    )
+
+
 def _summary_from_row(row: dict) -> CampaignNotesSummary:
     return CampaignNotesSummary(
         campaign_id=row["campaign_id"],
@@ -76,6 +118,83 @@ def list_all_notes(current_user: CurrentUser, session: SessionDep):
     rows = list_user_notes_by_campaign(session, current_user.id)
     session.commit()
     return AllNotesResponse(campaigns=[_summary_from_row(row) for row in rows])
+
+
+@router.get("/entries", response_model=UserNotesPageResponse)
+def list_user_note_entries(current_user: CurrentUser, session: SessionDep):
+    notes = list_user_notes(session, current_user.id)
+    campaigns = _accessible_campaigns(session, current_user.id)
+    session.commit()
+    return UserNotesPageResponse(
+        notes=[_note_to_read(session, note) for note in notes],
+        campaigns=[NoteCampaignOption(id=campaign.id, name=campaign.name) for campaign in campaigns],
+    )
+
+
+@router.post("/entries", response_model=UserNoteRead, status_code=status.HTTP_201_CREATED)
+def create_user_note_entry(
+    data: UserNoteCreate,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    try:
+        note = create_user_note(
+            session,
+            current_user.id,
+            title=data.title,
+            content=data.content,
+            campaign_id=data.campaign_id,
+        )
+    except ValueError as exc:
+        if str(exc) == "campaign_access_denied":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to that campaign",
+            ) from exc
+        raise
+    session.commit()
+    session.refresh(note)
+    return _note_to_read(session, note)
+
+
+@router.patch("/entries/{note_id}", response_model=UserNoteRead)
+def update_user_note_entry(
+    note_id: int,
+    data: UserNoteUpdate,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    updates = data.model_dump(exclude_unset=True)
+    try:
+        note = update_user_note(
+            session,
+            current_user.id,
+            note_id,
+            title=updates.get("title"),
+            content=updates.get("content"),
+            campaign_id=updates.get("campaign_id"),
+            assign_campaign="campaign_id" in updates,
+        )
+    except ValueError as exc:
+        if str(exc) == "campaign_access_denied":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to that campaign",
+            ) from exc
+        raise
+    if note is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+    session.commit()
+    session.refresh(note)
+    return _note_to_read(session, note)
+
+
+@router.delete("/entries/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_note_entry(note_id: int, current_user: CurrentUser, session: SessionDep):
+    deleted = delete_user_note(session, current_user.id, note_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+    session.commit()
 
 
 @router.get("/campaigns/{campaign_id}", response_model=CampaignNotesDocument)
