@@ -19,8 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
     table_names = set(inspector.get_table_names())
 
     if "characterphoto" not in table_names:
@@ -41,31 +41,43 @@ def upgrade() -> None:
     if "portrait_photo_id" not in character_columns:
         op.add_column("character", sa.Column("portrait_photo_id", sa.Integer(), nullable=True))
 
-    rows = conn.execute(
+    rows = bind.execute(
         sa.text("SELECT id, portrait_path FROM character WHERE portrait_path IS NOT NULL")
     ).fetchall()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+    dialect = bind.dialect.name
     for character_id, portrait_path in rows:
-        already = conn.execute(
+        already = bind.execute(
             sa.text("SELECT portrait_photo_id FROM character WHERE id = :character_id"),
             {"character_id": character_id},
         ).scalar()
         if already is not None:
             continue
 
-        result = conn.execute(
-            sa.text(
-                "INSERT INTO characterphoto (character_id, file_path, created_at) "
-                "VALUES (:character_id, :file_path, :created_at)"
-            ),
-            {
-                "character_id": character_id,
-                "file_path": portrait_path,
-                "created_at": now,
-            },
-        )
-        photo_id = result.lastrowid
-        conn.execute(
+        params = {
+            "character_id": character_id,
+            "file_path": portrait_path,
+            "created_at": now,
+        }
+        if dialect == "postgresql":
+            photo_id = bind.execute(
+                sa.text(
+                    "INSERT INTO characterphoto (character_id, file_path, created_at) "
+                    "VALUES (:character_id, :file_path, :created_at) RETURNING id"
+                ),
+                params,
+            ).scalar()
+        else:
+            result = bind.execute(
+                sa.text(
+                    "INSERT INTO characterphoto (character_id, file_path, created_at) "
+                    "VALUES (:character_id, :file_path, :created_at)"
+                ),
+                params,
+            )
+            photo_id = result.lastrowid
+
+        bind.execute(
             sa.text("UPDATE character SET portrait_photo_id = :photo_id WHERE id = :character_id"),
             {"photo_id": photo_id, "character_id": character_id},
         )

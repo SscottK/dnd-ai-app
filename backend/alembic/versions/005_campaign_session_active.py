@@ -18,9 +18,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    server_default = sa.text("false") if bind.dialect.name == "postgresql" else "0"
     with op.batch_alter_table("campaign") as batch_op:
         batch_op.add_column(
-            sa.Column("session_active", sa.Boolean(), nullable=False, server_default="0")
+            sa.Column("session_active", sa.Boolean(), nullable=False, server_default=server_default)
         )
 
 

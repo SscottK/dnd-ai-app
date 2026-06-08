@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: dnd-ai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash scripts/start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dnd-ai-db
+          property: connectionString
+      - key: CORS_ORIGINS
+        value: '["https://dnd-ai-app.vercel.app","http://localhost:5173"]'
+      - key: BOOTSTRAP_ADMIN_USERNAME
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: dnd-ai-db
+    plan: free
+    databaseName: dnd_ai
+    user: dnd_ai
