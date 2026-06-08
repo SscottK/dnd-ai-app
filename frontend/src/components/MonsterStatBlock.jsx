@@ -1,3 +1,5 @@
+import { MarkdownRenderer } from "./MarkdownRenderer";
+
 const ABILITY_ORDER = ["str", "dex", "con", "int", "wis", "cha"];
 const ABILITY_LABELS = {
   str: "STR",
@@ -155,11 +157,35 @@ function LegendaryActions({ legendary }) {
   );
 }
 
+function normalizeMarkdown(content) {
+  if (!content) return "";
+  return String(content).replace(/<br\s*\/?>/gi, "\n").replace(/<hr\s*\/?>/gi, "\n---\n");
+}
+
+function hasMarkdownStatBlock(entry) {
+  const text = entry?.content || entry?.description || "";
+  return /\*\*AC\*\*/.test(text);
+}
+
 export function isMonsterEntry(entry) {
-  return Boolean(entry?.stat_block_json && typeof entry.stat_block_json === "object");
+  if (entry?.stat_block_json && typeof entry.stat_block_json === "object") return true;
+  return hasMarkdownStatBlock(entry);
 }
 
 export function MonsterStatBlock({ monster }) {
+  if (!monster?.stat_block_json && hasMarkdownStatBlock(monster)) {
+    const typeLine = [monster.size, titleCase(monster.type)].filter(Boolean).join(" ");
+    return (
+      <div className="space-y-4">
+        {typeLine && <p className="text-xs font-black uppercase text-neon-cyan">{typeLine}</p>}
+        {monster.cr != null && (
+          <p className="font-mono text-xs text-starlight">Challenge Rating {monster.cr}</p>
+        )}
+        <MarkdownRenderer content={normalizeMarkdown(monster.content || monster.description)} />
+      </div>
+    );
+  }
+
   const stat = monster.stat_block_json || {};
   const typeLine = [monster.size, titleCase(monster.type || stat.type)].filter(Boolean).join(" ");
   const hitPoints =

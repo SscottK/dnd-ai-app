@@ -132,7 +132,7 @@ def list_entries(category: str) -> list[dict]:
                 "name": row.get("name"),
                 "slug": row.get("id") or row.get("name", "").lower(),
                 "cr": row.get("cr"),
-                "type": (row.get("stat_block_json") or {}).get("type"),
+                "type": row.get("type") or (row.get("stat_block_json") or {}).get("type"),
                 "size": row.get("size"),
             }
             for row in _monsters_index().values()
@@ -209,7 +209,16 @@ def _score_entry(query_tokens: set[str], query_lower: str, entry: dict, *, categ
     description = str(entry.get("description") or entry.get("desc") or entry.get("content") or "")
     if category == "monsters":
         stat = entry.get("stat_block_json") or {}
-        description = f"{stat.get('type', '')} {stat.get('alignment', '')}"
+        description = " ".join(
+            filter(
+                None,
+                [
+                    entry.get("type") or stat.get("type"),
+                    entry.get("alignment") or stat.get("alignment"),
+                    entry.get("content") or entry.get("description"),
+                ],
+            )
+        )
 
     desc_tokens = _tokenize(description)
     overlap = len(query_tokens & desc_tokens)

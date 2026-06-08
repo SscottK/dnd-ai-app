@@ -38,13 +38,9 @@ function BrowseListPanel({ title, titleClassName = "text-starlight", children, f
   );
 }
 
-function EntryDetailPanel({ title, onClose, children, fillHeight = false }) {
+function EntryDetailPanel({ title, onClose, children }) {
   return (
-    <div
-      className={`w-full rounded-md border border-border-bright bg-void-panel lg:w-[min(100%,26rem)] ${
-        fillHeight ? "flex min-h-0 flex-1 flex-col" : "shrink-0"
-      }`}
-    >
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-md border border-border-bright bg-void-panel lg:w-[min(100%,26rem)]">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
         <p className="min-w-0 truncate text-xs font-black uppercase text-starlight">{title}</p>
         <button
@@ -57,13 +53,7 @@ function EntryDetailPanel({ title, onClose, children, fillHeight = false }) {
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div
-        className={`p-3 text-sm font-mono text-ink-muted sm:p-4 ${
-          fillHeight
-            ? "min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
-            : "max-h-[min(70vh,28rem)] overflow-y-auto overscroll-y-contain"
-        }`}
-      >
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 text-sm font-mono text-ink-muted sm:p-4">
         {children}
       </div>
     </div>
@@ -265,7 +255,7 @@ export function SrdBrowsePage() {
             </div>
           </aside>
 
-          <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:items-start">
+          <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:items-stretch">
             {(!isMobile || !showDetail) && (
             <div className="min-h-0 w-full shrink-0 lg:w-[22rem] xl:w-[24rem]">
               <BrowseListPanel
@@ -310,11 +300,7 @@ export function SrdBrowsePage() {
             )}
 
             {showDetail && (
-              <EntryDetailPanel
-                title={selectedName}
-                onClose={closeEntry}
-                fillHeight={isMobile}
-              >
+              <EntryDetailPanel title={selectedName} onClose={closeEntry}>
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
                   <SrdEntryDetail entry={selectedEntry} category={detailCategory} />

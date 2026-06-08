@@ -37,6 +37,12 @@ BACKGROUND_SKIP = {
 SPECIES_SKIP = {"Creature Type", "Size", "Speed", "Special Traits"}
 MAGIC_ITEM_SKIP = {"Spells Cast from Items", "Charges", "Spells", "Conflict"}
 
+# Embedded creature stat blocks under magic items (e.g. Avatar of Death, Giant Fly).
+_CREATURE_SUBTITLE_RE = re.compile(
+    r"^_(?P<size>Tiny|Small|Medium|Large|Huge|Gargantuan)\s+(?P<type>[^,]+),\s*(?P<alignment>.+)_\s*$",
+    re.IGNORECASE,
+)
+
 RULES_DOCUMENTS = [
     ("playing-the-game.md", "playing-the-game", "Playing the Game"),
     ("character-creation.md", "character-creation", "Character Creation"),
@@ -145,6 +151,132 @@ def parse_h4_entries(
             entry["fields"] = fields
         entries.append(entry)
     return entries
+
+
+def _first_nonempty_line(body: str) -> str:
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def is_embedded_creature_stat_block(body: str) -> bool:
+    return bool(_CREATURE_SUBTITLE_RE.match(_first_nonempty_line(body)))
+
+
+def parse_creature_subtitle(line: str) -> dict[str, str]:
+    match = _CREATURE_SUBTITLE_RE.match(line.strip())
+    if not match:
+        return {}
+    return {
+        "size": match.group("size"),
+        "type": match.group("type").strip(),
+        "alignment": match.group("alignment").strip(),
+    }
+
+
+def parse_cr_from_creature_body(body: str) -> str | None:
+    match = re.search(r"\*\*CR\*\*\s+([^\n<]+)", body)
+    if not match:
+        return None
+    cr_token = match.group(1).strip().split()[0]
+    if cr_token.casefold() == "none":
+        return None
+    return cr_token
+
+
+def creature_to_monster_entry(name: str, body: str, *, max_content: int = 12000) -> dict:
+    subtitle_line = _first_nonempty_line(body)
+    meta = parse_creature_subtitle(subtitle_line)
+    slug = slugify(name)
+    content = body[:max_content]
+    return {
+        "id": f"srd:{slug}",
+        "name": name,
+        "source": "srd-5.2.1",
+        "attribution": "SRD 5.2.1 / CC-BY 4.0",
+        "size": meta.get("size"),
+        "type": meta.get("type"),
+        "alignment": meta.get("alignment"),
+        "cr": parse_cr_from_creature_body(body),
+        "content": content,
+        "description": content,
+    }
+
+
+def parse_magic_item_entries(
+    section: str,
+    *,
+    skip: set[str],
+    max_description: int = 12000,
+    strip_price: bool = False,
+) -> tuple[list[dict], list[dict]]:
+    items: list[dict] = []
+    embedded_creatures: list[dict] = []
+    if not section.strip():
+        return items, embedded_creatures
+
+    for chunk in re.split(r"\n#### ", section)[1:]:
+        lines = chunk.split("\n", 1)
+        raw_name = lines[0].strip()
+        if not raw_name or raw_name in skip:
+            continue
+
+        name = raw_name
+        cost = None
+        if strip_price:
+            match = re.match(r"^(.+?)\s*\(([^)]+)\)\s*$", raw_name)
+            if match:
+                name = match.group(1).strip()
+                cost = match.group(2).strip()
+
+        body = lines[1].strip() if len(lines) > 1 else ""
+        if is_embedded_creature_stat_block(body):
+            embedded_creatures.append(creature_to_monster_entry(name, body, max_content=max_description))
+            if items:
+                items[-1]["description"] = (
+                    f"{items[-1]['description']}\n\n#### {raw_name}\n\n{body}"
+                )[:max_description]
+            continue
+
+        entry: dict = {
+            "name": name,
+            "slug": slugify(name),
+            "description": body[:max_description],
+        }
+        if cost:
+            entry["cost"] = cost
+        fields = parse_field_lines(body)
+        if fields:
+            entry["fields"] = fields
+        items.append(entry)
+    return items, embedded_creatures
+
+
+def merge_supplemental_monsters(embedded_creatures: list[dict]) -> int:
+    if not embedded_creatures:
+        return 0
+
+    monsters_path = OUT_DIR / "monsters.json"
+    data = json.loads(monsters_path.read_text(encoding="utf-8"))
+    monsters = data.setdefault("monsters", [])
+    by_name = {row["name"].casefold(): idx for idx, row in enumerate(monsters) if row.get("name")}
+    changed = 0
+    for creature in embedded_creatures:
+        name_key = creature.get("name", "").casefold()
+        if not name_key:
+            continue
+        if name_key in by_name:
+            monsters[by_name[name_key]] = creature
+        else:
+            monsters.append(creature)
+            by_name[name_key] = len(monsters) - 1
+        changed += 1
+
+    data["monsters"] = sorted(monsters, key=lambda row: row.get("name", "").casefold())
+    write_json("monsters.json", data)
+    return changed
 
 
 def parse_h2_sections(markdown: str, *, max_content: int = 16000) -> list[dict]:
@@ -539,8 +671,12 @@ def build_classes(classes_md: str) -> int:
     return len(classes)
 
 
-def build_magic_items(magic_items_md: str) -> int:
-    items = parse_h4_entries(magic_items_md, skip=MAGIC_ITEM_SKIP, max_description=12000)
+def build_magic_items(magic_items_md: str) -> tuple[int, int]:
+    items, embedded_creatures = parse_magic_item_entries(
+        magic_items_md,
+        skip=MAGIC_ITEM_SKIP,
+        max_description=12000,
+    )
     write_json(
         "magic_items.json",
         {
@@ -549,7 +685,8 @@ def build_magic_items(magic_items_md: str) -> int:
             "magic_items": items,
         },
     )
-    return len(items)
+    supplemental = merge_supplemental_monsters(embedded_creatures)
+    return len(items), supplemental
 
 
 def build_animals(animals_md: str) -> int:
@@ -668,7 +805,7 @@ def main() -> None:
     counts["classes"] = build_classes(markdown["classes.md"])
 
     print("  magic items...")
-    counts["magic_items"] = build_magic_items(markdown["magic-items.md"])
+    counts["magic_items"], counts["supplemental_monsters"] = build_magic_items(markdown["magic-items.md"])
 
     print("  animals...")
     counts["animals"] = build_animals(markdown["animals.md"])
