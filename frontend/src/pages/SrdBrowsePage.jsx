@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Search } from "lucide-react";
+import { BookOpen, Search, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch } from "../lib/api";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
@@ -36,15 +36,37 @@ function entryBody(entry) {
   return text;
 }
 
-function BrowsePanel({ title, titleClassName = "text-starlight", children }) {
+function BrowseListPanel({ title, titleClassName = "text-starlight", children }) {
   return (
-    <div className="flex min-h-0 flex-col rounded-md border border-border-bright bg-void-panel lg:min-h-[280px]">
+    <div className="flex h-full min-h-0 flex-col rounded-md border border-border-bright bg-void-panel">
       <p
         className={`shrink-0 border-b border-border px-3 py-2 text-xs font-black uppercase ${titleClassName}`}
       >
         {title}
       </p>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    </div>
+  );
+}
+
+function EntryDetailPanel({ title, onClose, children }) {
+  return (
+    <div className="w-full shrink-0 rounded-md border border-border-bright bg-void-panel lg:w-[min(100%,26rem)]">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <p className="min-w-0 truncate text-xs font-black uppercase text-starlight">{title}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded p-1 text-ink-faint hover:bg-border/40 hover:text-starlight"
+          aria-label="Close entry"
+          title="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="max-h-[min(70vh,28rem)] overflow-y-auto p-3 text-sm font-mono text-ink-muted sm:p-4">
+        {children}
+      </div>
     </div>
   );
 }
@@ -142,6 +164,14 @@ export function SrdBrowsePage() {
     return entries.filter((row) => row.name.toLowerCase().includes(q));
   }, [entries, searchQuery]);
 
+  const closeEntry = () => {
+    setSelectedName(null);
+    setSelectedEntry(null);
+    setLoadingEntry(false);
+  };
+
+  const showDetail = Boolean(selectedName);
+
   return (
     <div className="session-ui flex h-full min-h-0 flex-col overflow-hidden bg-void">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-3 overflow-hidden px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
@@ -228,43 +258,53 @@ export function SrdBrowsePage() {
             </div>
           </aside>
 
-          <section className="grid min-h-0 flex-1 grid-rows-2 gap-3 overflow-hidden lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:grid-rows-1">
-            <BrowsePanel
-              title={
-                <>
-                  {categoryMeta.label}
-                  {loadingList && <span className="ml-2 text-ink-faint">Loading…</span>}
-                </>
-              }
-              titleClassName="text-neon-cyan"
-            >
-              <ul className="p-1.5 sm:p-2">
-                {filteredEntries.map((row) => (
-                  <li key={row.name}>
-                    <button
-                      type="button"
-                      onClick={() => void openEntry(row.name)}
-                      className={`block w-full rounded-sm px-2 py-1.5 text-left text-xs font-mono hover:bg-neon-cyan/10 ${
-                        selectedName === row.name ? "bg-neon-cyan/10 text-starlight" : "text-ink-muted"
-                      }`}
-                    >
-                      <span className="font-black text-starlight">{row.name}</span>
-                      {entrySummary(row, activeCategory) && (
-                        <span className="mt-0.5 block text-[10px] text-ink-faint">
-                          {entrySummary(row, activeCategory)}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-                {!loadingList && filteredEntries.length === 0 && (
-                  <li className="px-2 py-4 text-center text-xs font-mono text-ink-faint">No entries found.</li>
-                )}
-              </ul>
-            </BrowsePanel>
+          <section
+            className={`flex min-h-0 flex-1 gap-3 overflow-hidden ${
+              showDetail ? "flex-col lg:flex-row lg:items-start" : ""
+            }`}
+          >
+            <div className="min-h-0 min-w-0 flex-1">
+              <BrowseListPanel
+                title={
+                  <>
+                    {categoryMeta.label}
+                    {loadingList && <span className="ml-2 text-ink-faint">Loading…</span>}
+                  </>
+                }
+                titleClassName="text-neon-cyan"
+              >
+                <ul className="p-1.5 sm:p-2">
+                  {filteredEntries.map((row) => (
+                    <li key={row.name}>
+                      <button
+                        type="button"
+                        onClick={() => void openEntry(row.name)}
+                        className={`block w-full rounded-sm px-2 py-1.5 text-left text-xs font-mono hover:bg-neon-cyan/10 ${
+                          selectedName === row.name
+                            ? "bg-neon-cyan/10 text-starlight"
+                            : "text-ink-muted"
+                        }`}
+                      >
+                        <span className="font-black text-starlight">{row.name}</span>
+                        {entrySummary(row, activeCategory) && (
+                          <span className="mt-0.5 block text-[10px] text-ink-faint">
+                            {entrySummary(row, activeCategory)}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                  {!loadingList && filteredEntries.length === 0 && (
+                    <li className="px-2 py-4 text-center text-xs font-mono text-ink-faint">
+                      No entries found.
+                    </li>
+                  )}
+                </ul>
+              </BrowseListPanel>
+            </div>
 
-            <BrowsePanel title={selectedName || "Select an entry"}>
-              <div className="p-3 text-sm font-mono text-ink-muted sm:p-4">
+            {showDetail && (
+              <EntryDetailPanel title={selectedName} onClose={closeEntry}>
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
                   <div className="space-y-3">
@@ -281,10 +321,10 @@ export function SrdBrowsePage() {
                   </div>
                 )}
                 {!loadingEntry && !selectedEntry && (
-                  <p className="text-ink-faint">Pick a name from the list or run a search.</p>
+                  <p className="text-ink-faint">Could not load this entry.</p>
                 )}
-              </div>
-            </BrowsePanel>
+              </EntryDetailPanel>
+            )}
           </section>
         </div>
       </div>
