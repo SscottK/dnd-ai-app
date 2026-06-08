@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Search, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useMediaQuery, APP_MOBILE_QUERY } from "../hooks/useMediaQuery";
 import { apiFetch } from "../lib/api";
-import { entrySummary } from "../lib/srdEntryFormat";
+import { entrySummary, formatCategoryLabel } from "../lib/srdEntryFormat";
 import { SrdEntryDetail } from "../components/SrdEntryDetail";
+import { PullToRefresh } from "../components/PullToRefresh";
 
 const CATEGORIES = [
   { id: "spells", label: "Spells", path: "/rules/spells", listKey: "spells" },
@@ -21,7 +22,13 @@ const CATEGORIES = [
   { id: "glossary", label: "Glossary", path: "/rules/glossary", listKey: "glossary" },
 ];
 
-function BrowseListPanel({ title, titleClassName = "text-starlight", children, fillHeight = true }) {
+function BrowseListPanel({
+  title,
+  titleClassName = "text-starlight",
+  children,
+  fillHeight = true,
+  onRefresh,
+}) {
   return (
     <div
       className={`flex flex-col rounded-md border border-border-bright bg-void-panel ${
@@ -33,12 +40,17 @@ function BrowseListPanel({ title, titleClassName = "text-starlight", children, f
       >
         {title}
       </p>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
+      <PullToRefresh
+        onRefresh={onRefresh}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+      >
+        {children}
+      </PullToRefresh>
     </div>
   );
 }
 
-function EntryDetailPanel({ title, onClose, children }) {
+function EntryDetailPanel({ title, onClose, children, onRefresh }) {
   return (
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-md border border-border-bright bg-void-panel lg:w-[min(100%,26rem)]">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
@@ -53,10 +65,64 @@ function EntryDetailPanel({ title, onClose, children }) {
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 text-sm font-mono text-ink-muted sm:p-4">
+      <PullToRefresh
+        onRefresh={onRefresh}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 text-sm font-mono text-ink-muted sm:p-4"
+      >
         {children}
-      </div>
+      </PullToRefresh>
     </div>
+  );
+}
+
+function SearchResultsPanel({ results, searching, query, onSelect, onClear }) {
+  if (!query.trim()) return null;
+
+  return (
+    <section className="shrink-0 rounded-md border border-neon-magenta/40 bg-void-panel">
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+        <p className="text-xs font-black uppercase text-neon-magenta">
+          Search results
+          {searching && <span className="ml-2 font-mono text-ink-faint">Searching…</span>}
+        </p>
+        <button
+          type="button"
+          onClick={onClear}
+          className="shrink-0 rounded px-2 py-0.5 text-[10px] font-black uppercase text-ink-faint hover:bg-border/40 hover:text-starlight"
+        >
+          Clear
+        </button>
+      </div>
+      {!searching && results.length === 0 && (
+        <p className="px-3 py-4 text-center text-xs font-mono text-ink-faint">
+          No SRD entries match &ldquo;{query}&rdquo;.
+        </p>
+      )}
+      {results.length > 0 && (
+        <ul className="max-h-40 overflow-y-auto overscroll-y-contain p-1.5 sm:max-h-48">
+          {results.map((hit) => {
+            const summary = entrySummary(hit, hit.category);
+            return (
+              <li key={`${hit.category}-${hit.name}`}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(hit.name, hit.category)}
+                  className="block w-full rounded-sm px-2 py-2 text-left hover:bg-neon-magenta/10"
+                >
+                  <span className="block text-xs font-black text-starlight">{hit.name}</span>
+                  <span className="mt-0.5 block text-[10px] text-neon-magenta">
+                    {formatCategoryLabel(hit.category)}
+                  </span>
+                  {summary && (
+                    <span className="mt-0.5 block text-[10px] text-ink-faint">{summary}</span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -70,9 +136,11 @@ export function SrdBrowsePage() {
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
   const [loadingEntry, setLoadingEntry] = useState(false);
   const [error, setError] = useState("");
+  const searchRequestRef = useRef(0);
 
   const categoryMeta = useMemo(
     () => CATEGORIES.find((item) => item.id === activeCategory) || CATEGORIES[0],
@@ -80,84 +148,128 @@ export function SrdBrowsePage() {
   );
 
   const detailCategory = selectedCategory || activeCategory;
+  const trimmedSearch = searchQuery.trim();
+  const showGlobalSearch = Boolean(trimmedSearch);
 
-  const loadCategory = useCallback(async () => {
-    if (!token) return;
-    setLoadingList(true);
-    setError("");
-    setSelectedName(null);
-    setSelectedCategory(null);
-    setSelectedEntry(null);
-    try {
-      const res = await apiFetch(categoryMeta.path, { token });
-      if (!res.ok) throw new Error("Could not load SRD category");
-      const data = await res.json();
-      const rows = (data[categoryMeta.listKey] || [])
-        .map((row) => (typeof row === "string" ? { name: row } : row))
-        .filter((row) => row?.name)
-        .sort((left, right) => left.name.localeCompare(right.name));
-      setEntries(rows);
-    } catch (err) {
-      setError(err.message || "Could not load SRD data.");
-      setEntries([]);
-    } finally {
-      setLoadingList(false);
-    }
-  }, [token, categoryMeta]);
+  const loadCategory = useCallback(
+    async ({ preserveSelection = false } = {}) => {
+      if (!token) return;
+      setLoadingList(true);
+      setError("");
+      if (!preserveSelection) {
+        setSelectedName(null);
+        setSelectedCategory(null);
+        setSelectedEntry(null);
+      }
+      try {
+        const res = await apiFetch(categoryMeta.path, { token });
+        if (!res.ok) throw new Error("Could not load SRD category");
+        const data = await res.json();
+        const rows = (data[categoryMeta.listKey] || [])
+          .map((row) => (typeof row === "string" ? { name: row } : row))
+          .filter((row) => row?.name)
+          .sort((left, right) => left.name.localeCompare(right.name));
+        setEntries(rows);
+      } catch (err) {
+        setError(err.message || "Could not load SRD data.");
+        setEntries([]);
+      } finally {
+        setLoadingList(false);
+      }
+    },
+    [token, categoryMeta]
+  );
 
   useEffect(() => {
     void loadCategory();
   }, [loadCategory]);
 
-  const runSearch = useCallback(async () => {
-    const q = searchQuery.trim();
-    if (!token || !q) {
+  const runSearch = useCallback(
+    async (query = trimmedSearch) => {
+      const q = query.trim();
+      if (!token || !q) {
+        setSearchResults([]);
+        setSearching(false);
+        return;
+      }
+
+      const requestId = ++searchRequestRef.current;
+      setSearching(true);
+      setError("");
+      try {
+        const res = await apiFetch(`/rules/search?q=${encodeURIComponent(q)}&limit=16`, { token });
+        if (!res.ok) throw new Error("Search failed");
+        const data = await res.json();
+        if (requestId !== searchRequestRef.current) return;
+        setSearchResults(data.results || []);
+      } catch (err) {
+        if (requestId !== searchRequestRef.current) return;
+        setError(err.message || "Search failed.");
+        setSearchResults([]);
+      } finally {
+        if (requestId === searchRequestRef.current) {
+          setSearching(false);
+        }
+      }
+    },
+    [token, trimmedSearch]
+  );
+
+  useEffect(() => {
+    if (!trimmedSearch) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
-    setError("");
-    try {
-      const res = await apiFetch(`/rules/search?q=${encodeURIComponent(q)}&limit=16`, { token });
-      if (!res.ok) throw new Error("Search failed");
-      const data = await res.json();
-      setSearchResults(data.results || []);
-    } catch (err) {
-      setError(err.message || "Search failed.");
-      setSearchResults([]);
-    }
-  }, [token, searchQuery]);
+    const timer = window.setTimeout(() => {
+      void runSearch(trimmedSearch);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [trimmedSearch, runSearch]);
 
-  const openEntry = async (name, category = activeCategory) => {
-    if (!token || !name) return;
-    setSelectedName(name);
-    setSelectedCategory(category);
-    setLoadingEntry(true);
-    setError("");
-    try {
-      const res = await apiFetch(
-        `/rules/lookup/${encodeURIComponent(category)}/${encodeURIComponent(name)}`,
-        { token }
-      );
-      if (!res.ok) throw new Error("Could not load entry");
-      const data = await res.json();
-      setSelectedEntry(data.entry || null);
-      if (category !== activeCategory) {
-        const match = CATEGORIES.find((item) => item.id === category);
-        if (match) setActiveCategory(category);
+  const openEntry = useCallback(
+    async (name, category = activeCategory) => {
+      if (!token || !name) return;
+      setSelectedName(name);
+      setSelectedCategory(category);
+      setLoadingEntry(true);
+      setError("");
+      try {
+        const res = await apiFetch(
+          `/rules/lookup/${encodeURIComponent(category)}/${encodeURIComponent(name)}`,
+          { token }
+        );
+        if (!res.ok) throw new Error("Could not load entry");
+        const data = await res.json();
+        setSelectedEntry(data.entry || null);
+        if (category !== activeCategory) {
+          const match = CATEGORIES.find((item) => item.id === category);
+          if (match) setActiveCategory(category);
+        }
+      } catch (err) {
+        setError(err.message || "Could not load entry.");
+        setSelectedEntry(null);
+      } finally {
+        setLoadingEntry(false);
       }
-    } catch (err) {
-      setError(err.message || "Could not load entry.");
-      setSelectedEntry(null);
-    } finally {
-      setLoadingEntry(false);
-    }
-  };
+    },
+    [token, activeCategory]
+  );
 
-  const filteredEntries = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter((row) => row.name.toLowerCase().includes(q));
-  }, [entries, searchQuery]);
+  const reloadSelectedEntry = useCallback(async () => {
+    if (!selectedName || !selectedCategory) return;
+    await openEntry(selectedName, selectedCategory);
+  }, [openEntry, selectedCategory, selectedName]);
+
+  const refreshBrowse = useCallback(async () => {
+    await loadCategory({ preserveSelection: true });
+    if (trimmedSearch) {
+      await runSearch(trimmedSearch);
+    }
+    if (selectedName && selectedCategory) {
+      await reloadSelectedEntry();
+    }
+  }, [loadCategory, trimmedSearch, runSearch, selectedName, selectedCategory, reloadSelectedEntry]);
 
   const closeEntry = () => {
     setSelectedName(null);
@@ -166,8 +278,20 @@ export function SrdBrowsePage() {
     setLoadingEntry(false);
   };
 
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearching(false);
+    searchRequestRef.current += 1;
+  };
+
   const showDetail = Boolean(selectedName);
   const mobileDetailOpen = isMobile && showDetail;
+  const listEmptyMessage = loadingList
+    ? null
+    : showGlobalSearch && searchResults.length === 0 && !searching
+      ? `No entries in ${categoryMeta.label} match your search.`
+      : `No entries in ${categoryMeta.label}.`;
 
   return (
     <div className="session-ui flex h-full min-h-0 flex-col overflow-hidden bg-void">
@@ -186,23 +310,35 @@ export function SrdBrowsePage() {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void runSearch();
+            void runSearch(trimmedSearch);
           }}
           className="flex shrink-0 gap-2"
         >
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search all SRD categories…"
-            className="flex-1 rounded-sm border border-border bg-black px-3 py-2 text-sm font-mono text-starlight placeholder:text-ink-faint focus:border-neon-cyan focus:outline-none"
-          />
+          <div className="relative min-w-0 flex-1">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search all SRD categories…"
+              className="w-full rounded-sm border border-border bg-black py-2 pl-3 pr-9 text-sm font-mono text-starlight placeholder:text-ink-faint focus:border-neon-cyan focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ink-faint hover:text-starlight"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <button
             type="submit"
             className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-neon-cyan px-3 py-2 text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
           >
             <Search className="h-4 w-4" />
-            Search
+            <span className="hidden sm:inline">Search</span>
           </button>
         </form>
 
@@ -212,23 +348,14 @@ export function SrdBrowsePage() {
           </p>
         )}
 
-        {searchResults.length > 0 && !mobileDetailOpen && (
-          <section className="shrink-0 rounded-md border border-neon-magenta/40 bg-void-panel p-3">
-            <p className="mb-2 text-xs font-black uppercase text-neon-magenta">Search results</p>
-            <ul className="flex max-h-24 flex-wrap gap-2 overflow-y-auto">
-              {searchResults.map((hit) => (
-                <li key={`${hit.category}-${hit.name}`}>
-                  <button
-                    type="button"
-                    onClick={() => void openEntry(hit.name, hit.category)}
-                    className="rounded-sm border border-border px-2 py-1 text-xs font-mono text-starlight hover:border-neon-cyan hover:text-neon-cyan"
-                  >
-                    <span className="text-ink-faint">{hit.category}</span> {hit.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+        {showGlobalSearch && !mobileDetailOpen && (
+          <SearchResultsPanel
+            results={searchResults}
+            searching={searching}
+            query={trimmedSearch}
+            onSelect={(name, category) => void openEntry(name, category)}
+            onClear={clearSearch}
+          />
         )}
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:gap-4">
@@ -257,50 +384,58 @@ export function SrdBrowsePage() {
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:items-stretch">
             {(!isMobile || !showDetail) && (
-            <div className="min-h-0 w-full shrink-0 lg:w-[22rem] xl:w-[24rem]">
-              <BrowseListPanel
-                fillHeight={!isMobile}
-                title={
-                  <>
-                    {categoryMeta.label}
-                    {loadingList && <span className="ml-2 text-ink-faint">Loading…</span>}
-                  </>
-                }
-                titleClassName="text-neon-cyan"
-              >
-                <ul className="p-1.5 sm:p-2">
-                  {filteredEntries.map((row) => (
-                    <li key={row.name}>
-                      <button
-                        type="button"
-                        onClick={() => void openEntry(row.name, activeCategory)}
-                        className={`block w-full rounded-sm px-2 py-1.5 text-left text-xs font-mono hover:bg-neon-cyan/10 ${
-                          selectedName === row.name
-                            ? "bg-neon-cyan/10 text-starlight"
-                            : "text-ink-muted"
-                        }`}
-                      >
-                        <span className="font-black text-starlight">{row.name}</span>
-                        {entrySummary(row, activeCategory) && (
-                          <span className="mt-0.5 block text-[10px] text-ink-faint">
-                            {entrySummary(row, activeCategory)}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                  {!loadingList && filteredEntries.length === 0 && (
-                    <li className="px-2 py-4 text-center text-xs font-mono text-ink-faint">
-                      No entries found.
-                    </li>
-                  )}
-                </ul>
-              </BrowseListPanel>
-            </div>
+              <div className="min-h-0 w-full shrink-0 lg:w-[22rem] xl:w-[24rem]">
+                <BrowseListPanel
+                  fillHeight={!isMobile}
+                  onRefresh={refreshBrowse}
+                  title={
+                    <>
+                      {categoryMeta.label}
+                      {loadingList && <span className="ml-2 text-ink-faint">Loading…</span>}
+                      {!loadingList && entries.length > 0 && (
+                        <span className="ml-2 font-mono text-ink-faint">({entries.length})</span>
+                      )}
+                    </>
+                  }
+                  titleClassName="text-neon-cyan"
+                >
+                  <ul className="p-1.5 sm:p-2">
+                    {entries.map((row) => (
+                      <li key={row.name}>
+                        <button
+                          type="button"
+                          onClick={() => void openEntry(row.name, activeCategory)}
+                          className={`block w-full rounded-sm px-2 py-1.5 text-left text-xs font-mono transition-colors hover:bg-neon-cyan/10 ${
+                            selectedName === row.name && selectedCategory === activeCategory
+                              ? "bg-neon-cyan/10 text-starlight"
+                              : "text-ink-muted"
+                          }`}
+                        >
+                          <span className="font-black text-starlight">{row.name}</span>
+                          {entrySummary(row, activeCategory) && (
+                            <span className="mt-0.5 block text-[10px] text-ink-faint">
+                              {entrySummary(row, activeCategory)}
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                    {!loadingList && entries.length === 0 && (
+                      <li className="px-2 py-6 text-center text-xs font-mono text-ink-faint">
+                        {listEmptyMessage}
+                      </li>
+                    )}
+                  </ul>
+                </BrowseListPanel>
+              </div>
             )}
 
             {showDetail && (
-              <EntryDetailPanel title={selectedName} onClose={closeEntry}>
+              <EntryDetailPanel
+                title={selectedName}
+                onClose={closeEntry}
+                onRefresh={refreshBrowse}
+              >
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
                   <SrdEntryDetail entry={selectedEntry} category={detailCategory} />
@@ -309,6 +444,14 @@ export function SrdBrowsePage() {
                   <p className="text-ink-faint">Could not load this entry.</p>
                 )}
               </EntryDetailPanel>
+            )}
+
+            {!showDetail && !isMobile && (
+              <div className="hidden min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-border/60 bg-void-panel/40 lg:flex">
+                <p className="px-6 text-center text-xs font-mono text-ink-faint">
+                  Select an entry to view spells, stat blocks, and item details.
+                </p>
+              </div>
             )}
           </section>
         </div>

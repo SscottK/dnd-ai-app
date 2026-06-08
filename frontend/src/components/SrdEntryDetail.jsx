@@ -137,15 +137,8 @@ function GlossaryEntryMeta({ entry }) {
 }
 
 function ConditionEntryMeta({ entry }) {
-  return (
-    <MetaPanel
-      header="Condition"
-      rows={[
-        ["Key", entry.key],
-        ["Category", entry.tag || "Condition"],
-      ]}
-    />
-  );
+  if (!entry.tag) return null;
+  return <MetaPanel header={entry.tag} headerClassName="text-plasma" />;
 }
 
 function GearEntryMeta({ entry }) {

@@ -174,11 +174,13 @@ export function isMonsterEntry(entry) {
 
 export function MonsterStatBlock({ monster }) {
   if (!monster?.stat_block_json && hasMarkdownStatBlock(monster)) {
-    const typeLine = [monster.size, titleCase(monster.type)].filter(Boolean).join(" ");
+    const typeLine = [monster.size, titleCase(monster.type), monster.alignment]
+      .filter(Boolean)
+      .join(" ");
     return (
       <div className="space-y-4">
         {typeLine && <p className="text-xs font-black uppercase text-neon-cyan">{typeLine}</p>}
-        {monster.cr != null && (
+        {monster.cr != null && monster.cr !== "" && (
           <p className="font-mono text-xs text-starlight">Challenge Rating {monster.cr}</p>
         )}
         <MarkdownRenderer content={normalizeMarkdown(monster.content || monster.description)} />

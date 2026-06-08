@@ -184,6 +184,19 @@ class AccessRequest(SQLModel, table=True):
     reviewed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
+class Feedback(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    message: str = Field(max_length=2000)
+    page_url: str = Field(default="", max_length=500)
+    status: str = Field(default="pending", max_length=20, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    reviewed_at: Optional[datetime] = Field(default=None)
+    reviewed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
+
+    user: Optional[User] = Relationship()
+
+
 class UserNote(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)

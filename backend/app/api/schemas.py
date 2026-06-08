@@ -79,7 +79,30 @@ class AccessRequestActionResponse(BaseModel):
 
 
 class AccessRequestSummaryResponse(BaseModel):
+    access_pending_count: int
+    feedback_pending_count: int
     pending_count: int
+
+
+class FeedbackCreate(BaseModel):
+    message: str = Field(min_length=10, max_length=2000)
+    page_url: str = Field(default="", max_length=500)
+
+
+class FeedbackRead(BaseModel):
+    id: int
+    username: str
+    message: str
+    page_url: str
+    status: str
+    created_at: datetime
+    reviewed_at: datetime | None = None
+    reviewed_by_username: str | None = None
+
+
+class FeedbackActionResponse(BaseModel):
+    feedback: FeedbackRead
+    message: str
 
 
 class AuthStatusResponse(BaseModel):

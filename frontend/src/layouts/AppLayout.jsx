@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { BookOpen, LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText, UserPlus } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
-import { APP_NAME, APP_TAGLINE, RULE_WIZARD_LABEL } from "../constants/branding";
+import { FeedbackModal } from "../components/FeedbackModal";
+import { APP_NAME, APP_TAGLINE, APP_VERSION, RULE_WIZARD_LABEL } from "../constants/branding";
 
 const navLinkClass = ({ isActive }) =>
   `flex shrink-0 items-center gap-1 rounded-sm px-2.5 py-2 text-[10px] font-black uppercase tracking-wide border-b-2 transition sm:gap-1.5 sm:px-3 sm:text-xs ${
@@ -24,7 +26,11 @@ function NavItem({ to, end, icon: Icon, label, shortLabel, children }) {
 
 export function AppLayout() {
   const { token, user, logout } = useAuth();
-  const { pendingCount } = usePendingAccessCount(token, Boolean(user?.is_admin));
+  const { pendingCount, refresh: refreshPendingCount } = usePendingAccessCount(
+    token,
+    Boolean(user?.is_admin)
+  );
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
     <div className="flex h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-void font-sans text-ink">
@@ -68,15 +74,15 @@ export function AppLayout() {
           <NavItem to="/srd" icon={BookOpen} label="SRD" shortLabel="SRD" />
           <NavItem to="/notes" icon={ScrollText} label="Notes" shortLabel="Notes" />
           {user?.is_admin && (
-            <NavLink to="/admin/access" className={navLinkClass} title="Access requests">
+            <NavLink to="/admin/access" className={navLinkClass} title="Requests">
               <span className="relative flex shrink-0 items-center gap-1">
                 <UserPlus className="h-3.5 w-3.5" />
-                <span className="sm:hidden">Access</span>
-                <span className="hidden sm:inline">Access</span>
+                <span className="sm:hidden">Requests</span>
+                <span className="hidden sm:inline">Requests</span>
                 {pendingCount > 0 && (
                   <span
                     className="min-w-[1.1rem] rounded-full bg-neon-magenta px-1 text-center text-[9px] font-black leading-4 text-black"
-                    title={`${pendingCount} pending access request${pendingCount === 1 ? "" : "s"}`}
+                    title={`${pendingCount} pending request${pendingCount === 1 ? "" : "s"}`}
                   >
                     {pendingCount}
                   </span>
@@ -90,6 +96,28 @@ export function AppLayout() {
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
         <Outlet />
       </main>
+
+      <footer className="shrink-0 border-t border-border/50 bg-void-deep/80 px-3 py-2">
+        <div className="flex items-center justify-center gap-3 text-[10px] font-mono uppercase tracking-widest text-ink-faint">
+          <span>Beta {APP_VERSION}</span>
+          <span className="text-border" aria-hidden>
+            ·
+          </span>
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="text-neon-cyan hover:text-starlight"
+          >
+            Send feedback
+          </button>
+        </div>
+      </footer>
+
+      <FeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        onSubmitted={refreshPendingCount}
+      />
     </div>
   );
 }

@@ -1,3 +1,25 @@
+export const SRD_CATEGORY_LABELS = {
+  spells: "Spells",
+  monsters: "Monsters",
+  magic_items: "Magic items",
+  conditions: "Conditions",
+  species: "Species",
+  backgrounds: "Backgrounds",
+  feats: "Feats",
+  weapons: "Weapons",
+  armor: "Armor",
+  gear: "Gear",
+  animals: "Animals",
+  glossary: "Glossary",
+  classes: "Classes",
+  rules_sections: "Rules",
+};
+
+export function formatCategoryLabel(category) {
+  if (!category) return "";
+  return SRD_CATEGORY_LABELS[category] || String(category).replace(/_/g, " ");
+}
+
 export function formatSpellLevel(level) {
   if (level === 0) return "Cantrip";
   if (level != null) return `Lv ${level}`;
@@ -52,7 +74,15 @@ export function entrySummary(entry, category) {
       .join(" · ");
   }
   if (category === "monsters") {
-    return [`CR ${entry.cr ?? "?"}`, entry.size, entry.type].filter(Boolean).join(" · ");
+    const parts = [];
+    const cr = entry.cr ?? entry.stat_block_json?.cr;
+    if (cr != null && cr !== "" && String(cr).toLowerCase() !== "none") {
+      parts.push(`CR ${cr}`);
+    }
+    if (entry.size) parts.push(entry.size);
+    if (entry.type) parts.push(entry.type);
+    if (entry.alignment) parts.push(entry.alignment);
+    return parts.join(" · ");
   }
   if (category === "magic_items") {
     const { subtitle } = parseLeadingSubtitle(entry.description || "");
