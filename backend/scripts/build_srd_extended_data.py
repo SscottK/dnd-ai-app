@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build SRD 5.2.1 species, backgrounds, feats, equipment, and glossary JSON.
+"""Build partial SRD 5.2.1 data (superseded by build_srd_all.py).
+
+Prefer: python scripts/build_srd_all.py
+
+Build SRD 5.2.1 species, backgrounds, feats, equipment, and glossary JSON.
 
 Species/backgrounds/feats/glossary: parsed from downfallx/dnd-5e-srd-markdown (CC-BY SRD).
 Weapons/armor: Open5e API (wotc-srd document, CC-BY 4.0).

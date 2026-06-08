@@ -1,0 +1,39 @@
+{
+  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0.",
+  "_edition": "5.2.1",
+  "counts": {
+    "monsters": 322,
+    "conditions": 14,
+    "spells": 319,
+    "standard_actions": 11,
+    "class_features": 36,
+    "species": 9,
+    "backgrounds": 4,
+    "feats": 17,
+    "glossary": 154,
+    "classes": 12,
+    "magic_items": 260,
+    "animals": 95,
+    "weapons": 37,
+    "armor": 18,
+    "gear": 83,
+    "equipment_chapters": 14,
+    "rules_sections": 40
+  },
+  "files": [
+    "animals.json",
+    "backgrounds.json",
+    "classes.json",
+    "combat_actions.json",
+    "conditions.json",
+    "equipment.json",
+    "feats.json",
+    "glossary.json",
+    "magic_items.json",
+    "manifest.json",
+    "monsters.json",
+    "rules_documents.json",
+    "species.json",
+    "spells.json"
+  ]
+}

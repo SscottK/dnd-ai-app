@@ -1,5 +1,6 @@
 {
-  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0. Re-published via the Open5e API (https://api.open5e.com/, document slug: wotc-srd), also under CC-BY 4.0.",
+  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0.",
+  "_source_note": "Open5e wotc-srd classes + SRD 5.2.1 standard actions",
   "standard_actions": [
     {
       "name": "Attack",
@@ -73,7 +74,7 @@
   "class_features": [
     {
       "name": "Action Surge",
-      "action_type": "bonus_action",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Fighter",
@@ -98,7 +99,7 @@
     },
     {
       "name": "Channel Divinity",
-      "action_type": "reaction",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Cleric",
@@ -154,7 +155,7 @@
     },
     {
       "name": "Eldritch Invocations",
-      "action_type": "reaction",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Warlock",
@@ -212,51 +213,15 @@
     },
     {
       "name": "Hide in Plain Sight",
-      "action_type": "reaction",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Ranger",
       "description": "Starting at 10th level, you can spend 1 minute creating camouflage for yourself. You must have access to fresh mud, dirt, plants, soot, and other naturally occurring materials with which to create your camouflage. \n \nOnce you are camouflaged in this way, you can try to hide by pressing yourself up against a solid surface, such as a tree or wall, that is at least as tall and wide as you are. You gain a +10 bonus to Dexterity (Stealth) checks as long as you remain there without moving or taking ac"
     },
     {
-      "name": "Flurry of Blows",
-      "action_type": "bonus_action",
-      "targeting": "one_enemy",
-      "category": "class_feature",
-      "source_class": "Monk",
-      "resource_cost": { "resource_id": "ki", "amount": 1 },
-      "description": "Immediately after you take the Attack action on your turn, you can spend 1 ki point to make two unarmed strikes as a bonus action."
-    },
-    {
-      "name": "Patient Defense",
-      "action_type": "bonus_action",
-      "targeting": "self",
-      "category": "class_feature",
-      "source_class": "Monk",
-      "resource_cost": { "resource_id": "ki", "amount": 1 },
-      "description": "You can spend 1 ki point to take the Dodge action as a bonus action on your turn."
-    },
-    {
-      "name": "Step of the Wind",
-      "action_type": "bonus_action",
-      "targeting": "self",
-      "category": "class_feature",
-      "source_class": "Monk",
-      "resource_cost": { "resource_id": "ki", "amount": 1 },
-      "description": "You can spend 1 ki point to take the Disengage or Dash action as a bonus action on your turn, and your jump distance is doubled for the turn."
-    },
-    {
-      "name": "Stunning Strike",
-      "action_type": "free",
-      "targeting": "one_enemy",
-      "category": "class_feature",
-      "source_class": "Monk",
-      "resource_cost": { "resource_id": "ki", "amount": 1 },
-      "description": "When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike."
-    },
-    {
       "name": "Ki",
-      "action_type": "bonus_action",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Monk",
@@ -272,7 +237,7 @@
     },
     {
       "name": "Martial Arts",
-      "action_type": "bonus_action",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Monk",
@@ -280,7 +245,7 @@
     },
     {
       "name": "Metamagic",
-      "action_type": "bonus_action",
+      "action_type": "action",
       "targeting": "one_enemy",
       "category": "class_feature",
       "source_class": "Sorcerer",
@@ -288,7 +253,7 @@
     },
     {
       "name": "Monks of the Way of the Open Hand are the ultimate masters of martial arts combat, whether armed or unarmed. They learn techniques to push and trip their opponents, manipulate ki to heal damage to their bodies, and practice advanced meditation that can protect them from harm.",
-      "action_type": "reaction",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Monk (Way of the Open Hand)",
@@ -297,7 +262,7 @@
     },
     {
       "name": "Pact Boon",
-      "action_type": "reaction",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Warlock",
@@ -355,7 +320,7 @@
     },
     {
       "name": "The Oath of Devotion binds a paladin to the loftiest ideals of justice, virtue, and order. Sometimes called cavaliers, white knights, or holy warriors, these paladins meet the ideal of the knight in shining armor, acting with honor in pursuit of justice and the greater good. They hold themselves to the highest standards of conduct, and some, for better or worse, hold the rest of the world to the same standards. Many who swear this oath are devoted to gods of law and good and use their gods' tenets as the measure of their devotion. They hold angels-the perfect servants of good-as their ideals, and incorporate images of angelic wings into their helmets or coats of arms.",
-      "action_type": "reaction",
+      "action_type": "action",
       "targeting": "one_ally",
       "category": "class_feature",
       "source_class": "Paladin (Oath of Devotion)",
@@ -372,7 +337,7 @@
     },
     {
       "name": "Vanish",
-      "action_type": "bonus_action",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Ranger",
@@ -384,19 +349,7 @@
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Druid",
-      "requires_option": true,
-      "option_source": "wild_shapes",
-      "description": "Starting at 2nd level, you can use your action to magically assume the shape of a beast that you have seen before. You can use this feature twice. You regain expended uses when you finish a short or long rest."
-    },
-    {
-      "name": "Combat Wild Shape",
-      "action_type": "bonus_action",
-      "targeting": "self",
-      "category": "class_feature",
-      "source_class": "Druid (Circle of the Moon)",
-      "requires_option": true,
-      "option_source": "wild_shapes",
-      "description": "When you choose this circle at 2nd level, you can use Wild Shape as a bonus action, and you can transform into a beast with a challenge rating as high as 1 (3 at 6th level, 2 at 9th, 3 at 12th, 4 at 15th, 5 at 18th)."
+      "description": "Starting at 2nd level, you can use your action to magically assume the shape of a beast that you have seen before. You can use this feature twice. You regain expended uses when you finish a short or long rest. \n \nYour druid level determines the beasts you can transform into, as shown in the Beast Shapes table. At 2nd level, for example, you can transform into any beast that has a challenge rating of 1/4 or lower that doesn't have a flying or swimming speed. \n \n**Beast Shapes (table)** \n \n| Level"
     },
     {
       "name": "You hone your skills in the larcenous arts. Burglars, bandits, cutpurses, and other criminals typically follow this archetype, but so do rogues who prefer to think of themselves as professional treasure seekers, explorers, delvers, and investigators. In addition to improving your agility and stealth, you learn skills useful for delving into ancient ruins, reading unfamiliar languages, and using magic items you normally couldn't employ.",
@@ -409,7 +362,7 @@
     },
     {
       "name": "Your innate magic comes from draconic magic that was mingled with your blood or that of your ancestors. Most often, sorcerers with this origin trace their descent back to a mighty sorcerer of ancient times who made a bargain with a dragon or who might even have claimed a dragon parent. Some of these bloodlines are well established in the world, but most are obscure. Any given sorcerer could be the first of a new bloodline, as a result of a pact or some other exceptional circumstance.",
-      "action_type": "bonus_action",
+      "action_type": "action",
       "targeting": "self",
       "category": "class_feature",
       "source_class": "Sorcerer (Draconic Bloodline)",

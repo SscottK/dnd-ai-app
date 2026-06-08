@@ -9,15 +9,6 @@ from pathlib import Path
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "srd-5.2.1"
 
-CATALOG_FILES = {
-    "species": "species.json",
-    "backgrounds": "backgrounds.json",
-    "feats": "feats.json",
-    "glossary": "glossary.json",
-    "spells": "spells.json",
-    "conditions": "conditions.json",
-}
-
 
 def _load_json(filename: str) -> dict:
     path = _DATA_DIR / filename
@@ -27,49 +18,93 @@ def _load_json(filename: str) -> dict:
         return json.load(handle)
 
 
-@lru_cache(maxsize=1)
-def _species_index() -> dict[str, dict]:
-    payload = _load_json("species.json")
-    return {row["name"].casefold(): row for row in payload.get("species") or [] if row.get("name")}
-
-
-@lru_cache(maxsize=1)
-def _backgrounds_index() -> dict[str, dict]:
-    payload = _load_json("backgrounds.json")
-    return {
-        row["name"].casefold(): row for row in payload.get("backgrounds") or [] if row.get("name")
-    }
-
-
-@lru_cache(maxsize=1)
-def _feats_index() -> dict[str, dict]:
-    payload = _load_json("feats.json")
-    return {row["name"].casefold(): row for row in payload.get("feats") or [] if row.get("name")}
-
-
-@lru_cache(maxsize=1)
-def _glossary_index() -> dict[str, dict]:
-    payload = _load_json("glossary.json")
-    return {row["name"].casefold(): row for row in payload.get("glossary") or [] if row.get("name")}
-
-
-@lru_cache(maxsize=1)
-def _spells_index() -> dict[str, dict]:
-    payload = _load_json("spells.json")
-    return {row["name"].casefold(): row for row in payload.get("spells") or [] if row.get("name")}
-
-
-@lru_cache(maxsize=1)
-def _conditions_index() -> dict[str, dict]:
-    payload = _load_json("conditions.json")
-    rows = payload.get("conditions") or []
+def _index_by_name(rows: list[dict]) -> dict[str, dict]:
     return {row["name"].casefold(): row for row in rows if row.get("name")}
 
 
 @lru_cache(maxsize=1)
+def _species_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("species.json").get("species") or []))
+
+
+@lru_cache(maxsize=1)
+def _backgrounds_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("backgrounds.json").get("backgrounds") or []))
+
+
+@lru_cache(maxsize=1)
+def _feats_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("feats.json").get("feats") or []))
+
+
+@lru_cache(maxsize=1)
+def _glossary_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("glossary.json").get("glossary") or []))
+
+
+@lru_cache(maxsize=1)
+def _spells_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("spells.json").get("spells") or []))
+
+
+@lru_cache(maxsize=1)
+def _conditions_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("conditions.json").get("conditions") or []))
+
+
+@lru_cache(maxsize=1)
+def _classes_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("classes.json").get("classes") or []))
+
+
+@lru_cache(maxsize=1)
+def _magic_items_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("magic_items.json").get("magic_items") or []))
+
+
+@lru_cache(maxsize=1)
+def _animals_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("animals.json").get("animals") or []))
+
+
+@lru_cache(maxsize=1)
+def _monsters_index() -> dict[str, dict]:
+    return _index_by_name((_load_json("monsters.json").get("monsters") or []))
+
+
+@lru_cache(maxsize=1)
 def _equipment_data() -> dict:
-    payload = _load_json("equipment.json")
-    return payload.get("equipment") or {}
+    return _load_json("equipment.json").get("equipment") or {}
+
+
+@lru_cache(maxsize=1)
+def _rules_sections_flat() -> list[dict]:
+    sections: list[dict] = []
+    for doc in _load_json("rules_documents.json").get("documents") or []:
+        doc_title = doc.get("title") or doc.get("id") or "Rules"
+        for section in doc.get("sections") or []:
+            sections.append(
+                {
+                    "name": section.get("name"),
+                    "slug": section.get("slug"),
+                    "description": section.get("content") or "",
+                    "document": doc_title,
+                }
+            )
+    for chapter in _equipment_data().get("chapters") or []:
+        sections.append(
+            {
+                "name": chapter.get("name"),
+                "slug": chapter.get("slug"),
+                "description": chapter.get("content") or "",
+                "document": "Equipment",
+            }
+        )
+    return sections
+
+
+def _gear_index() -> dict[str, dict]:
+    return _index_by_name(list(_equipment_data().get("gear") or []))
 
 
 def list_entries(category: str) -> list[dict]:
@@ -85,33 +120,62 @@ def list_entries(category: str) -> list[dict]:
         return list(_spells_index().values())
     if category == "conditions":
         return list(_conditions_index().values())
+    if category == "classes":
+        return list(_classes_index().values())
+    if category == "magic_items":
+        return list(_magic_items_index().values())
+    if category == "animals":
+        return list(_animals_index().values())
+    if category == "monsters":
+        return [
+            {
+                "name": row.get("name"),
+                "slug": row.get("id") or row.get("name", "").lower(),
+                "cr": row.get("cr"),
+                "type": (row.get("stat_block_json") or {}).get("type"),
+                "size": row.get("size"),
+            }
+            for row in _monsters_index().values()
+        ]
     if category == "weapons":
         return list(_equipment_data().get("weapons") or [])
     if category == "armor":
         return list(_equipment_data().get("armor") or [])
+    if category == "gear":
+        return list(_equipment_data().get("gear") or [])
+    if category == "rules_sections":
+        return _rules_sections_flat()
     return []
 
 
 def lookup_entry(category: str, name: str) -> dict | None:
     key = name.strip().casefold()
-    if category == "species":
-        return _species_index().get(key)
-    if category == "backgrounds":
-        return _backgrounds_index().get(key)
-    if category == "feats":
-        return _feats_index().get(key)
-    if category == "glossary":
-        return _glossary_index().get(key)
-    if category == "spells":
-        return _spells_index().get(key)
-    if category == "conditions":
-        return _conditions_index().get(key)
+    lookup_map = {
+        "species": _species_index,
+        "backgrounds": _backgrounds_index,
+        "feats": _feats_index,
+        "glossary": _glossary_index,
+        "spells": _spells_index,
+        "conditions": _conditions_index,
+        "classes": _classes_index,
+        "magic_items": _magic_items_index,
+        "animals": _animals_index,
+        "monsters": _monsters_index,
+        "gear": _gear_index,
+    }
+    if category in lookup_map:
+        return lookup_map[category]().get(key)
+
     if category == "weapons":
         for row in _equipment_data().get("weapons") or []:
             if row.get("name", "").casefold() == key:
                 return row
     if category == "armor":
         for row in _equipment_data().get("armor") or []:
+            if row.get("name", "").casefold() == key:
+                return row
+    if category == "rules_sections":
+        for row in _rules_sections_flat():
             if row.get("name", "").casefold() == key:
                 return row
     return None
@@ -131,7 +195,11 @@ def _score_entry(query_tokens: set[str], query_lower: str, entry: dict, *, categ
     if name_lower and any(token in name_lower.split() for token in query_tokens):
         score += 40
 
-    description = str(entry.get("description") or entry.get("desc") or "")
+    description = str(entry.get("description") or entry.get("desc") or entry.get("content") or "")
+    if category == "monsters":
+        stat = entry.get("stat_block_json") or {}
+        description = f"{stat.get('type', '')} {stat.get('alignment', '')}"
+
     desc_tokens = _tokenize(description)
     overlap = len(query_tokens & desc_tokens)
     score += min(overlap * 3, 30)
@@ -146,7 +214,7 @@ def _score_entry(query_tokens: set[str], query_lower: str, entry: dict, *, categ
     return score
 
 
-def search_catalog(query: str, *, limit: int = 8) -> list[dict]:
+def search_catalog(query: str, *, limit: int = 10) -> list[dict]:
     query = query.strip()
     if not query:
         return []
@@ -155,13 +223,19 @@ def search_catalog(query: str, *, limit: int = 8) -> list[dict]:
     query_tokens = _tokenize(query)
 
     scored: list[tuple[int, str, dict]] = []
-    catalogs = [
+    catalogs: list[tuple[str, object]] = [
         ("glossary", _glossary_index().values()),
         ("feats", _feats_index().values()),
         ("species", _species_index().values()),
         ("backgrounds", _backgrounds_index().values()),
         ("conditions", _conditions_index().values()),
         ("spells", _spells_index().values()),
+        ("classes", _classes_index().values()),
+        ("magic_items", _magic_items_index().values()),
+        ("animals", _animals_index().values()),
+        ("monsters", _monsters_index().values()),
+        ("gear", _gear_index().values()),
+        ("rules_sections", _rules_sections_flat()),
     ]
 
     for category, rows in catalogs:
@@ -190,14 +264,24 @@ def search_catalog(query: str, *, limit: int = 8) -> list[dict]:
 
 
 def catalog_summary() -> dict:
+    manifest = _load_json("manifest.json")
+    if manifest.get("counts"):
+        return dict(manifest["counts"])
+
     equipment = _equipment_data()
     return {
+        "monsters": len(_monsters_index()),
+        "conditions": len(_conditions_index()),
+        "spells": len(_spells_index()),
         "species": len(_species_index()),
         "backgrounds": len(_backgrounds_index()),
         "feats": len(_feats_index()),
         "glossary": len(_glossary_index()),
-        "spells": len(_spells_index()),
-        "conditions": len(_conditions_index()),
+        "classes": len(_classes_index()),
+        "magic_items": len(_magic_items_index()),
+        "animals": len(_animals_index()),
         "weapons": len(equipment.get("weapons") or []),
         "armor": len(equipment.get("armor") or []),
+        "gear": len(equipment.get("gear") or []),
+        "rules_sections": len(_rules_sections_flat()),
     }

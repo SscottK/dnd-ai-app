@@ -252,7 +252,7 @@ def main() -> None:
                 "targeting": infer_spell_targeting(spell),
                 "range": spell.get("range"),
                 "casting_time": spell.get("casting_time"),
-                "description": (spell.get("desc") or "")[:600],
+                "description": spell.get("desc") or "",
             }
         )
     spells_payload = {"_license": LICENSE, "spells": sorted(spells, key=lambda row: row["name"].casefold())}

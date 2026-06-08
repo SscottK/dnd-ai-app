@@ -49,13 +49,23 @@ def rules_summary():
 
 
 @router.get("/classes")
-def list_classes():
+def list_class_catalog():
+    """Combat/class-catalog keys (br-2024 merge) — used by character builder."""
     path = Path(__file__).resolve().parents[4] / "data" / "class_catalog.json"
     if not path.is_file():
         return {"classes": []}
     with path.open(encoding="utf-8") as handle:
         payload = json.load(handle)
     return {"classes": sorted((payload.get("classes") or {}).keys())}
+
+
+@router.get("/srd-classes")
+def list_srd_classes():
+    path = _DATA_DIR / "classes.json"
+    if not path.is_file():
+        return {"classes": []}
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 @router.get("/species")
@@ -83,11 +93,53 @@ def list_conditions():
     return {"conditions": list_entries("conditions")}
 
 
+@router.get("/magic-items")
+def list_magic_items():
+    path = _DATA_DIR / "magic_items.json"
+    if not path.is_file():
+        return {"magic_items": []}
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+@router.get("/animals")
+def list_animals():
+    return {"animals": list_entries("animals")}
+
+
+@router.get("/monsters")
+def list_monsters():
+    return {"monsters": list_entries("monsters")}
+
+
+@router.get("/gear")
+def list_gear():
+    return {"gear": list_entries("gear")}
+
+
+@router.get("/rules-documents")
+def list_rules_documents():
+    path = _DATA_DIR / "rules_documents.json"
+    if not path.is_file():
+        return {"documents": []}
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+@router.get("/manifest")
+def srd_manifest():
+    path = _DATA_DIR / "manifest.json"
+    if not path.is_file():
+        return {"counts": catalog_summary()}
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 @router.get("/equipment")
 def get_equipment():
     path = _DATA_DIR / "equipment.json"
     if not path.is_file():
-        return {"equipment": {"weapons": [], "armor": [], "rules_sections": []}}
+        return {"equipment": {"weapons": [], "armor": [], "gear": [], "chapters": []}}
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -145,6 +197,12 @@ def lookup_by_category(category: str, name: str):
         "glossary",
         "spells",
         "conditions",
+        "classes",
+        "magic_items",
+        "animals",
+        "monsters",
+        "gear",
+        "rules_sections",
         "weapons",
         "armor",
     }
