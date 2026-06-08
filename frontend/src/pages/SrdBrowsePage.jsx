@@ -237,7 +237,7 @@ export function SrdBrowsePage() {
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:gap-4">
           <aside className="shrink-0 lg:w-44 xl:w-52">
             <p className="mb-2 text-xs font-black uppercase text-ink-faint">Categories</p>
-            <div className="flex flex-wrap gap-1 lg:flex-col">
+            <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:flex-col lg:overflow-visible lg:pb-0 [&::-webkit-scrollbar]:hidden">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
@@ -246,7 +246,7 @@ export function SrdBrowsePage() {
                     setSearchResults([]);
                     setActiveCategory(cat.id);
                   }}
-                  className={`rounded-sm border px-3 py-1.5 text-left text-xs font-black uppercase lg:py-2 ${
+                  className={`shrink-0 rounded-sm border px-3 py-1.5 text-left text-xs font-black uppercase lg:shrink lg:py-2 ${
                     activeCategory === cat.id
                       ? "border-neon-cyan bg-neon-cyan/10 text-starlight"
                       : "border-border text-ink-muted hover:border-neon-cyan/50 hover:text-starlight"
@@ -258,12 +258,8 @@ export function SrdBrowsePage() {
             </div>
           </aside>
 
-          <section
-            className={`flex min-h-0 flex-1 gap-3 overflow-hidden ${
-              showDetail ? "flex-col lg:flex-row lg:items-start" : ""
-            }`}
-          >
-            <div className="min-h-0 min-w-0 flex-1">
+          <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:items-start">
+            <div className="min-h-0 w-full shrink-0 lg:w-[22rem] xl:w-[24rem]">
               <BrowseListPanel
                 title={
                   <>

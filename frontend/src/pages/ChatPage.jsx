@@ -15,11 +15,14 @@ import {
   Trash2,
   Pin,
   PinOff,
+  ArrowLeft,
 } from "lucide-react";
+import { useMediaQuery, APP_MOBILE_QUERY } from "../hooks/useMediaQuery";
 
 export function ChatPage() {
   const { token } = useAuth();
   const { streamMessage, isStreaming } = useChatStream(token);
+  const isMobile = useMediaQuery(APP_MOBILE_QUERY);
 
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -207,7 +210,7 @@ export function ChatPage() {
             <span className="truncate font-bold tracking-wide">{c.title}</span>
           )}
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-shrink-0 items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
           {editingConvId === c.id ? (
             <>
               <button onClick={(e) => handleSaveRename(e, c.id)} className="text-emerald-400 p-0.5">
@@ -235,9 +238,17 @@ export function ChatPage() {
     );
   };
 
+  const showThreadList = !isMobile || !activeConvId;
+  const showChatPane = !isMobile || Boolean(activeConvId);
+
   return (
-    <div className="flex h-full bg-black text-neon-cyan overflow-hidden">
-      <aside className="w-72 border-r-2 border-neon-magenta/50 bg-zinc-950 flex flex-col">
+    <div className="flex h-full min-h-0 overflow-hidden bg-black text-neon-cyan">
+      {showThreadList && (
+      <aside
+        className={`flex min-h-0 flex-col border-neon-magenta/50 bg-zinc-950 ${
+          isMobile ? "w-full shrink-0" : "w-72 shrink-0 border-r-2"
+        }`}
+      >
         <div className="p-3 border-b border-neon-magenta/30">
           <button
             onClick={handleCreateConversation}
@@ -265,15 +276,29 @@ export function ChatPage() {
           </div>
         </div>
       </aside>
+      )}
 
-      <div className="flex-1 flex flex-col">
+      {showChatPane && (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {activeConvId ? (
           <>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {isMobile && (
+              <div className="shrink-0 border-b border-neon-magenta/30 bg-zinc-950 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveConvId(null)}
+                  className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-neon-cyan hover:text-starlight"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Threads
+                </button>
+              </div>
+            )}
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:space-y-6 sm:p-6">
               {messages.map((m, idx) => (
                 <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-2xl p-4 text-sm border-2 font-mono ${
+                    className={`max-w-2xl p-3 text-sm border-2 font-mono sm:p-4 ${
                       m.role === "user"
                         ? "bg-neon-cyan text-black border-white"
                         : "bg-zinc-950 text-white border-neon-magenta"
@@ -303,28 +328,29 @@ export function ChatPage() {
                 </div>
               )}
             </div>
-            <div className="p-4 border-t-2 border-neon-magenta bg-black/95">
-              <form onSubmit={handleSendMessage} className="flex gap-2 max-w-3xl mx-auto font-mono">
+            <div className="shrink-0 border-t-2 border-neon-magenta bg-black/95 p-3 sm:p-4">
+              <form onSubmit={handleSendMessage} className="mx-auto flex max-w-3xl gap-2 font-mono">
                 <input
                   type="text"
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
                   placeholder="Ask about a rule, spell, or monster..."
                   disabled={isStreaming}
-                  className="flex-1 px-4 py-3 border-2 border-neon-cyan bg-zinc-950 text-starlight focus:outline-none focus:border-starlight text-sm"
+                  className="min-w-0 flex-1 border-2 border-neon-cyan bg-zinc-950 px-3 py-2.5 text-sm text-starlight focus:border-starlight focus:outline-none sm:px-4 sm:py-3"
                 />
                 <button
                   type="submit"
                   disabled={isStreaming || !inputVal.trim()}
-                  className="px-6 bg-neon-magenta text-black font-black border-2 border-black hover:bg-starlight disabled:opacity-40 flex items-center gap-2 text-xs uppercase"
+                  className="flex shrink-0 items-center gap-2 border-2 border-black bg-neon-magenta px-3 py-2.5 text-xs font-black uppercase hover:bg-starlight disabled:opacity-40 sm:px-6"
                 >
-                  <Send className="w-4 h-4" /> Send
+                  <Send className="h-4 w-4" />
+                  <span className="hidden sm:inline">Send</span>
                 </button>
               </form>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-void">
+          <div className="flex flex-1 flex-col items-center justify-center bg-void p-6 text-center sm:p-8">
             <BookOpen className="w-16 h-16 text-neon-magenta mb-4 animate-pulse" />
             <h3 className="text-xl font-black text-starlight uppercase tracking-wider">Rule Wizard</h3>
             <p className="text-xs text-neon-cyan mt-2 max-w-xs font-mono">
@@ -333,6 +359,7 @@ export function ChatPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

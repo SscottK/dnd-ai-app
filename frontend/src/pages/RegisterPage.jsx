@@ -77,10 +77,10 @@ export function RegisterPage() {
   const submitLabel = isRequestMode ? "Submit Request" : "Create Account";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-void-deep px-4 py-8">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-void-deep px-4 py-6">
       <form
         onSubmit={isRequestMode ? handleRequestAccess : handleOpenRegister}
-        className="w-full max-w-md p-8 border-4 border-neon-cyan bg-black shadow-[0_0_30px_rgba(5,217,232,0.25)]"
+        className="w-full max-w-md border-4 border-neon-cyan bg-black p-6 shadow-[0_0_30px_rgba(5,217,232,0.25)] sm:p-8"
       >
         <div className="text-center mb-6">
           <Scroll className="w-14 h-14 text-neon-magenta mx-auto mb-2" />

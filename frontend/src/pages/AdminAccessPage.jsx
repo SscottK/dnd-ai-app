@@ -92,10 +92,10 @@ export function AdminAccessPage() {
       : "No reviewed requests yet.";
 
   return (
-    <div className="h-full overflow-y-auto p-4 sm:p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto overscroll-y-contain p-3 sm:p-6">
+      <div className="mx-auto max-w-3xl space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-2xl font-black uppercase italic text-starlight tracking-tight flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-xl font-black uppercase italic tracking-tight text-starlight sm:text-2xl">
             <UserPlus className="w-6 h-6 text-neon-cyan" />
             Access Requests
           </h1>

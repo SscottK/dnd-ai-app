@@ -49,17 +49,17 @@ function UserNoteEditor({ note, campaigns, onChange, onDelete, saving }) {
 
   return (
     <div className="rounded-sm border border-border/70 bg-void-deep/30 p-3 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <input
           value={note.title}
           onChange={(event) => scheduleSave({ title: event.target.value })}
-          className="min-w-0 flex-1 rounded-sm border border-border bg-black px-2 py-1 text-xs font-black uppercase text-starlight"
+          className="min-w-0 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs font-black uppercase text-starlight sm:flex-1"
         />
         <CampaignSelect
           value={note.campaign_id}
           campaigns={campaigns}
           onChange={(campaignId) => onChange({ campaignId })}
-          className="min-w-[160px]"
+          className="w-full min-w-0 sm:min-w-[160px] sm:w-auto"
         />
         <button
           type="button"
@@ -221,7 +221,7 @@ export function NotesPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4 sm:p-6">
+    <div className="h-full overflow-y-auto overscroll-y-contain p-3 sm:p-6">
       <div className="mx-auto max-w-4xl space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -283,7 +283,7 @@ export function NotesPage() {
                     <select
                       value={selectedCampaignId ?? ""}
                       onChange={(event) => setSelectedCampaignId(Number(event.target.value))}
-                      className="min-w-[200px] rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+                      className="w-full min-w-0 rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink sm:min-w-[200px] sm:w-auto"
                     >
                       {campaigns.map((campaign) => (
                         <option key={campaign.id} value={campaign.id}>

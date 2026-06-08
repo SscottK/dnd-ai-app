@@ -116,29 +116,30 @@ export function CharacterViewPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <header className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 border-b-2 border-neon-magenta bg-zinc-950">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="shrink-0 flex flex-col gap-2 border-b-2 border-neon-magenta bg-zinc-950 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link
             to="/dashboard"
-            className="text-zinc-500 hover:text-neon-cyan flex items-center gap-1 text-[10px] font-black uppercase"
+            className="flex shrink-0 items-center gap-1 text-[10px] font-black uppercase text-zinc-500 hover:text-neon-cyan"
           >
-            <ArrowLeft className="w-3 h-3" />
-            Campaigns
+            <ArrowLeft className="h-3 w-3" />
+            <span className="hidden sm:inline">Campaigns</span>
           </Link>
-          <h1 className="font-black text-sm text-starlight uppercase truncate">
+          <h1 className="truncate font-black text-sm uppercase text-starlight">
             {character.name}
           </h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {character.dnd_beyond_url && (
             <a
               href={character.dnd_beyond_url}
               target="_blank"
               rel="noreferrer"
-              className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-neon-cyan hover:text-starlight"
             >
-              <ExternalLink className="w-3 h-3" />
-              D&amp;D Beyond
+              <ExternalLink className="h-3 w-3 shrink-0" />
+              <span className="hidden sm:inline">D&amp;D Beyond</span>
+              <span className="sm:hidden">Beyond</span>
             </a>
           )}
           <button
@@ -148,7 +149,10 @@ export function CharacterViewPage() {
             className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight inline-flex items-center gap-1 disabled:opacity-40"
           >
             <Upload className={`w-3 h-3 ${uploading ? "animate-pulse" : ""}`} />
-            {uploading ? "Uploading…" : hasPdf ? "Replace PDF" : "Upload PDF"}
+            <span className="hidden sm:inline">
+              {uploading ? "Uploading…" : hasPdf ? "Replace PDF" : "Upload PDF"}
+            </span>
+            <span className="sm:hidden">{uploading ? "…" : "PDF"}</span>
           </button>
           <input
             ref={uploadInputRef}
@@ -166,15 +170,17 @@ export function CharacterViewPage() {
                 className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan inline-flex items-center gap-1 disabled:opacity-40"
               >
                 <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Re-syncing…" : "Re-sync PDF"}
+                <span className="hidden sm:inline">{syncing ? "Re-syncing…" : "Re-sync PDF"}</span>
+                <span className="sm:hidden">{syncing ? "…" : "Sync"}</span>
               </button>
               <button
                 type="button"
                 onClick={handleOpenPdfTab}
-                className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight inline-flex items-center gap-1"
+                className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-neon-cyan hover:text-starlight"
               >
-                <FileText className="w-3 h-3" />
-                Open PDF in tab
+                <FileText className="h-3 w-3 shrink-0" />
+                <span className="hidden sm:inline">Open PDF in tab</span>
+                <span className="sm:hidden">Open</span>
               </button>
             </>
           )}

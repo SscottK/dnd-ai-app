@@ -490,8 +490,8 @@ export function InitiativePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto p-6">
+    <div className="h-full overflow-y-auto overscroll-y-contain">
+      <div className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Link
             to="/dashboard"

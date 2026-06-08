@@ -27,14 +27,14 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-void-deep px-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-void-deep px-4 py-6">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-sm border border-border-bright bg-void-panel p-8 shadow-xl shadow-black/50"
+        className="w-full max-w-md rounded-sm border border-border-bright bg-void-panel p-6 shadow-xl shadow-black/50 sm:p-8"
       >
         <div className="text-center mb-6">
           <Scroll className="w-14 h-14 text-accent mx-auto mb-2" />
-          <h1 className="text-4xl font-black text-starlight tracking-tighter italic uppercase">
+          <h1 className="text-3xl font-black uppercase italic tracking-tighter text-starlight sm:text-4xl">
             {APP_NAME}
           </h1>
           <p className="text-[10px] text-ink-muted uppercase tracking-[0.2em] font-extrabold mt-1">

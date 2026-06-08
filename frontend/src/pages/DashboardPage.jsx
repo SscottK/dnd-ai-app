@@ -483,7 +483,7 @@ export function DashboardPage() {
 
   return (
     <div className="session-ui h-full overflow-y-auto bg-void">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-8">
         <header className="mb-8">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan sm:text-sm">
             {APP_NAME}
@@ -1084,8 +1084,8 @@ export function DashboardPage() {
       </div>
 
       {detailsCampaign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="w-full max-w-lg rounded-md border border-border-bright bg-void-panel p-5 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-3 sm:items-center sm:p-4">
+          <div className="max-h-[min(92dvh,100%)] w-full max-w-lg overflow-y-auto rounded-md border border-border-bright bg-void-panel p-4 shadow-xl sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-black uppercase text-starlight">{detailsCampaign.name}</h2>
