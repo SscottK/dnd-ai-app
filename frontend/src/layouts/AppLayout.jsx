@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText, UserPlus } from "lucide-react";
+import { BookOpen, LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText, UserPlus } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
 import { APP_NAME, APP_TAGLINE, RULE_WIZARD_LABEL } from "../constants/branding";
@@ -39,6 +39,10 @@ export function AppLayout() {
             <NavLink to="/chat" className={navLinkClass}>
               <MessageSquare className="w-3.5 h-3.5" />
               {RULE_WIZARD_LABEL}
+            </NavLink>
+            <NavLink to="/srd" className={navLinkClass}>
+              <BookOpen className="w-3.5 h-3.5" />
+              SRD
             </NavLink>
             <NavLink to="/notes" className={navLinkClass}>
               <ScrollText className="w-3.5 h-3.5" />

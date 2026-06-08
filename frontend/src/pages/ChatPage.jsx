@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useChatStream } from "../hooks/useChatStream";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
+import { SrdCitations } from "../components/SrdCitations";
 import { apiFetch } from "../lib/api";
 import {
   Plus,
@@ -25,6 +26,8 @@ export function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [inputVal, setInputVal] = useState("");
   const [streamedReply, setStreamedReply] = useState("");
+  const [streamedCitations, setStreamedCitations] = useState([]);
+  const [messageCitations, setMessageCitations] = useState({});
   const [editingConvId, setEditingConvId] = useState(null);
   const [editTitleVal, setEditTitleVal] = useState("");
   const [pinnedConvIds, setPinnedConvIds] = useState(() => {
@@ -150,12 +153,21 @@ export function ChatPage() {
     const newUserMessage = { role: "user", content: userMsgText, conversation_id: activeConvId };
     setMessages((prev) => [...prev, newUserMessage]);
     setStreamedReply("");
+    setStreamedCitations([]);
 
     await streamMessage(activeConvId, userMsgText, {
+      onCitations: (citations) => setStreamedCitations(citations),
       onChunk: (chunk) => setStreamedReply((prev) => prev + chunk),
       onDone: (finalMessage) => {
         setMessages((prev) => [...prev, finalMessage]);
+        if (finalMessage?.id && finalMessage?.srd_citations?.length) {
+          setMessageCitations((prev) => ({
+            ...prev,
+            [finalMessage.id]: finalMessage.srd_citations,
+          }));
+        }
         setStreamedReply("");
+        setStreamedCitations([]);
       },
       onError: (err) => {
         console.error("Stream error:", err);
@@ -270,7 +282,14 @@ export function ChatPage() {
                     <div className={`text-[9px] font-black tracking-widest mb-1.5 uppercase ${m.role === "user" ? "text-zinc-800" : "text-starlight"}`}>
                       {m.role === "user" ? "You" : "Rule Wizard"}
                     </div>
-                    {m.role === "user" ? m.content : <MarkdownRenderer content={m.content} />}
+                    {m.role === "user" ? (
+                      m.content
+                    ) : (
+                      <>
+                        <MarkdownRenderer content={m.content} />
+                        <SrdCitations citations={messageCitations[m.id] || m.srd_citations} />
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -278,6 +297,7 @@ export function ChatPage() {
                 <div className="flex justify-start">
                   <div className="max-w-2xl p-4 bg-zinc-950 text-white border-2 border-starlight text-sm font-mono">
                     <MarkdownRenderer content={streamedReply} />
+                    <SrdCitations citations={streamedCitations} />
                     <span className="inline-block w-2.5 h-4 ml-1 bg-neon-magenta animate-ping align-middle" />
                   </div>
                 </div>

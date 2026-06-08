@@ -127,6 +127,11 @@ class SendMessageResponse(BaseModel):
 
 class CampaignCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class CampaignUpdate(BaseModel):
+    description: str | None = Field(default=None, max_length=500)
 
 
 class CampaignJoin(BaseModel):
@@ -137,6 +142,7 @@ class CampaignJoin(BaseModel):
 class CampaignRead(BaseModel):
     id: int
     name: str
+    description: str | None = None
     owner_username: str
     is_owner: bool
     invite_code: str | None = None

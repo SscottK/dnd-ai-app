@@ -5,6 +5,7 @@ import {
   formatModifier,
   setAbilityScore,
 } from "../../lib/characterSheet";
+import { PANE_ORIENTATION_HORIZONTAL } from "../../lib/sheetLayout";
 
 export function AbilityScoresGrid({
   sheet,
@@ -12,16 +13,20 @@ export function AbilityScoresGrid({
   readOnly = false,
   onShowDetail,
   compact = false,
+  orientation,
 }) {
   const editable = Boolean(onChange) && !readOnly;
+  const isHorizontal = orientation === PANE_ORIENTATION_HORIZONTAL;
 
   const handleScoreChange = (key, rawValue) => {
     onChange?.(setAbilityScore(sheet, key, rawValue));
   };
 
-  const gridClass = compact
-    ? "grid grid-cols-3 gap-2"
-    : "grid grid-cols-6 gap-2 lg:gap-3";
+  const gridClass = isHorizontal
+    ? "grid grid-cols-6 gap-1"
+    : compact
+      ? "grid grid-cols-3 gap-2"
+      : "grid grid-cols-6 gap-2 lg:gap-3";
 
   return (
     <div className={gridClass}>

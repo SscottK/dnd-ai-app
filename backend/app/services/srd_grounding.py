@@ -48,6 +48,28 @@ def _format_entry(entry: dict) -> str:
     return f"{header}\n{body}" if body else header
 
 
+def find_srd_citations(user_query: str, *, limit: int = 6) -> list[dict[str, str]]:
+    """Compact citation list for UI display alongside Rule Wizard replies."""
+    hits = search_catalog(user_query, limit=limit)
+    citations: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for entry in hits:
+        name = str(entry.get("name") or "").strip()
+        category = str(entry.get("category") or "rule").strip()
+        if not name:
+            continue
+        key = (category, name.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        citation: dict[str, str] = {"category": category, "name": name}
+        tag = entry.get("tag")
+        if tag:
+            citation["tag"] = str(tag)
+        citations.append(citation)
+    return citations
+
+
 def build_srd_context(user_query: str) -> str:
     hits = search_catalog(user_query, limit=12)
     if not hits:

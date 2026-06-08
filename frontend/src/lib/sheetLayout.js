@@ -39,7 +39,7 @@ const MOBILE_PANE_MIN_HEIGHTS = {
   vtt_zone: 240,
   combat: 220,
   character_tabs: 360,
-  dice_roller: 180,
+  dice_roller: 300,
   player_notes: 260,
   abilities: 200,
   skills_saves: 240,
@@ -65,6 +65,9 @@ function dmSideColumnWidth(canvasW) {
 
 export const INITIATIVE_ORIENTATION_VERTICAL = "vertical";
 export const INITIATIVE_ORIENTATION_HORIZONTAL = "horizontal";
+
+export const PANE_ORIENTATION_VERTICAL = INITIATIVE_ORIENTATION_VERTICAL;
+export const PANE_ORIENTATION_HORIZONTAL = INITIATIVE_ORIENTATION_HORIZONTAL;
 
 const HORIZONTAL_INIT_CARD_WIDTH = 124;
 const HORIZONTAL_INIT_CARD_GAP = 8;
@@ -656,6 +659,13 @@ function normalizeWidget(widget) {
         ? INITIATIVE_ORIENTATION_HORIZONTAL
         : INITIATIVE_ORIENTATION_VERTICAL;
   }
+  if (widget.type === "party" || widget.type === "abilities") {
+    const key = widget.type === "party" ? "partyOrientation" : "abilitiesOrientation";
+    normalized[key] =
+      widget[key] === PANE_ORIENTATION_HORIZONTAL
+        ? PANE_ORIENTATION_HORIZONTAL
+        : PANE_ORIENTATION_VERTICAL;
+  }
   if (widget.type === "dm_generators") {
     normalized.dmGeneratorsTab = widget.dmGeneratorsTab === "npc" ? "npc" : "encounter";
   }
@@ -915,7 +925,7 @@ export function createWidget(type, canvasW, canvasH) {
     character_tabs: { w: sideW, h: 320 },
     character_portrait: { w: sideW, h: 220 },
     player_notes: { w: sideW, h: 380 },
-    dice_roller: { w: sideW, h: 200 },
+    dice_roller: { w: sideW, h: 340 },
     vtt_zone: vttZoneDefault(canvasW, canvasH),
     initiative: { w: sideW, h: Math.min(480, Math.max(380, Math.round(canvasH * 0.5))) },
     party: { w: sideW, h: 200 },
@@ -936,6 +946,8 @@ export function createWidget(type, canvasW, canvasH) {
     minimized: false,
     expandedH: size.h,
     ...(type === "initiative" ? { initiativeOrientation: INITIATIVE_ORIENTATION_VERTICAL } : {}),
+    ...(type === "party" ? { partyOrientation: PANE_ORIENTATION_VERTICAL } : {}),
+    ...(type === "abilities" ? { abilitiesOrientation: PANE_ORIENTATION_VERTICAL } : {}),
     ...(type === "dm_generators" ? { dmGeneratorsTab: "encounter" } : {}),
     ...(type === "dm_notes"
       ? {

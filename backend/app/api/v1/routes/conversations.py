@@ -24,6 +24,7 @@ from app.db.session import get_session
 from app.services.conversations import build_prompt_from_db_messages
 from app.services.gemini import generate_text
 from app.services.gemini_stream import gemini_stream
+from app.services.srd_grounding import find_srd_citations
 
 logger = logging.getLogger("app.api.v1.conversations")
 
@@ -281,7 +282,12 @@ async def stream_message(
     except Exception:
         pass
 
+    srd_citations = find_srd_citations(data.content)
+
     async def sse_event_generator() -> AsyncGenerator[str, None]:
+        if srd_citations:
+            yield f"data: {json.dumps({'srd_citations': srd_citations})}\n\n"
+
         completed_reply = []
         try:
             async for chunk in gemini_stream(chat_history_payload):
@@ -315,6 +321,7 @@ async def stream_message(
                         "created_at": assistant_message.created_at.isoformat()
                         if assistant_message.created_at
                         else None,
+                        "srd_citations": srd_citations,
                     }
                     yield f"data: {json.dumps({'status': 'DONE', 'message': message_data})}\n\n"
             except Exception as e:

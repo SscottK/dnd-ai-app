@@ -220,7 +220,8 @@ export function NotesPaneWidget({
                   if (e.key === "Escape") setEditingTabId(null);
                 }}
                 autoFocus
-                className="w-20 rounded-sm border border-neon-cyan bg-black px-1 py-0.5 text-[9px] font-black uppercase text-starlight"
+                className="min-w-[5rem] max-w-[min(20rem,100%)] rounded-sm border border-neon-cyan bg-black px-1 py-0.5 text-[9px] font-black uppercase text-starlight"
+                style={{ width: `${Math.max(5, Math.min(20, editTitle.length + 1))}rem` }}
               />
             ) : (
               <button
@@ -230,12 +231,12 @@ export function NotesPaneWidget({
                   setEditingContent(false);
                 }}
                 onDoubleClick={() => startRename(tab)}
-                className={`max-w-[88px] truncate px-2 py-1 text-[9px] font-black uppercase ${
+                className={`whitespace-nowrap px-2 py-1 text-[9px] font-black uppercase ${
                   tab.id === activeTab?.id
                     ? "border-b-2 border-neon-cyan text-starlight"
                     : "text-ink-faint hover:text-ink-muted"
                 }`}
-                title="Double-click to rename"
+                title={`${tab.title} — double-click to rename`}
               >
                 {tab.title}
               </button>

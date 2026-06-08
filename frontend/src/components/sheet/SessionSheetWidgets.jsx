@@ -23,7 +23,10 @@ import { PortraitPreviewModal } from "./PortraitPreviewModal";
 import {
   INITIATIVE_ORIENTATION_HORIZONTAL,
   INITIATIVE_ORIENTATION_VERTICAL,
+  PANE_ORIENTATION_HORIZONTAL,
+  PANE_ORIENTATION_VERTICAL,
 } from "../../lib/sheetLayout";
+import { PaneOrientationToggle } from "./PaneOrientationToggle";
 import {
   ABILITIES,
   ABILITY_LABELS,
@@ -64,7 +67,7 @@ function formatPartyResource(label, value) {
   return `${label}: ${value}`;
 }
 
-function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortraitPreview }) {
+function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortraitPreview, horizontal = false }) {
   const hpLabel =
     member.hp != null && member.max_hp != null
       ? `${member.hp}/${member.max_hp}`
@@ -90,6 +93,8 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortrait
   return (
     <li
       className={`flex items-center gap-2 rounded-sm border px-2 py-2 ${
+        horizontal ? "min-w-[220px] shrink-0" : ""
+      } ${
         isYou ? "border-neon-cyan/60 bg-neon-cyan/5" : "border-border bg-void-deep/40"
       } ${isOwner && onViewSheet ? "hover:border-neon-cyan/40" : ""}`}
     >
@@ -153,7 +158,15 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortrait
   );
 }
 
-export function PartyWidget({ campaignId, token, characterId, isOwner = false }) {
+export function PartyWidget({
+  campaignId,
+  token,
+  characterId,
+  isOwner = false,
+  orientation = PANE_ORIENTATION_VERTICAL,
+  onOrientationChange,
+}) {
+  const isHorizontal = orientation === PANE_ORIENTATION_HORIZONTAL;
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -252,6 +265,15 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
         <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-ink-faint">
           {members.length} adventurer{members.length === 1 ? "" : "s"}
         </p>
+        <div className="flex items-center gap-1">
+          {onOrientationChange && (
+            <PaneOrientationToggle
+              orientation={orientation}
+              onChange={onOrientationChange}
+              verticalTitle="Vertical party list"
+              horizontalTitle="Horizontal party row"
+            />
+          )}
         {isOwner && (
           <button
             type="button"
@@ -262,15 +284,23 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
             {addingAll ? "Rolling…" : "Add all to initiative"}
           </button>
         )}
+        </div>
       </div>
       {actionMessage && (
         <p className="shrink-0 text-xs sm:text-sm font-mono text-neon-cyan">{actionMessage}</p>
       )}
-      <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+      <ul
+        className={`min-h-0 flex-1 ${
+          isHorizontal
+            ? "flex gap-2 overflow-x-auto pb-1"
+            : "space-y-1.5 overflow-y-auto"
+        }`}
+      >
         {members.map((member) => (
           <PartyMemberRow
             key={member.member_id}
             member={member}
+            horizontal={isHorizontal}
             isYou={member.character_id === characterId}
             token={token}
             isOwner={isOwner}
@@ -482,15 +512,36 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
   );
 }
 
-export function AbilitiesWidget({ sheet, onShowDetail, onSheetChange }) {
+export function AbilitiesWidget({
+  sheet,
+  onShowDetail,
+  onSheetChange,
+  orientation = PANE_ORIENTATION_VERTICAL,
+  onOrientationChange,
+}) {
   return (
-    <AbilityScoresGrid
-      sheet={sheet}
-      compact
-      readOnly={!onSheetChange}
-      onShowDetail={onShowDetail}
-      onChange={onSheetChange}
-    />
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      {onOrientationChange && (
+        <div className="flex shrink-0 justify-end">
+          <PaneOrientationToggle
+            orientation={orientation}
+            onChange={onOrientationChange}
+            verticalTitle="3×2 ability grid"
+            horizontalTitle="Single-row abilities"
+          />
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <AbilityScoresGrid
+          sheet={sheet}
+          compact={orientation !== PANE_ORIENTATION_HORIZONTAL}
+          orientation={orientation}
+          readOnly={!onSheetChange}
+          onShowDetail={onShowDetail}
+          onChange={onSheetChange}
+        />
+      </div>
+    </div>
   );
 }
 

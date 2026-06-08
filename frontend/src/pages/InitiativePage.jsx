@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -78,9 +78,37 @@ export function InitiativePage() {
   const [sessionActive, setSessionActive] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
   const [activeResourceSheet, setActiveResourceSheet] = useState(null);
+  const [dicePanelWidth, setDicePanelWidth] = useState(() => {
+    const stored = localStorage.getItem(`initiative-dice-width-${campaignId}`);
+    const parsed = stored ? Number(stored) : 280;
+    return Number.isFinite(parsed) ? Math.min(480, Math.max(200, parsed)) : 280;
+  });
+  const resizeRef = useRef(null);
   const [dmActionSheet, setDmActionSheet] = useState(null);
   const [dmSheetLoading, setDmSheetLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+
+  useEffect(() => {
+    localStorage.setItem(`initiative-dice-width-${campaignId}`, String(dicePanelWidth));
+  }, [campaignId, dicePanelWidth]);
+
+  useEffect(() => {
+    const onPointerMove = (event) => {
+      if (!resizeRef.current) return;
+      const delta = resizeRef.current.x - event.clientX;
+      const next = Math.min(480, Math.max(200, resizeRef.current.origin + delta));
+      setDicePanelWidth(next);
+    };
+    const onPointerUp = () => {
+      resizeRef.current = null;
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, []);
 
   useEffect(() => {
     if (!token || !isOwner || monsterName.trim().length < 2) {
@@ -605,8 +633,8 @@ export function InitiativePage() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_220px]">
-          <section>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
+          <section className="min-w-0 flex-1">
             {displaySorted.length === 0 ? (
               <div className="p-8 border-2 border-dashed border-zinc-700 text-center text-xs font-mono text-zinc-500">
                 No combatants yet. {isOwner ? "Add PCs from roster or monsters below." : ""}
@@ -856,13 +884,29 @@ export function InitiativePage() {
             )}
           </section>
 
-          <aside className="space-y-4">
-            <DiceRoller
-              campaignId={campaignId}
-              token={token}
-              rollerLabel={user?.username}
-              combatActive={(encounter.combatants || []).length > 0}
-            />
+          <div
+            className="hidden shrink-0 cursor-col-resize select-none lg:block"
+            style={{ width: 6 }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              resizeRef.current = { x: event.clientX, origin: dicePanelWidth };
+            }}
+            title="Drag to resize dice panel"
+          >
+            <div className="mx-auto h-full w-1 rounded-full bg-border hover:bg-neon-cyan/60" />
+          </div>
+          <aside
+            className="w-full shrink-0 space-y-4 lg:max-w-[480px]"
+            style={{ width: "100%", "--dice-panel-width": `${dicePanelWidth}px` }}
+          >
+            <div className="min-h-[280px] rounded-sm border border-border-bright bg-void-panel p-2 lg:min-h-[360px] lg:w-[var(--dice-panel-width)]">
+              <DiceRoller
+                campaignId={campaignId}
+                token={token}
+                rollerLabel={user?.username}
+                combatActive={(encounter.combatants || []).length > 0}
+              />
+            </div>
           </aside>
         </div>
       </div>

@@ -52,7 +52,9 @@ export function useChatStream(token) {
           try {
             const parsed = JSON.parse(rawJson);
 
-            if (parsed.chunk) {
+            if (parsed.srd_citations) {
+              callbacks.onCitations?.(parsed.srd_citations);
+            } else if (parsed.chunk) {
               callbacks.onChunk(parsed.chunk);
             } else if (parsed.status === "DONE" && parsed.message) {
               callbacks.onDone(parsed.message);

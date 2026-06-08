@@ -163,8 +163,8 @@ export function DiceRoller({
   const selectedSkill = skills.find((skill) => skill.name === skillName) || skills[0];
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 border-2 border-neon-magenta bg-black p-3">
-      <div className="flex items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <Dices className="h-4 w-4 shrink-0 text-neon-magenta" />
         <span className="text-[10px] font-black uppercase tracking-widest text-starlight">Dice</span>
         {rollerLabel && (
@@ -172,7 +172,7 @@ export function DiceRoller({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex shrink-0 flex-wrap gap-1">
         {["quick", "expr", "check"].map((tab) => (
           <button
             key={tab}
@@ -328,19 +328,23 @@ export function DiceRoller({
         </div>
       )}
 
-      {lastRoll && (
-        <p className="text-xs font-mono text-neon-cyan">
-          <span className="text-starlight">{lastRoll.message}</span>
-          <span className="ml-2 text-zinc-600">{lastRoll.at}</span>
-        </p>
-      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {lastRoll && (
+          <p className="text-xs font-mono text-neon-cyan">
+            <span className="text-starlight">{lastRoll.message}</span>
+            <span className="ml-2 text-zinc-600">{lastRoll.at}</span>
+          </p>
+        )}
+      </div>
 
-      <p className="text-[8px] font-mono text-ink-faint">
-        {combatActive
-          ? "Combat active — dice rolls go to the combat log."
-          : "Rolls are logged to the session action log."}
-      </p>
-      {error && <p className="text-[9px] font-mono text-danger">{error}</p>}
+      <div className="shrink-0 space-y-1 border-t border-border/60 pt-2">
+        <p className="text-[8px] font-mono text-ink-faint">
+          {combatActive
+            ? "Combat active — dice rolls go to the combat log."
+            : "Rolls are logged to the session action log."}
+        </p>
+        {error && <p className="text-[9px] font-mono text-danger">{error}</p>}
+      </div>
     </div>
   );
 }

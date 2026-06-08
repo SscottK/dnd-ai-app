@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Info,
   Hammer,
   MessageSquare,
   Play,
@@ -92,6 +93,9 @@ export function DashboardPage() {
   const [editingCharacterId, setEditingCharacterId] = useState(null);
   const [characterForm, setCharacterForm] = useState(emptyCharacterForm);
   const [savingCharacter, setSavingCharacter] = useState(false);
+  const [detailsCampaign, setDetailsCampaign] = useState(null);
+  const [detailsDraft, setDetailsDraft] = useState("");
+  const [savingDetails, setSavingDetails] = useState(false);
 
   const availableCharacters = characters.filter((c) => !c.campaign_id);
   const liveCampaigns = useMemo(
@@ -380,6 +384,40 @@ export function DashboardPage() {
     }
   };
 
+  const openCampaignDetails = (campaign) => {
+    setDetailsCampaign(campaign);
+    setDetailsDraft(campaign.description || "");
+  };
+
+  const handleSaveCampaignDetails = async () => {
+    if (!token || !detailsCampaign?.is_owner) {
+      setDetailsCampaign(null);
+      return;
+    }
+    setSavingDetails(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/campaigns/${detailsCampaign.id}`, {
+        token,
+        method: "PATCH",
+        body: { description: detailsDraft.trim() || null },
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not save campaign details.");
+      }
+      const updated = await response.json();
+      setCampaigns((prev) =>
+        prev.map((campaign) => (campaign.id === updated.id ? { ...campaign, ...updated } : campaign))
+      );
+      setDetailsCampaign(null);
+    } catch (err) {
+      setError(err.message || "Could not save campaign details.");
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
   const handleToggleSession = async (campaignId, active) => {
     if (!token) return;
     const response = await apiFetch(`/campaigns/${campaignId}/session`, {
@@ -505,7 +543,7 @@ export function DashboardPage() {
           </section>
         )}
 
-        <section className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <Link
             to="/chat"
             className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-magenta/60 hover:bg-neon-magenta/5"
@@ -513,6 +551,14 @@ export function DashboardPage() {
             <MessageSquare className="mb-2 h-5 w-5 text-neon-magenta group-hover:text-starlight" />
             <h3 className="text-sm font-black uppercase text-starlight">{RULE_WIZARD_LABEL}</h3>
             <p className="mt-1 text-xs text-ink-muted sm:text-sm">Spells, monsters, and 5.5e lookups</p>
+          </Link>
+          <Link
+            to="/srd"
+            className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-cyan/60 hover:bg-neon-cyan/5"
+          >
+            <Scroll className="mb-2 h-5 w-5 text-neon-cyan group-hover:text-starlight" />
+            <h3 className="text-sm font-black uppercase text-starlight">SRD browser</h3>
+            <p className="mt-1 text-xs text-ink-muted sm:text-sm">Browse spells, monsters, and magic items</p>
           </Link>
           <div
             aria-disabled="true"
@@ -713,6 +759,13 @@ export function DashboardPage() {
                               Join session
                             </LinkButton>
                           )}
+                        <ActionButton
+                          onClick={() => openCampaignDetails(campaign)}
+                          className="border-border text-starlight hover:border-neon-cyan hover:text-neon-cyan"
+                        >
+                          <Info className="h-4 w-4" />
+                          Details
+                        </ActionButton>
                         <LinkButton
                           to={`/notes?campaign=${campaign.id}`}
                           className="border-border text-starlight hover:border-neon-cyan hover:text-neon-cyan"
@@ -1029,6 +1082,85 @@ export function DashboardPage() {
           </section>
         </div>
       </div>
+
+      {detailsCampaign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="w-full max-w-lg rounded-md border border-border-bright bg-void-panel p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black uppercase text-starlight">{detailsCampaign.name}</h2>
+                <p className="mt-1 text-xs font-mono text-ink-muted">
+                  DM: {detailsCampaign.owner_username}
+                  {detailsCampaign.is_owner ? " (you)" : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailsCampaign(null)}
+                className="text-xs font-black uppercase text-ink-faint hover:text-starlight"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {detailsCampaign.is_owner ? (
+                <>
+                  <label className="block text-xs font-black uppercase text-neon-cyan">
+                    Campaign description
+                  </label>
+                  <textarea
+                    value={detailsDraft}
+                    onChange={(event) => setDetailsDraft(event.target.value)}
+                    rows={5}
+                    maxLength={500}
+                    placeholder="Brief pitch, tone, house rules, or where the party left off…"
+                    className={inputClass}
+                  />
+                  <p className="text-[10px] font-mono text-ink-faint">
+                    {detailsDraft.length}/500 — visible to all campaign members.
+                  </p>
+                  <ActionButton
+                    onClick={handleSaveCampaignDetails}
+                    disabled={savingDetails}
+                    className="border-neon-cyan bg-neon-cyan text-black hover:bg-starlight disabled:opacity-50"
+                  >
+                    {savingDetails ? "Saving…" : "Save description"}
+                  </ActionButton>
+                </>
+              ) : (
+                <div className="rounded-sm border border-border bg-void-deep/50 p-3">
+                  <p className="text-xs font-black uppercase text-ink-faint">About this campaign</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm font-mono text-ink-muted">
+                    {detailsCampaign.description?.trim() ||
+                      "The DM has not added a description yet."}
+                  </p>
+                </div>
+              )}
+
+              <div className="border-t border-border pt-3 text-xs font-mono text-ink-muted">
+                <p>
+                  Status:{" "}
+                  <span className="text-starlight">
+                    {detailsCampaign.session_active ? "Session live" : "Between sessions"}
+                  </span>
+                </p>
+                {detailsCampaign.is_owner && detailsCampaign.invite_code && (
+                  <p className="mt-1">
+                    Invite code:{" "}
+                    <span className="tracking-widest text-starlight">{detailsCampaign.invite_code}</span>
+                  </p>
+                )}
+                {rosters[detailsCampaign.id]?.length > 0 && (
+                  <p className="mt-1">
+                    Party: {rosters[detailsCampaign.id].map((m) => m.character_name).join(", ")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

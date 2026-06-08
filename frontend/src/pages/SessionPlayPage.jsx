@@ -57,6 +57,7 @@ import {
   defaultViewport,
   hydrateLayout,
   INITIATIVE_ORIENTATION_HORIZONTAL,
+  PANE_ORIENTATION_HORIZONTAL,
   mergePlayerNotesOnResync,
   migrateLegacyNotesIntoLayout,
   parseLayout,
@@ -855,6 +856,28 @@ export function SessionPlayPage() {
     [saveLayoutSnapshot]
   );
 
+  const setWidgetOrientation = useCallback(
+    (widgetId, orientationKey, orientation) => {
+      const { width: canvasW, height: canvasH } = canvasBoundsRef.current;
+      const prev = layoutRef.current;
+      const nextWidgets = prev.widgets.map((w) => {
+        if (w.id !== widgetId) return w;
+        let next = { ...w, [orientationKey]: orientation };
+        if (orientation === PANE_ORIENTATION_HORIZONTAL && w.type === "party") {
+          const memberCount = 4;
+          const idealW = Math.min(canvasW - w.x, Math.max(w.w, 180 + memberCount * 120));
+          next.w = idealW;
+          next.h = Math.min(Math.max(180, w.h), Math.max(140, canvasH - w.y));
+        }
+        return clampWidget(next, canvasW, canvasH);
+      });
+      const nextLayout = { ...prev, widgets: nextWidgets };
+      setLayout(nextLayout);
+      saveLayoutSnapshot(nextLayout);
+    },
+    [saveLayoutSnapshot]
+  );
+
   const togglePin = (id) => {
     const nextLayout = {
       ...layout,
@@ -1122,7 +1145,15 @@ export function SessionPlayPage() {
         );
       case "abilities":
         return guard(
-          <AbilitiesWidget sheet={sheet} onShowDetail={showDetail} onSheetChange={onSheetChange} />
+          <AbilitiesWidget
+            sheet={sheet}
+            onShowDetail={showDetail}
+            onSheetChange={onSheetChange}
+            orientation={widget.abilitiesOrientation}
+            onOrientationChange={(nextOrientation) =>
+              setWidgetOrientation(widget.id, "abilitiesOrientation", nextOrientation)
+            }
+          />
         );
       case "skills_saves":
         return guard(
@@ -1188,6 +1219,10 @@ export function SessionPlayPage() {
             token={token}
             characterId={character?.id}
             isOwner={sessionStatus?.is_owner}
+            orientation={widget.partyOrientation}
+            onOrientationChange={(nextOrientation) =>
+              setWidgetOrientation(widget.id, "partyOrientation", nextOrientation)
+            }
           />
         );
       case "initiative":

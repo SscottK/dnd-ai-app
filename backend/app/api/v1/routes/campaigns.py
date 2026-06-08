@@ -9,6 +9,7 @@ from app.api.schemas import (
     AddRosterRequest,
     CampaignCreate,
     CampaignJoin,
+    CampaignUpdate,
     CampaignListResponse,
     CampaignMemberRead,
     CampaignRead,
@@ -138,6 +139,7 @@ def to_campaign_read(
     return CampaignRead(
         id=campaign.id,
         name=campaign.name,
+        description=campaign.description,
         owner_username=owner.username,
         is_owner=is_owner,
         invite_code=campaign.invite_code if is_owner else None,
@@ -210,9 +212,11 @@ def create_campaign(data: CampaignCreate, current_user: CurrentUser, session: Se
     while session.exec(select(Campaign).where(Campaign.invite_code == invite_code)).first():
         invite_code = generate_invite_code()
 
+    description = (data.description or "").strip() or None
     campaign = Campaign(
         owner_id=current_user.id,
         name=data.name.strip(),
+        description=description,
         invite_code=invite_code,
     )
     session.add(campaign)
@@ -220,6 +224,33 @@ def create_campaign(data: CampaignCreate, current_user: CurrentUser, session: Se
     session.refresh(campaign)
 
     return to_campaign_read(campaign, current_user, current_user, session)
+
+
+@router.patch("/{campaign_id}", response_model=CampaignRead)
+def update_campaign(
+    campaign_id: int,
+    data: CampaignUpdate,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign = get_owned_campaign(campaign_id, session)
+    if campaign.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can update campaign details",
+        )
+
+    if data.description is not None:
+        campaign.description = data.description.strip() or None
+    session.add(campaign)
+    session.commit()
+    session.refresh(campaign)
+
+    owner = session.get(User, campaign.owner_id)
+    if owner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign owner not found")
+
+    return to_campaign_read(campaign, owner, current_user, session)
 
 
 @router.post("/join", response_model=CampaignRead)

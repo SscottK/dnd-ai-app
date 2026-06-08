@@ -10,6 +10,7 @@ import { CharacterViewPage } from "./pages/CharacterViewPage";
 import { SessionPlayPage } from "./pages/SessionPlayPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { NotesPage } from "./pages/NotesPage";
+import { SrdBrowsePage } from "./pages/SrdBrowsePage";
 import { AdminAccessPage } from "./pages/AdminAccessPage";
 
 function LegacySheetRedirect() {
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/character/build" element={<Navigate to="/dashboard" replace />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/srd" element={<SrdBrowsePage />} />
             <Route path="/character/:characterId" element={<CharacterViewPage />} />
             <Route path="/session/:campaignId" element={<SessionPlayPage />} />
             <Route path="/initiative/:campaignId" element={<InitiativePage />} />

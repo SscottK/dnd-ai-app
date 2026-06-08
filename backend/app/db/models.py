@@ -48,6 +48,7 @@ class Campaign(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     owner_id: int = Field(foreign_key="user.id", index=True)
     name: str = Field(max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     invite_code: str = Field(unique=True, index=True, max_length=12)
     encounter_json: str = Field(default="{}")
     session_active: bool = Field(default=False)

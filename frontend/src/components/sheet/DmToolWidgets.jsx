@@ -10,6 +10,7 @@ import { apiFetch } from "../../lib/api";
 import { buildEncounterPrompt, parseEncounterGeneration } from "../../lib/encounterGen";
 import { useChatStream } from "../../hooks/useChatStream";
 import { MarkdownRenderer } from "../MarkdownRenderer";
+import { SrdCitations } from "../SrdCitations";
 import { DiceRoller } from "../DiceRoller";
 import { NotesPaneWidget } from "./NotesPaneWidget";
 
@@ -162,6 +163,8 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [streamedReply, setStreamedReply] = useState("");
+  const [streamedCitations, setStreamedCitations] = useState([]);
+  const [messageCitations, setMessageCitations] = useState({});
   const [booting, setBooting] = useState(true);
 
   const storageKey = `${DM_CHAT_STORAGE_PREFIX}${campaignId}`;
@@ -217,16 +220,26 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setStreamedReply("");
+    setStreamedCitations([]);
 
     await streamMessage(conversationId, content, {
+      onCitations: (citations) => setStreamedCitations(citations),
       onChunk: (chunk) => setStreamedReply((prev) => prev + chunk),
       onDone: (message) => {
         setMessages((prev) => [...prev, message]);
+        if (message?.id && message?.srd_citations?.length) {
+          setMessageCitations((prev) => ({
+            ...prev,
+            [message.id]: message.srd_citations,
+          }));
+        }
         setStreamedReply("");
+        setStreamedCitations([]);
       },
       onError: (err) => {
         console.error(err);
         setStreamedReply("");
+        setStreamedCitations([]);
       },
     });
   };
@@ -275,12 +288,20 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
                 : "mr-2 border border-border text-ink-muted"
             }`}
           >
-            {msg.role === "assistant" ? <MarkdownRenderer content={msg.content} /> : msg.content}
+            {msg.role === "assistant" ? (
+              <>
+                <MarkdownRenderer content={msg.content} />
+                <SrdCitations citations={messageCitations[msg.id] || msg.srd_citations} />
+              </>
+            ) : (
+              msg.content
+            )}
           </div>
         ))}
         {streamedReply && (
           <div className="mr-2 rounded-sm border border-border px-2 py-1 text-xs sm:text-sm text-ink-muted">
             <MarkdownRenderer content={streamedReply} />
+            <SrdCitations citations={streamedCitations} />
           </div>
         )}
       </div>
