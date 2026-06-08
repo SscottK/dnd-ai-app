@@ -25,15 +25,37 @@ ARMOR_CATALOG = [
 SHIELD_PATTERN = re.compile(r"shield", re.I)
 MAGIC_BONUS_PATTERN = re.compile(r"\+\s*(\d+)")
 
+EQUIPPED_PROTECTION_ITEMS = [
+    ("ring", re.compile(r"ring of protection", re.I)),
+    ("cloak", re.compile(r"cloak of protection", re.I)),
+    ("ioun", re.compile(r"ioun stone.*protection|stone of protection", re.I)),
+    ("bracers", re.compile(r"bracers of defense", re.I)),
+    ("amulet", re.compile(r"amulet of (?:natural )?armor", re.I)),
+]
+
 
 def _strip_magic_suffix(name: str) -> str:
     return re.sub(r"\s*\+\s*\d+\s*", " ", name or "").strip()
+
+
+def _is_shield_item(item: dict) -> bool:
+    name = str(item.get("name") or "")
+    return bool(SHIELD_PATTERN.search(_strip_magic_suffix(name)))
+
+
+def _is_armor_item(item: dict) -> bool:
+    label = _strip_magic_suffix(str(item.get("name") or ""))
+    return any(pattern.search(label) for pattern, _, _ in ARMOR_CATALOG)
 
 
 def _item_magic_bonus(item: dict) -> int:
     from app.services.character_sheet import _sanitize_item_ac_bonus
 
     item = _sanitize_item_ac_bonus(item)
+    name = str(item.get("name") or "")
+    if _is_shield_item(item) or _is_armor_item(item):
+        match = MAGIC_BONUS_PATTERN.search(name)
+        return int(match.group(1)) if match else 0
     if item.get("ac_bonus") is not None:
         try:
             return int(item["ac_bonus"])
@@ -159,9 +181,19 @@ def _dedupe_defense_bonuses(bonuses: list[dict]) -> list[dict]:
     return cleaned
 
 
+def _equipped_protection_keys(sheet: dict) -> set[str]:
+    keys: set[str] = set()
+    for item in _equipped_items(sheet):
+        haystack = f"{item.get('name') or ''} {item.get('notes') or ''}"
+        for key, pattern in EQUIPPED_PROTECTION_ITEMS:
+            if pattern.search(haystack):
+                keys.add(key)
+    return keys
+
+
 def _sanitize_ac_bonuses(sheet: dict, bonuses: list[dict]) -> list[dict]:
     equipped = _equipped_items(sheet)
-    has_shield = any((_classify_item(item) or {}).get("kind") == "shield" for item in equipped)
+    equipped_protection = _equipped_protection_keys(sheet)
     best_armor = None
     for item in equipped:
         stats = _classify_item(item)
@@ -180,6 +212,11 @@ def _sanitize_ac_bonuses(sheet: dict, bonuses: list[dict]) -> list[dict]:
         except (TypeError, ValueError):
             continue
         if name.strip() == "base" or (re.search(r"\bbase\b", name) and bonus == 10):
+            continue
+        if any(
+            key in equipped_protection and pattern.search(name)
+            for key, pattern in EQUIPPED_PROTECTION_ITEMS
+        ):
             continue
         if re.search(r"dex|dexterity|ability", name) and bonus == dex:
             continue
@@ -213,6 +250,25 @@ def _merge_ac_bonuses(existing: list[dict], inferred: list[dict]) -> list[dict]:
 
 def _has_equipped_armor(sheet: dict) -> bool:
     return any((_classify_item(item) or {}).get("kind") == "armor" for item in _equipped_items(sheet))
+
+
+def _compute_misc_ac_bonuses(sheet: dict, *, wearing_armor: bool) -> int:
+    total = 0
+    for item in _equipped_items(sheet):
+        haystack = f"{item.get('name') or ''} {item.get('notes') or ''}"
+        if re.search(r"ring of protection", haystack, re.I):
+            total += 1
+        if re.search(r"cloak of protection", haystack, re.I):
+            total += 1
+        if re.search(r"ioun stone.*protection|stone of protection", haystack, re.I):
+            total += 1
+        if not wearing_armor and re.search(r"bracers of defense", haystack, re.I):
+            total += 2
+        if re.search(r"amulet of (?:natural )?armor", haystack, re.I):
+            name = str(item.get("name") or "")
+            match = MAGIC_BONUS_PATTERN.search(name)
+            total += int(match.group(1)) if match else 1
+    return total
 
 
 def _sum_ac_bonuses(sheet: dict, *, wearing_armor: bool) -> int:
@@ -275,7 +331,11 @@ def enrich_sheet_ac(sheet: dict, parsed_ac: int | None = None) -> dict:
     wearing_armor = _has_equipped_armor(enriched)
     equipment_ac = estimate_equipment_ac(enriched)
     if parsed_ac is not None and equipment_ac is not None and parsed_ac > equipment_ac:
-        covered = equipment_ac + _sum_ac_bonuses(enriched, wearing_armor=wearing_armor)
+        covered = (
+            equipment_ac
+            + _sum_ac_bonuses(enriched, wearing_armor=wearing_armor)
+            + _compute_misc_ac_bonuses(enriched, wearing_armor=wearing_armor)
+        )
         gap = parsed_ac - covered
         if gap > 0:
             enriched["ac_bonuses"] = _merge_ac_bonuses(
@@ -291,9 +351,10 @@ def compute_sheet_ac(sheet: dict, parsed_ac: int | None = None) -> int | None:
     wearing_armor = _has_equipped_armor(enriched)
     equipment_ac = estimate_equipment_ac(enriched)
     bonus_total = _sum_ac_bonuses(enriched, wearing_armor=wearing_armor)
+    misc_total = _compute_misc_ac_bonuses(enriched, wearing_armor=wearing_armor)
 
     if equipment_ac is not None:
-        total = equipment_ac + bonus_total
+        total = equipment_ac + bonus_total + misc_total
         authoritative = enriched.get("authoritative_ac")
         overrides = enriched.get("equipped_overrides") or {}
         if authoritative is not None and wearing_armor and not overrides:

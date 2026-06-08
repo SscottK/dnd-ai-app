@@ -192,12 +192,12 @@ def _sanitize_item_ac_bonus(item: dict) -> dict:
     lowered = re.sub(r"\s*\+\s*\d+\s*", " ", name, flags=re.I).strip().lower()
     has_magic_suffix = bool(re.search(r"\+\s*\d+", name))
 
-    if "shield" in lowered and not has_magic_suffix and bonus <= 2:
+    if "shield" in lowered and not has_magic_suffix:
         entry.pop("ac_bonus", None)
         return entry
 
-    for label, base_ac in _ARMOR_BASE_AC.items():
-        if label in lowered and not has_magic_suffix and bonus >= base_ac - 10:
+    for label in _ARMOR_BASE_AC:
+        if label in lowered and not has_magic_suffix:
             entry.pop("ac_bonus", None)
             return entry
 

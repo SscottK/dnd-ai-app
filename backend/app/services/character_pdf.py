@@ -83,6 +83,7 @@ Rules:
 - Include all six saving throws.
 - Inventory: list gear with qty, weight if shown, equipped=true for worn/wielded items.
 - For magic armor/shields ONLY, include ac_bonus as the extra +N (e.g. "+1 Shield" → ac_bonus: 1, total shield +3). Do NOT set ac_bonus on non-magic "Shield" (standard +2 is implicit) or on armor base AC (Chain Mail alone → no ac_bonus; "+1 Chain Mail" → ac_bonus: 1).
+- Never set ac_bonus from shield or armor rules text in notes (e.g. "gains +2 bonus to AC", "AC 16") — standard shield/armor AC is implicit; only magic +N in the item name gets ac_bonus.
 - Parse the full AC breakdown from the Armor Class section into ac_breakdown AND ac_bonuses.
 - Top-level "ac" MUST be the large final total (e.g. 17), NOT a sub-line like armor base 16 alone.
 - Every bonus line that is not armor base, DEX, or shield goes in ac_bonuses (e.g. "+1 Armored Bonus (Defense)" → { "name": "Armored Bonus (Defense)", "bonus": 1, "requires_armor": true }).

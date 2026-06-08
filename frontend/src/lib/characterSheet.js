@@ -336,13 +336,13 @@ function sanitizeInventoryAcBonus(item) {
   const bonus = Number(item.ac_bonus);
   if (Number.isNaN(bonus)) return item;
 
-  if (SHIELD_PATTERN.test(label) && !/\+\s*\d+/.test(name) && bonus <= 2) {
+  if (SHIELD_PATTERN.test(label) && !/\+\s*\d+/.test(name)) {
     const { ac_bonus: _drop, ...rest } = item;
     return rest;
   }
 
   for (const armor of ARMOR_CATALOG) {
-    if (armor.pattern.test(label) && !/\+\s*\d+/.test(name) && bonus >= armor.base - 10) {
+    if (armor.pattern.test(label) && !/\+\s*\d+/.test(name)) {
       const { ac_bonus: _drop, ...rest } = item;
       return rest;
     }
@@ -351,8 +351,48 @@ function sanitizeInventoryAcBonus(item) {
   return item;
 }
 
+function isShieldItem(item) {
+  const label = stripMagicSuffix(String(item?.name || ""));
+  return SHIELD_PATTERN.test(label);
+}
+
+function isArmorItem(item) {
+  const label = stripMagicSuffix(String(item?.name || ""));
+  return ARMOR_CATALOG.some((armor) => armor.pattern.test(label));
+}
+
+const EQUIPPED_PROTECTION_ITEMS = [
+  { key: "ring", item: /ring of protection/i, bonus: /ring of protection/i },
+  { key: "cloak", item: /cloak of protection/i, bonus: /cloak of protection/i },
+  {
+    key: "ioun",
+    item: /ioun stone.*protection|stone of protection/i,
+    bonus: /ioun stone|stone of protection/i,
+  },
+  { key: "bracers", item: /bracers of defense/i, bonus: /bracers of defense/i },
+  {
+    key: "amulet",
+    item: /amulet of (?:natural )?armor/i,
+    bonus: /amulet of (?:natural )?armor/i,
+  },
+];
+
+function equippedProtectionKeys(sheet) {
+  const keys = new Set();
+  for (const item of equippedItems(sheet)) {
+    const haystack = `${item.name || ""} ${item.notes || ""}`;
+    for (const row of EQUIPPED_PROTECTION_ITEMS) {
+      if (row.item.test(haystack)) keys.add(row.key);
+    }
+  }
+  return keys;
+}
+
 function itemMagicBonus(item) {
   const sanitized = sanitizeInventoryAcBonus(item);
+  if (isShieldItem(sanitized) || isArmorItem(sanitized)) {
+    return parseMagicBonus(sanitized?.name);
+  }
   if (sanitized?.ac_bonus != null && !Number.isNaN(Number(sanitized.ac_bonus))) {
     return Number(sanitized.ac_bonus);
   }
@@ -481,6 +521,7 @@ function dedupeDefenseBonuses(bonuses) {
 function sanitizeAcBonuses(sheet, bonuses) {
   const equipped = equippedItems(sheet);
   const dex = abilityModifier(sheet.abilities?.dex) ?? 0;
+  const equippedProtection = equippedProtectionKeys(sheet);
   let bestArmor = null;
   for (const item of equipped) {
     const stats = classifyInventoryItem(item);
@@ -493,6 +534,9 @@ function sanitizeAcBonuses(sheet, bonuses) {
     const name = String(entry.name || "").toLowerCase();
     const bonus = Number(entry.bonus) || 0;
     if (isStructuralAcLine(name, bonus, dex)) return false;
+    for (const row of EQUIPPED_PROTECTION_ITEMS) {
+      if (equippedProtection.has(row.key) && row.bonus.test(name)) return false;
+    }
     if (/shield|buckler/i.test(name)) return false;
     if (bestArmor && /dex|dexterity/i.test(name)) return false;
     if (
@@ -644,7 +688,7 @@ function computeMiscAcBonuses(sheet, wearingArmor) {
     if (/ioun stone.*protection|stone of protection/i.test(haystack)) total += 1;
     if (!wearingArmor && /bracers of defense/i.test(haystack)) total += 2;
     if (/amulet of (?:natural )?armor/i.test(haystack)) {
-      total += itemMagicBonus(item) || parseMagicBonus(haystack) || 1;
+      total += parseMagicBonus(item.name) || 1;
     }
   }
   return total;
