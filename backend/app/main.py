@@ -9,7 +9,6 @@ from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.exceptions import GeminiProxyException  # We will create this file next
 from app.core.logging_config import setup_logging
-from app.db.migrate import run_migrations
 from app.services.bootstrap import bootstrap_admin_user
 
 # 1. Initialize Logging Configuration
@@ -20,7 +19,6 @@ logger = logging.getLogger("app.main")
 # 2. Manage Database Session Lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    run_migrations()
     bootstrap_admin_user()
     yield
 
