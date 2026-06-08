@@ -3,7 +3,8 @@ import { BookOpen, Search, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useMediaQuery, APP_MOBILE_QUERY } from "../hooks/useMediaQuery";
 import { apiFetch } from "../lib/api";
-import { MarkdownRenderer } from "../components/MarkdownRenderer";
+import { entrySummary } from "../lib/srdEntryFormat";
+import { SrdEntryDetail } from "../components/SrdEntryDetail";
 
 const CATEGORIES = [
   { id: "spells", label: "Spells", path: "/rules/spells", listKey: "spells" },
@@ -11,75 +12,14 @@ const CATEGORIES = [
   { id: "magic_items", label: "Magic items", path: "/rules/magic-items", listKey: "magic_items" },
   { id: "conditions", label: "Conditions", path: "/rules/conditions", listKey: "conditions" },
   { id: "species", label: "Species", path: "/rules/species", listKey: "species" },
+  { id: "backgrounds", label: "Backgrounds", path: "/rules/backgrounds", listKey: "backgrounds" },
   { id: "feats", label: "Feats", path: "/rules/feats", listKey: "feats" },
-  { id: "glossary", label: "Glossary", path: "/rules/glossary", listKey: "glossary" },
+  { id: "weapons", label: "Weapons", path: "/rules/weapons", listKey: "weapons" },
+  { id: "armor", label: "Armor", path: "/rules/armor", listKey: "armor" },
   { id: "gear", label: "Gear", path: "/rules/gear", listKey: "gear" },
+  { id: "animals", label: "Animals", path: "/rules/animals", listKey: "animals" },
+  { id: "glossary", label: "Glossary", path: "/rules/glossary", listKey: "glossary" },
 ];
-
-function formatSpellLevel(level) {
-  if (level === 0) return "Cantrip";
-  if (level != null) return `Lv ${level}`;
-  return null;
-}
-
-function isSpellEntry(entry) {
-  return Boolean(entry?.school != null && (entry.casting_time != null || entry.components != null));
-}
-
-function SpellEntryMeta({ entry }) {
-  const header = [
-    formatSpellLevel(entry.level) || (entry.level != null ? `Level ${entry.level}` : null),
-    entry.school,
-    entry.classes ? `(${entry.classes})` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const rows = [
-    ["Casting Time", entry.casting_time],
-    ["Range", entry.range],
-    ["Components", entry.components],
-    ["Duration", entry.duration],
-  ].filter(([, value]) => value);
-
-  if (entry.ritual === "yes") rows.push(["Ritual", "Yes"]);
-  if (entry.concentration === "yes") rows.push(["Concentration", "Yes"]);
-
-  return (
-    <div className="space-y-2 border-b border-border/60 pb-3">
-      {header && <p className="text-xs font-black uppercase text-neon-cyan">{header}</p>}
-      <dl className="space-y-1 font-mono text-xs">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex gap-2">
-            <dt className="shrink-0 text-ink-faint">{label}:</dt>
-            <dd className="text-starlight">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
-function entrySummary(entry, category) {
-  if (category === "spells") {
-    return [formatSpellLevel(entry.level), entry.school, entry.casting_time]
-      .filter(Boolean)
-      .join(" · ");
-  }
-  if (category === "monsters") {
-    return [`CR ${entry.cr ?? "?"}`, entry.size, entry.type].filter(Boolean).join(" · ");
-  }
-  if (category === "magic_items") {
-    return entry.rarity || entry.category || "";
-  }
-  return entry.tag || entry.category || "";
-}
-
-function entryBody(entry) {
-  const text = entry.description || entry.desc || entry.content || "";
-  if (!text) return "No description in SRD excerpt.";
-  return text;
-}
 
 function BrowseListPanel({ title, titleClassName = "text-starlight", children, fillHeight = true }) {
   return (
@@ -136,6 +76,7 @@ export function SrdBrowsePage() {
   const [activeCategory, setActiveCategory] = useState("spells");
   const [entries, setEntries] = useState([]);
   const [selectedName, setSelectedName] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -148,11 +89,14 @@ export function SrdBrowsePage() {
     [activeCategory]
   );
 
+  const detailCategory = selectedCategory || activeCategory;
+
   const loadCategory = useCallback(async () => {
     if (!token) return;
     setLoadingList(true);
     setError("");
     setSelectedName(null);
+    setSelectedCategory(null);
     setSelectedEntry(null);
     try {
       const res = await apiFetch(categoryMeta.path, { token });
@@ -196,6 +140,7 @@ export function SrdBrowsePage() {
   const openEntry = async (name, category = activeCategory) => {
     if (!token || !name) return;
     setSelectedName(name);
+    setSelectedCategory(category);
     setLoadingEntry(true);
     setError("");
     try {
@@ -226,6 +171,7 @@ export function SrdBrowsePage() {
 
   const closeEntry = () => {
     setSelectedName(null);
+    setSelectedCategory(null);
     setSelectedEntry(null);
     setLoadingEntry(false);
   };
@@ -337,7 +283,7 @@ export function SrdBrowsePage() {
                     <li key={row.name}>
                       <button
                         type="button"
-                        onClick={() => void openEntry(row.name)}
+                        onClick={() => void openEntry(row.name, activeCategory)}
                         className={`block w-full rounded-sm px-2 py-1.5 text-left text-xs font-mono hover:bg-neon-cyan/10 ${
                           selectedName === row.name
                             ? "bg-neon-cyan/10 text-starlight"
@@ -371,13 +317,7 @@ export function SrdBrowsePage() {
               >
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
-                  <div className="space-y-3">
-                    {isSpellEntry(selectedEntry) && <SpellEntryMeta entry={selectedEntry} />}
-                    {!isSpellEntry(selectedEntry) && selectedEntry.cr != null && (
-                      <p className="text-xs text-neon-cyan">CR {selectedEntry.cr}</p>
-                    )}
-                    <MarkdownRenderer content={entryBody(selectedEntry)} />
-                  </div>
+                  <SrdEntryDetail entry={selectedEntry} category={detailCategory} />
                 )}
                 {!loadingEntry && !selectedEntry && (
                   <p className="text-ink-faint">Could not load this entry.</p>

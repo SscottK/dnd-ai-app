@@ -117,6 +117,16 @@ def list_gear():
     return {"gear": list_entries("gear")}
 
 
+@router.get("/weapons")
+def list_weapons():
+    return {"weapons": list_entries("weapons")}
+
+
+@router.get("/armor")
+def list_armor():
+    return {"armor": list_entries("armor")}
+
+
 @router.get("/rules-documents")
 def list_rules_documents():
     path = _DATA_DIR / "rules_documents.json"

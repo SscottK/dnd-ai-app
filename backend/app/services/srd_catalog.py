@@ -164,7 +164,18 @@ def lookup_entry(category: str, name: str) -> dict | None:
         "gear": _gear_index,
     }
     if category in lookup_map:
-        return lookup_map[category]().get(key)
+        entry = lookup_map[category]().get(key)
+        if entry is None:
+            return None
+        if category == "conditions":
+            glossary = _glossary_index().get(key)
+            if glossary and glossary.get("description"):
+                return {
+                    **entry,
+                    "description": glossary["description"],
+                    "tag": glossary.get("tag") or entry.get("tag"),
+                }
+        return entry
 
     if category == "weapons":
         for row in _equipment_data().get("weapons") or []:
