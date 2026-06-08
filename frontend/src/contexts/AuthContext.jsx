@@ -61,22 +61,40 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (username, password) => {
+    let response;
     try {
-      const response = await apiFetch("/auth/login", {
+      response = await apiFetch("/auth/login", {
         method: "POST",
         body: { username, password },
       });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      return persistSession(data.access_token);
     } catch (error) {
       console.error("Login failed:", error);
-      return null;
+      throw new Error(
+        "Could not reach the server. If you are on production, wait for the backend to wake up and try again."
+      );
     }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const detail = Array.isArray(err.detail)
+        ? err.detail.map((item) => item.msg).join(", ")
+        : err.detail;
+
+      if (response.status === 401) {
+        throw new Error(
+          "Incorrect username or password. If the app was recently redeployed, your account may have been reset — try creating a new one."
+        );
+      }
+
+      throw new Error(detail || `Login failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    const user = await persistSession(data.access_token);
+    if (!user) {
+      throw new Error("Signed in, but the session could not be loaded. Try again.");
+    }
+    return user;
   };
 
   const register = async ({ username, password }) => {

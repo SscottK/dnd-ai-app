@@ -18,12 +18,12 @@ export function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoginError("");
-    const loggedInUser = await login(username, password);
-    if (!loggedInUser) {
-      setLoginError("ACCESS DENIED. CHECK USERNAME AND PASSWORD.");
-      return;
+    try {
+      await login(username, password);
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      setLoginError(error.message || "ACCESS DENIED. CHECK USERNAME AND PASSWORD.");
     }
-    navigate("/dashboard", { replace: true });
   };
 
   return (
