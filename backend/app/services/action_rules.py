@@ -30,7 +30,7 @@ _BONUS_ACTION_HINT = re.compile(r"bonus action", re.IGNORECASE)
 _REACTION_HINT = re.compile(r"reaction", re.IGNORECASE)
 _ACTION_HINT = re.compile(r"\baction\b", re.IGNORECASE)
 _HEALING_DICE_RE = re.compile(
-    r"regain hit points equal to (\d+d\d+(?:\s*(?:\+|plus)\s*(?:your\s+)?(?:\w+\s+)?level)?)",
+    r"(?:regain|regains)(?:\s+a\s+number\s+of)?\s+Hit Points equal to (\d+d\d+(?:\s*(?:\+|plus)\s*[^.\n]+)?)",
     re.IGNORECASE,
 )
 _PASSIVE_TURN_ACTION_NAMES = frozenset(

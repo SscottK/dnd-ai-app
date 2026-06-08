@@ -4,9 +4,9 @@
   "counts": {
     "monsters": 322,
     "conditions": 14,
-    "spells": 319,
+    "spells": 339,
     "standard_actions": 11,
-    "class_features": 36,
+    "class_features": 49,
     "species": 9,
     "backgrounds": 4,
     "feats": 17,
@@ -14,8 +14,8 @@
     "classes": 12,
     "magic_items": 260,
     "animals": 95,
-    "weapons": 37,
-    "armor": 18,
+    "weapons": 39,
+    "armor": 14,
     "gear": 83,
     "equipment_chapters": 14,
     "rules_sections": 40

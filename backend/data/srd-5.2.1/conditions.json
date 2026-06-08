@@ -1,5 +1,5 @@
 {
-  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0. Re-published via the Open5e API (https://api.open5e.com/, document slug: wotc-srd), also under CC-BY 4.0.",
+  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0.",
   "conditions": [
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
@@ -85,5 +85,6 @@
       "key": "unconscious",
       "name": "Unconscious"
     }
-  ]
+  ],
+  "_source_note": "cocoajamworld/srd-5.2.1"
 }

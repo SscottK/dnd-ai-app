@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build SRD 5.2.1 combat action and spell JSON from Open5e (CC-BY 4.0)."""
+"""Legacy partial SRD build from Open5e (2014 wotc-srd). Superseded by build_srd_all.py."""
 
 from __future__ import annotations
 
@@ -165,7 +165,11 @@ def infer_spell_action_type(spell: dict) -> str:
 
 
 def parse_healing_dice(text: str) -> str | None:
-    match = re.search(r"regain hit points equal to (\d+d\d+(?:\s*\+\s*[^.]+)?)", text, re.I)
+    match = re.search(
+        r"(?:regain|regains)(?:\s+a\s+number\s+of)?\s+Hit Points equal to (\d+d\d+(?:\s*\+\s*[^.]+)?)",
+        text,
+        re.I,
+    )
     if match:
         return re.sub(r"\s+", "", match.group(1).lower())
     return None

@@ -1,693 +1,681 @@
 {
   "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0.",
-  "_source_note": "Open5e weapons/armor + downfallx equipment.md gear and rules",
+  "_source_note": "downfallx/dnd-5e-srd-markdown equipment.md (weapons, armor, gear, rules)",
   "equipment": {
     "weapons": [
       {
         "name": "Battleaxe",
         "slug": "battleaxe",
         "category": "Martial Melee Weapons",
-        "cost": "10 gp",
+        "cost": "10 GP",
         "damage_dice": "1d8",
         "damage_type": "slashing",
         "weight": "4 lb.",
         "properties": [
-          "versatile (1d10)"
-        ]
+          "Versatile (1d10)"
+        ],
+        "mastery": "Topple"
       },
       {
         "name": "Blowgun",
         "slug": "blowgun",
         "category": "Martial Ranged Weapons",
-        "cost": "10 gp",
-        "damage_dice": "1",
-        "damage_type": "piercing",
+        "cost": "10 GP",
+        "damage_dice": null,
+        "damage_type": null,
         "weight": "1 lb.",
         "properties": [
-          "ammunition (range 25/100)",
-          "loading"
-        ]
+          "Ammunition (Range 25/100; Needle)",
+          "Loading"
+        ],
+        "mastery": "Vex"
       },
       {
         "name": "Club",
         "slug": "club",
         "category": "Simple Melee Weapons",
-        "cost": "1 sp",
+        "cost": "1 SP",
         "damage_dice": "1d4",
         "damage_type": "bludgeoning",
         "weight": "2 lb.",
         "properties": [
-          "light"
-        ]
-      },
-      {
-        "name": "Crossbow, hand",
-        "slug": "crossbow-hand",
-        "category": "Martial Ranged Weapons",
-        "cost": "75 gp",
-        "damage_dice": "1d6",
-        "damage_type": "piercing",
-        "weight": "3 lb.",
-        "properties": [
-          "ammunition (range 30/120)",
-          "light",
-          "loading"
-        ]
-      },
-      {
-        "name": "Crossbow, heavy",
-        "slug": "crossbow-heavy",
-        "category": "Martial Ranged Weapons",
-        "cost": "50 gp",
-        "damage_dice": "1d10",
-        "damage_type": "piercing",
-        "weight": "18 lb.",
-        "properties": [
-          "ammunition (range 100/400)",
-          "heavy",
-          "loading",
-          "two-handed"
-        ]
-      },
-      {
-        "name": "Crossbow, light",
-        "slug": "crossbow-light",
-        "category": "Simple Ranged Weapons",
-        "cost": "25 gp",
-        "damage_dice": "1d8",
-        "damage_type": "piercing",
-        "weight": "5 lb.",
-        "properties": [
-          "ammunition (range 80/320)",
-          "loading",
-          "two-handed"
-        ]
+          "Light"
+        ],
+        "mastery": "Slow"
       },
       {
         "name": "Dagger",
         "slug": "dagger",
         "category": "Simple Melee Weapons",
-        "cost": "2 gp",
+        "cost": "2 GP",
         "damage_dice": "1d4",
         "damage_type": "piercing",
         "weight": "1 lb.",
         "properties": [
-          "finesse",
-          "light",
-          "thrown (range 20/60)"
-        ]
+          "Finesse",
+          "Light",
+          "Thrown (Range 20/60)"
+        ],
+        "mastery": "Nick"
       },
       {
         "name": "Dart",
         "slug": "dart",
         "category": "Simple Ranged Weapons",
-        "cost": "5 cp",
+        "cost": "5 CP",
         "damage_dice": "1d4",
         "damage_type": "piercing",
         "weight": "1/4 lb.",
         "properties": [
-          "finesse",
-          "thrown (range 20/60)"
-        ]
+          "Finesse",
+          "Thrown (Range 20/60)"
+        ],
+        "mastery": "Vex"
       },
       {
         "name": "Flail",
         "slug": "flail",
         "category": "Martial Melee Weapons",
-        "cost": "10 gp",
+        "cost": "10 GP",
         "damage_dice": "1d8",
         "damage_type": "bludgeoning",
         "weight": "2 lb.",
-        "properties": []
+        "properties": [],
+        "mastery": "Sap"
       },
       {
         "name": "Glaive",
         "slug": "glaive",
         "category": "Martial Melee Weapons",
-        "cost": "20 gp",
+        "cost": "20 GP",
         "damage_dice": "1d10",
         "damage_type": "slashing",
         "weight": "6 lb.",
         "properties": [
-          "heavy",
-          "reach",
-          "two-handed"
-        ]
+          "Heavy",
+          "Reach",
+          "Two-Handed"
+        ],
+        "mastery": "Graze"
       },
       {
         "name": "Greataxe",
         "slug": "greataxe",
         "category": "Martial Melee Weapons",
-        "cost": "30 gp",
+        "cost": "30 GP",
         "damage_dice": "1d12",
         "damage_type": "slashing",
         "weight": "7 lb.",
         "properties": [
-          "heavy",
-          "two-handed"
-        ]
+          "Heavy",
+          "Two-Handed"
+        ],
+        "mastery": "Cleave"
       },
       {
         "name": "Greatclub",
         "slug": "greatclub",
         "category": "Simple Melee Weapons",
-        "cost": "2 sp",
+        "cost": "2 SP",
         "damage_dice": "1d8",
         "damage_type": "bludgeoning",
         "weight": "10 lb.",
         "properties": [
-          "two-handed"
-        ]
+          "Two-Handed"
+        ],
+        "mastery": "Push"
       },
       {
         "name": "Greatsword",
         "slug": "greatsword",
         "category": "Martial Melee Weapons",
-        "cost": "50 gp",
+        "cost": "50 GP",
         "damage_dice": "2d6",
         "damage_type": "slashing",
         "weight": "6 lb.",
         "properties": [
-          "heavy",
-          "two-handed"
-        ]
+          "Heavy",
+          "Two-Handed"
+        ],
+        "mastery": "Graze"
       },
       {
         "name": "Halberd",
         "slug": "halberd",
         "category": "Martial Melee Weapons",
-        "cost": "20 gp",
+        "cost": "20 GP",
         "damage_dice": "1d10",
         "damage_type": "slashing",
         "weight": "6 lb.",
         "properties": [
-          "heavy",
-          "reach",
-          "two-handed"
-        ]
+          "Heavy",
+          "Reach",
+          "Two-Handed"
+        ],
+        "mastery": "Cleave"
+      },
+      {
+        "name": "Hand Crossbow",
+        "slug": "hand-crossbow",
+        "category": "Martial Ranged Weapons",
+        "cost": "75 GP",
+        "damage_dice": "1d6",
+        "damage_type": "piercing",
+        "weight": "3 lb.",
+        "properties": [
+          "Ammunition (Range 30/120; Bolt)",
+          "Light",
+          "Loading"
+        ],
+        "mastery": "Vex"
       },
       {
         "name": "Handaxe",
         "slug": "handaxe",
         "category": "Simple Melee Weapons",
-        "cost": "5 gp",
+        "cost": "5 GP",
         "damage_dice": "1d6",
         "damage_type": "slashing",
         "weight": "2 lb.",
         "properties": [
-          "light",
-          "thrown (range 20/60)"
-        ]
+          "Light",
+          "Thrown (Range 20/60)"
+        ],
+        "mastery": "Vex"
+      },
+      {
+        "name": "Heavy Crossbow",
+        "slug": "heavy-crossbow",
+        "category": "Martial Ranged Weapons",
+        "cost": "50 GP",
+        "damage_dice": "1d10",
+        "damage_type": "piercing",
+        "weight": "18 lb.",
+        "properties": [
+          "Ammunition (Range 100/400; Bolt)",
+          "Heavy",
+          "Loading",
+          "Two-Handed"
+        ],
+        "mastery": "Push"
       },
       {
         "name": "Javelin",
         "slug": "javelin",
         "category": "Simple Melee Weapons",
-        "cost": "5 sp",
+        "cost": "5 SP",
         "damage_dice": "1d6",
         "damage_type": "piercing",
         "weight": "2 lb.",
         "properties": [
-          "thrown (range 30/120)"
-        ]
+          "Thrown (Range 30/120)"
+        ],
+        "mastery": "Slow"
       },
       {
         "name": "Lance",
         "slug": "lance",
         "category": "Martial Melee Weapons",
-        "cost": "10 gp",
-        "damage_dice": "1d12",
+        "cost": "10 GP",
+        "damage_dice": "1d10",
         "damage_type": "piercing",
         "weight": "6 lb.",
         "properties": [
-          "reach",
-          "special"
-        ]
+          "Heavy",
+          "Reach",
+          "Two-Handed (unless mounted)"
+        ],
+        "mastery": "Topple"
       },
       {
-        "name": "Light hammer",
+        "name": "Light Crossbow",
+        "slug": "light-crossbow",
+        "category": "Simple Ranged Weapons",
+        "cost": "25 GP",
+        "damage_dice": "1d8",
+        "damage_type": "piercing",
+        "weight": "5 lb.",
+        "properties": [
+          "Ammunition (Range 80/320; Bolt)",
+          "Loading",
+          "Two-Handed"
+        ],
+        "mastery": "Slow"
+      },
+      {
+        "name": "Light Hammer",
         "slug": "light-hammer",
         "category": "Simple Melee Weapons",
-        "cost": "2 gp",
+        "cost": "2 GP",
         "damage_dice": "1d4",
         "damage_type": "bludgeoning",
         "weight": "2 lb.",
         "properties": [
-          "light",
-          "thrown (range 20/60)"
-        ]
+          "Light",
+          "Thrown (Range 20/60)"
+        ],
+        "mastery": "Nick"
       },
       {
         "name": "Longbow",
         "slug": "longbow",
         "category": "Martial Ranged Weapons",
-        "cost": "50 gp",
+        "cost": "50 GP",
         "damage_dice": "1d8",
         "damage_type": "piercing",
         "weight": "2 lb.",
         "properties": [
-          "ammunition (range 150/600)",
-          "heavy",
-          "two-handed"
-        ]
+          "Ammunition (Range 150/600; Arrow)",
+          "Heavy",
+          "Two-Handed"
+        ],
+        "mastery": "Slow"
       },
       {
         "name": "Longsword",
         "slug": "longsword",
         "category": "Martial Melee Weapons",
-        "cost": "15 gp",
+        "cost": "15 GP",
         "damage_dice": "1d8",
         "damage_type": "slashing",
         "weight": "3 lb.",
         "properties": [
-          "versatile (1d10)"
-        ]
+          "Versatile (1d10)"
+        ],
+        "mastery": "Sap"
       },
       {
         "name": "Mace",
         "slug": "mace",
         "category": "Simple Melee Weapons",
-        "cost": "5 gp",
+        "cost": "5 GP",
         "damage_dice": "1d6",
         "damage_type": "bludgeoning",
         "weight": "4 lb.",
-        "properties": []
+        "properties": [],
+        "mastery": "Sap"
       },
       {
         "name": "Maul",
         "slug": "maul",
         "category": "Martial Melee Weapons",
-        "cost": "10 gp",
+        "cost": "10 GP",
         "damage_dice": "2d6",
         "damage_type": "bludgeoning",
         "weight": "10 lb.",
         "properties": [
-          "heavy",
-          "two-handed"
-        ]
+          "Heavy",
+          "Two-Handed"
+        ],
+        "mastery": "Topple"
       },
       {
         "name": "Morningstar",
         "slug": "morningstar",
         "category": "Martial Melee Weapons",
-        "cost": "15 gp",
+        "cost": "15 GP",
         "damage_dice": "1d8",
         "damage_type": "piercing",
         "weight": "4 lb.",
-        "properties": []
+        "properties": [],
+        "mastery": "Sap"
       },
       {
-        "name": "Net",
-        "slug": "net",
+        "name": "Musket",
+        "slug": "musket",
         "category": "Martial Ranged Weapons",
-        "cost": "1 gp",
-        "damage_dice": "0",
-        "damage_type": "",
-        "weight": "3 lb.",
+        "cost": "500 GP",
+        "damage_dice": "1d12",
+        "damage_type": "piercing",
+        "weight": "10 lb.",
         "properties": [
-          "special",
-          "thrown (range 5/15)"
-        ]
+          "Ammunition (Range 40/120; Bullet)",
+          "Loading",
+          "Two-Handed"
+        ],
+        "mastery": "Slow"
+      },
+      {
+        "name": "Name",
+        "slug": "name",
+        "category": "Weapon",
+        "cost": "Cost",
+        "damage_dice": null,
+        "damage_type": null,
+        "weight": "Weight",
+        "properties": [
+          "Properties"
+        ],
+        "mastery": "Mastery"
       },
       {
         "name": "Pike",
         "slug": "pike",
         "category": "Martial Melee Weapons",
-        "cost": "5 gp",
+        "cost": "5 GP",
         "damage_dice": "1d10",
         "damage_type": "piercing",
         "weight": "18 lb.",
         "properties": [
-          "heavy",
-          "reach",
-          "two-handed"
-        ]
+          "Heavy",
+          "Reach",
+          "Two-Handed"
+        ],
+        "mastery": "Push"
+      },
+      {
+        "name": "Pistol",
+        "slug": "pistol",
+        "category": "Martial Ranged Weapons",
+        "cost": "250 GP",
+        "damage_dice": "1d10",
+        "damage_type": "piercing",
+        "weight": "3 lb.",
+        "properties": [
+          "Ammunition (Range 30/90; Bullet)",
+          "Loading"
+        ],
+        "mastery": "Vex"
       },
       {
         "name": "Quarterstaff",
         "slug": "quarterstaff",
         "category": "Simple Melee Weapons",
-        "cost": "2 sp",
+        "cost": "2 SP",
         "damage_dice": "1d6",
         "damage_type": "bludgeoning",
         "weight": "4 lb.",
         "properties": [
-          "versatile (1d8)"
-        ]
+          "Versatile (1d8)"
+        ],
+        "mastery": "Topple"
       },
       {
         "name": "Rapier",
         "slug": "rapier",
         "category": "Martial Melee Weapons",
-        "cost": "25 gp",
+        "cost": "25 GP",
         "damage_dice": "1d8",
         "damage_type": "piercing",
         "weight": "2 lb.",
         "properties": [
-          "finesse"
-        ]
+          "Finesse"
+        ],
+        "mastery": "Vex"
       },
       {
         "name": "Scimitar",
         "slug": "scimitar",
         "category": "Martial Melee Weapons",
-        "cost": "25 gp",
+        "cost": "25 GP",
         "damage_dice": "1d6",
         "damage_type": "slashing",
         "weight": "3 lb.",
         "properties": [
-          "finesse",
-          "light"
-        ]
+          "Finesse",
+          "Light"
+        ],
+        "mastery": "Nick"
       },
       {
         "name": "Shortbow",
         "slug": "shortbow",
         "category": "Simple Ranged Weapons",
-        "cost": "25 gp",
+        "cost": "25 GP",
         "damage_dice": "1d6",
         "damage_type": "piercing",
         "weight": "2 lb.",
         "properties": [
-          "ammunition (range 80/320)",
-          "two-handed"
-        ]
+          "Ammunition (Range 80/320; Arrow)",
+          "Two-Handed"
+        ],
+        "mastery": "Vex"
       },
       {
         "name": "Shortsword",
         "slug": "shortsword",
         "category": "Martial Melee Weapons",
-        "cost": "10 gp",
+        "cost": "10 GP",
         "damage_dice": "1d6",
         "damage_type": "piercing",
         "weight": "2 lb.",
         "properties": [
-          "finesse",
-          "light"
-        ]
+          "Finesse",
+          "Light"
+        ],
+        "mastery": "Vex"
       },
       {
         "name": "Sickle",
         "slug": "sickle",
         "category": "Simple Melee Weapons",
-        "cost": "1 gp",
+        "cost": "1 GP",
         "damage_dice": "1d4",
         "damage_type": "slashing",
         "weight": "2 lb.",
         "properties": [
-          "light"
-        ]
+          "Light"
+        ],
+        "mastery": "Nick"
       },
       {
         "name": "Sling",
         "slug": "sling",
         "category": "Simple Ranged Weapons",
-        "cost": "1 sp",
+        "cost": "1 SP",
         "damage_dice": "1d4",
         "damage_type": "bludgeoning",
-        "weight": "0 lb.",
+        "weight": "—",
         "properties": [
-          "ammunition (range 30/120)"
-        ]
+          "Ammunition (Range 30/120; Bullet)"
+        ],
+        "mastery": "Slow"
       },
       {
         "name": "Spear",
         "slug": "spear",
         "category": "Simple Melee Weapons",
-        "cost": "1 gp",
+        "cost": "1 GP",
         "damage_dice": "1d6",
         "damage_type": "piercing",
         "weight": "3 lb.",
         "properties": [
-          "thrown (range 20/60)",
-          "versatile (1d8)"
-        ]
+          "Thrown (Range 20/60)",
+          "Versatile (1d8)"
+        ],
+        "mastery": "Sap"
       },
       {
         "name": "Trident",
         "slug": "trident",
         "category": "Martial Melee Weapons",
-        "cost": "5 gp",
-        "damage_dice": "1d6",
+        "cost": "5 GP",
+        "damage_dice": "1d8",
         "damage_type": "piercing",
         "weight": "4 lb.",
         "properties": [
-          "thrown (range 20/60)",
-          "versatile (1d8)"
-        ]
+          "Thrown (Range 20/60)",
+          "Versatile (1d10)"
+        ],
+        "mastery": "Topple"
       },
       {
-        "name": "War pick",
+        "name": "War Pick",
         "slug": "war-pick",
         "category": "Martial Melee Weapons",
-        "cost": "5 gp",
+        "cost": "5 GP",
         "damage_dice": "1d8",
         "damage_type": "piercing",
         "weight": "2 lb.",
-        "properties": []
+        "properties": [
+          "Versatile (1d10)"
+        ],
+        "mastery": "Sap"
       },
       {
         "name": "Warhammer",
         "slug": "warhammer",
         "category": "Martial Melee Weapons",
-        "cost": "15 gp",
+        "cost": "15 GP",
         "damage_dice": "1d8",
         "damage_type": "bludgeoning",
-        "weight": "2 lb.",
+        "weight": "5 lb.",
         "properties": [
-          "versatile (1d10)"
-        ]
+          "Versatile (1d10)"
+        ],
+        "mastery": "Push"
       },
       {
         "name": "Whip",
         "slug": "whip",
         "category": "Martial Melee Weapons",
-        "cost": "2 gp",
+        "cost": "2 GP",
         "damage_dice": "1d4",
         "damage_type": "slashing",
         "weight": "3 lb.",
         "properties": [
-          "finesse",
-          "reach"
-        ]
+          "Finesse",
+          "Reach"
+        ],
+        "mastery": "Slow"
       }
     ],
     "armor": [
       {
-        "name": "Breastplate",
-        "slug": "breastplate",
-        "category": "Medium Armor",
-        "cost": "400 gp",
-        "ac_base": 14,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
+        "name": "Armor",
+        "slug": "armor",
+        "category": "Armor",
+        "cost": "Cost",
+        "weight": "Weight",
+        "ac_text": "Armor Class (AC)",
+        "stealth_disadvantage": true
       },
       {
-        "name": "Chain mail",
+        "name": "Breastplate",
+        "slug": "breastplate",
+        "category": "Medium Armor (5 Minutes to Don and 1 Minute to Doff)",
+        "cost": "400 GP",
+        "weight": "20 lb.",
+        "ac_base": 14,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": 2
+      },
+      {
+        "name": "Chain Mail",
         "slug": "chain-mail",
-        "category": "Heavy Armor",
-        "cost": "75 gp",
+        "category": "Heavy Armor (10 Minutes to Don and 5 Minutes to Doff)",
+        "cost": "75 GP",
+        "weight": "55 lb.",
         "ac_base": 16,
-        "ac_add_dexmod": false,
-        "ac_cap_dexmod": null,
         "strength_requirement": 13,
-        "stealth_disadvantage": true,
-        "weight": ""
+        "stealth_disadvantage": true
       },
       {
         "name": "Chain Shirt",
         "slug": "chain-shirt",
-        "category": "Medium Armor",
-        "cost": "50 gp",
+        "category": "Medium Armor (5 Minutes to Don and 1 Minute to Doff)",
+        "cost": "50 GP",
+        "weight": "20 lb.",
         "ac_base": 13,
         "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
+        "ac_cap_dexmod": 2
       },
       {
-        "name": "Draconic Resilience",
-        "slug": "draconic-resilience",
-        "category": "Class Feature",
-        "cost": "0 gp",
-        "ac_base": 13,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
-      },
-      {
-        "name": "Half plate",
-        "slug": "half-plate",
-        "category": "Medium Armor",
-        "cost": "750 gp",
+        "name": "Half Plate Armor",
+        "slug": "half-plate-armor",
+        "category": "Medium Armor (5 Minutes to Don and 1 Minute to Doff)",
+        "cost": "750 GP",
+        "weight": "40 lb.",
         "ac_base": 15,
         "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": true,
-        "weight": ""
+        "ac_cap_dexmod": 2,
+        "stealth_disadvantage": true
       },
       {
-        "name": "Hide",
-        "slug": "hide",
-        "category": "Medium Armor",
-        "cost": "10 gp",
+        "name": "Hide Armor",
+        "slug": "hide-armor",
+        "category": "Medium Armor (5 Minutes to Don and 1 Minute to Doff)",
+        "cost": "10 GP",
+        "weight": "12 lb.",
         "ac_base": 12,
         "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
+        "ac_cap_dexmod": 2
       },
       {
-        "name": "Leather",
-        "slug": "leather",
-        "category": "Light Armor",
-        "cost": "10 gp",
+        "name": "Leather Armor",
+        "slug": "leather-armor",
+        "category": "Light Armor (1 Minute to Don or Doff)",
+        "cost": "10 GP",
+        "weight": "10 lb.",
+        "ac_base": 11,
+        "ac_add_dexmod": true
+      },
+      {
+        "name": "Padded Armor",
+        "slug": "padded-armor",
+        "category": "Light Armor (1 Minute to Don or Doff)",
+        "cost": "5 GP",
+        "weight": "8 lb.",
         "ac_base": 11,
         "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
+        "stealth_disadvantage": true
       },
       {
-        "name": "Mage Armor",
-        "slug": "mage-armor",
-        "category": "Spell",
-        "cost": "0 gp",
-        "ac_base": 13,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
-      },
-      {
-        "name": "Padded",
-        "slug": "padded",
-        "category": "Light Armor",
-        "cost": "5 gp",
-        "ac_base": 11,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": true,
-        "weight": ""
-      },
-      {
-        "name": "Plate",
-        "slug": "plate",
-        "category": "Heavy Armor",
-        "cost": "1500 gp",
+        "name": "Plate Armor",
+        "slug": "plate-armor",
+        "category": "Heavy Armor (10 Minutes to Don and 5 Minutes to Doff)",
+        "cost": "1,500 GP",
+        "weight": "65 lb.",
         "ac_base": 18,
-        "ac_add_dexmod": false,
-        "ac_cap_dexmod": null,
         "strength_requirement": 15,
-        "stealth_disadvantage": true,
-        "weight": ""
+        "stealth_disadvantage": true
       },
       {
-        "name": "Ring mail",
+        "name": "Ring Mail",
         "slug": "ring-mail",
-        "category": "Heavy Armor",
-        "cost": "30 gp",
+        "category": "Heavy Armor (10 Minutes to Don and 5 Minutes to Doff)",
+        "cost": "30 GP",
+        "weight": "40 lb.",
         "ac_base": 14,
-        "ac_add_dexmod": false,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": true,
-        "weight": ""
+        "stealth_disadvantage": true
       },
       {
-        "name": "Scale mail",
+        "name": "Scale Mail",
         "slug": "scale-mail",
-        "category": "Medium Armor",
-        "cost": "50 gp",
+        "category": "Medium Armor (5 Minutes to Don and 1 Minute to Doff)",
+        "cost": "50 GP",
+        "weight": "45 lb.",
         "ac_base": 14,
         "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": true,
-        "weight": ""
+        "ac_cap_dexmod": 2,
+        "stealth_disadvantage": true
       },
       {
         "name": "Shield",
         "slug": "shield",
         "category": "Shield",
-        "cost": "10 gp",
-        "ac_base": 0,
-        "ac_add_dexmod": false,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
+        "cost": "10 GP",
+        "weight": "6 lb.",
+        "ac_base": 2
       },
       {
-        "name": "Splint",
-        "slug": "splint",
-        "category": "Heavy Armor",
-        "cost": "200 gp",
+        "name": "Splint Armor",
+        "slug": "splint-armor",
+        "category": "Heavy Armor (10 Minutes to Don and 5 Minutes to Doff)",
+        "cost": "200 GP",
+        "weight": "60 lb.",
         "ac_base": 17,
-        "ac_add_dexmod": false,
-        "ac_cap_dexmod": null,
         "strength_requirement": 15,
-        "stealth_disadvantage": true,
-        "weight": ""
+        "stealth_disadvantage": true
       },
       {
-        "name": "Studded Leather",
-        "slug": "studded-leather",
-        "category": "Light Armor",
-        "cost": "45 gp",
+        "name": "Studded Leather Armor",
+        "slug": "studded-leather-armor",
+        "category": "Light Armor (1 Minute to Don or Doff)",
+        "cost": "45 GP",
+        "weight": "13 lb.",
         "ac_base": 12,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
-      },
-      {
-        "name": "Unarmored",
-        "slug": "unarmored",
-        "category": "No Armor",
-        "cost": "5 gp",
-        "ac_base": 10,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
-      },
-      {
-        "name": "Unarmored Defense (Barbarian)",
-        "slug": "unarmored-defense-barbarian",
-        "category": "Class Feature",
-        "cost": "0 gp",
-        "ac_base": 10,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
-      },
-      {
-        "name": "Unarmored Defense (Monk)",
-        "slug": "unarmored-defense-monk",
-        "category": "Class Feature",
-        "cost": "0 gp",
-        "ac_base": 10,
-        "ac_add_dexmod": true,
-        "ac_cap_dexmod": null,
-        "strength_requirement": null,
-        "stealth_disadvantage": false,
-        "weight": ""
+        "ac_add_dexmod": true
       }
     ],
     "gear": [
