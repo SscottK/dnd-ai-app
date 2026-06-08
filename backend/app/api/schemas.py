@@ -129,8 +129,45 @@ class CampaignSessionStatus(BaseModel):
     character_id: int | None = None
     character_name: str | None = None
     last_combat_log_id: int | None = None
+    last_action_log_id: int | None = None
     play_session_notes_tab_id: str | None = None
     play_session_notes_tab_title: str | None = None
+    action_log_text: str | None = None
+
+
+class ActionLogEntry(BaseModel):
+    at: str
+    message: str
+    kind: str = "roll"
+    roller_name: str
+    character_name: str | None = None
+    dice: str | None = None
+    expression: str | None = None
+    result: int | None = None
+    bonus: int | None = None
+    total: int | None = None
+    rolls: list[int] | None = None
+    dropped: list[int] | None = None
+
+
+class ActionRollRequest(BaseModel):
+    expression: str | None = Field(default=None, max_length=48)
+    quick_die: str | None = Field(default=None, max_length=8)
+    roll_kind: str = Field(default="dice", max_length=16)
+    label: str | None = Field(default=None, max_length=80)
+    character_id: int | None = Field(default=None, ge=1)
+    advantage: bool = False
+    disadvantage: bool = False
+
+
+class ActionRollResponse(BaseModel):
+    entry: ActionLogEntry
+    log: list[ActionLogEntry] = Field(default_factory=list)
+
+
+class LatestActionLogResponse(BaseModel):
+    action_log_id: int
+    action_log_text: str
 
 
 class DiceRollRequest(BaseModel):
@@ -317,6 +354,11 @@ class UseActionRequest(BaseModel):
 class UseActionResponse(BaseModel):
     encounter: EncounterState
     action_messages: list[str] = Field(default_factory=list)
+    combat_ended: bool = False
+    combat_log_id: int | None = None
+    combat_log_text: str | None = None
+    party_updated: int | None = None
+    reason: str | None = None
 
 
 class CombatantActionSheetResponse(BaseModel):
@@ -378,6 +420,11 @@ class EndCombatResponse(BaseModel):
     reason: str
 
 
+class LatestCombatLogResponse(BaseModel):
+    combat_log_id: int
+    combat_log_text: str
+
+
 class EncounterEnemyInput(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     count: int = Field(default=1, ge=1, le=12)
@@ -422,3 +469,46 @@ class CharacterDraft(BaseModel):
     sheet_json: str | None = None
     pdf_stored_name: str | None = None
     parse_warning: str | None = None
+
+
+class NoteTab(BaseModel):
+    id: str
+    title: str
+    content: str = ""
+    archived: bool = False
+
+
+class CampaignNotesDocument(BaseModel):
+    tabs: list[NoteTab]
+    closed_tabs: list[NoteTab] = Field(default_factory=list, alias="closedTabs")
+    active_tab_id: str | None = Field(default=None, alias="activeTabId")
+
+    model_config = {"populate_by_name": True}
+
+
+class CampaignNotesUpdate(BaseModel):
+    tabs: list[NoteTab]
+    closed_tabs: list[NoteTab] = Field(default_factory=list, alias="closedTabs")
+    active_tab_id: str | None = Field(default=None, alias="activeTabId")
+
+    model_config = {"populate_by_name": True}
+
+
+class NoteTabCreate(BaseModel):
+    title: str = Field(default="New tab", min_length=1, max_length=120)
+    content: str = ""
+
+
+class CampaignNotesSummary(BaseModel):
+    campaign_id: int
+    campaign_name: str
+    tabs: list[NoteTab]
+    closed_tabs: list[NoteTab] = Field(default_factory=list, alias="closedTabs")
+    active_tab_id: str | None = Field(default=None, alias="activeTabId")
+    updated_at: datetime
+
+    model_config = {"populate_by_name": True}
+
+
+class AllNotesResponse(BaseModel):
+    campaigns: list[CampaignNotesSummary]

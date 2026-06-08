@@ -28,6 +28,10 @@ from app.api.schemas import (
     UseActionResponse,
     InitiativeSubmitRequest,
     InitiativeSubmitResponse,
+    LatestActionLogResponse,
+    LatestCombatLogResponse,
+    ActionRollRequest,
+    ActionRollResponse,
 )
 from app.db.models import Campaign, CampaignMember, Character, User
 from app.services.campaign_membership import (
@@ -39,12 +43,23 @@ from app.services.campaign_membership import (
 )
 from app.services.combat_log import (
     all_enemies_defeated,
+    all_pcs_defeated,
     append_log,
     end_combat,
     latest_combat_log_id,
+    latest_formatted_combat_log,
     log_hp_changes,
 )
+from app.services.action_log import (
+    clear_action_log,
+    finalize_session_action_log,
+    latest_action_log_id,
+    latest_formatted_action_log,
+    parse_action_log,
+)
+from app.services.action_log_roll import ActionRollError, perform_action_roll
 from app.services.play_session_notes import (
+    active_notes_tab,
     distribute_play_session_tabs,
     new_play_session_tab,
     parse_play_session,
@@ -60,6 +75,7 @@ from app.services.encounter_actions import (
     resolve_active_index,
     roll_initiative_for_character,
     sorted_combatants,
+    sync_initiative_order_after_setup_change,
     upsert_pc_combatant,
 )
 from app.services.character_assets import portrait_download_url
@@ -366,6 +382,7 @@ def build_session_status(
         character_id=character_id,
         character_name=character_name,
         last_combat_log_id=latest_combat_log_id(session, campaign.id),
+        last_action_log_id=latest_action_log_id(session, campaign.id),
         play_session_notes_tab_id=tab_id,
         play_session_notes_tab_title=tab_title,
     )
@@ -392,7 +409,7 @@ def build_encounter_response(
             session, enrich_encounter_portraits(session, parse_encounter(campaign))
         ),
     )
-    if fix_active and ensure_active_combatant(state):
+    if fix_active and sync_initiative_order_after_setup_change(state):
         persist_encounter(session, campaign, state)
         session.refresh(campaign)
         state = enrich_encounter_pc_stats(
@@ -403,6 +420,65 @@ def build_encounter_response(
         )
     ensure_turn_economy(state)
     return encounter_for_viewer(state, is_owner=is_owner)
+
+
+def _victory_response_if_needed(
+    session: SessionDep,
+    campaign: Campaign,
+    state: EncounterState,
+    *,
+    is_owner: bool,
+) -> EncounterPatchResponse | None:
+    if not all_enemies_defeated(state):
+        return None
+    _cleared, combat_log_id, combat_log_text, party_updated = end_combat(
+        session, campaign, state, reason="victory"
+    )
+    session.refresh(campaign)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=is_owner),
+        combat_ended=True,
+        combat_log_id=combat_log_id,
+        combat_log_text=combat_log_text,
+        party_updated=party_updated,
+        reason="victory",
+    )
+
+
+def _defeat_response_if_needed(
+    session: SessionDep,
+    campaign: Campaign,
+    state: EncounterState,
+    *,
+    is_owner: bool,
+) -> EncounterPatchResponse | None:
+    if not all_pcs_defeated(state):
+        return None
+    _cleared, combat_log_id, combat_log_text, party_updated = end_combat(
+        session, campaign, state, reason="defeat"
+    )
+    session.refresh(campaign)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=is_owner),
+        combat_ended=True,
+        combat_log_id=combat_log_id,
+        combat_log_text=combat_log_text,
+        party_updated=party_updated,
+        reason="defeat",
+    )
+
+
+def _combat_end_response_if_needed(
+    session: SessionDep,
+    campaign: Campaign,
+    state: EncounterState,
+    *,
+    is_owner: bool,
+) -> EncounterPatchResponse | None:
+    victory = _victory_response_if_needed(session, campaign, state, is_owner=is_owner)
+    if victory:
+        return victory
+    return _defeat_response_if_needed(session, campaign, state, is_owner=is_owner)
 
 
 @router.get("/srd-monsters/search", response_model=MonsterSearchResponse)
@@ -428,10 +504,60 @@ def search_srd_monsters(
     )
 
 
+@router.get("/{campaign_id}/action-logs/latest", response_model=LatestActionLogResponse)
+def get_latest_action_log(campaign_id: int, current_user: CurrentUser, session: SessionDep):
+    get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    latest = latest_formatted_action_log(session, campaign_id)
+    if latest is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No archived action log for this campaign",
+        )
+    action_log_id, action_log_text = latest
+    return LatestActionLogResponse(
+        action_log_id=action_log_id,
+        action_log_text=action_log_text,
+    )
+
+
+@router.post("/{campaign_id}/action-log/roll", response_model=ActionRollResponse)
+def roll_action_log(
+    campaign_id: int,
+    data: ActionRollRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, _is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    try:
+        entry = perform_action_roll(session, campaign, current_user, data)
+    except ActionRollError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    session.add(campaign)
+    session.commit()
+    session.refresh(campaign)
+    return ActionRollResponse(entry=entry, log=parse_action_log(campaign))
+
+
 @router.get("/{campaign_id}/encounter", response_model=EncounterState)
 def get_encounter(campaign_id: int, current_user: CurrentUser, session: SessionDep):
     campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
     return build_encounter_response(session, campaign, is_owner=is_owner, fix_active=True)
+
+
+@router.get("/{campaign_id}/combat-logs/latest", response_model=LatestCombatLogResponse)
+def get_latest_combat_log(campaign_id: int, current_user: CurrentUser, session: SessionDep):
+    get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    latest = latest_formatted_combat_log(session, campaign_id)
+    if latest is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No archived combat log for this campaign",
+        )
+    combat_log_id, combat_log_text = latest
+    return LatestCombatLogResponse(
+        combat_log_id=combat_log_id,
+        combat_log_text=combat_log_text,
+    )
 
 
 @router.get(
@@ -524,18 +650,11 @@ def update_encounter(
         state.active_combatant_id = ordered[0].id if ordered else None
         state.active_index = 0
 
-    if all_enemies_defeated(state):
-        cleared, combat_log_id, combat_log_text, party_updated = end_combat(
-            session, campaign, state, reason="victory"
-        )
-        return EncounterPatchResponse(
-            encounter=build_encounter_response(session, campaign, is_owner=True),
-            combat_ended=True,
-            combat_log_id=combat_log_id,
-            combat_log_text=combat_log_text,
-            party_updated=party_updated,
-            reason="victory",
-        )
+    end_response = _combat_end_response_if_needed(
+        session, campaign, state, is_owner=True
+    )
+    if end_response:
+        return end_response
 
     persist_encounter(session, campaign, state)
     session.refresh(campaign)
@@ -599,6 +718,7 @@ def submit_initiative(
             kind="initiative",
             actor=character.name,
         )
+    sync_initiative_order_after_setup_change(state)
     persist_encounter(session, campaign, state)
     session.refresh(campaign)
     return InitiativeSubmitResponse(
@@ -825,6 +945,19 @@ def use_encounter_action(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     sync_encounter_combatants_to_characters(session, before, state)
+
+    victory = _combat_end_response_if_needed(session, campaign, state, is_owner=is_owner)
+    if victory:
+        return UseActionResponse(
+            encounter=victory.encounter,
+            action_messages=action_messages,
+            combat_ended=True,
+            combat_log_id=victory.combat_log_id,
+            combat_log_text=victory.combat_log_text,
+            party_updated=victory.party_updated,
+            reason=victory.reason,
+        )
+
     persist_encounter(session, campaign, state)
     session.refresh(campaign)
     return UseActionResponse(
@@ -1038,15 +1171,35 @@ def update_session_status(
     if data.session_active and not was_active:
         tab_id, tab_title = new_play_session_tab()
         campaign.play_session_json = json.dumps(play_session_payload(tab_id, tab_title))
+        clear_action_log(campaign)
         session.add(campaign)
         session.commit()
         distribute_play_session_tabs(session, campaign, tab_id, tab_title)
         session.refresh(campaign)
     elif not data.session_active and was_active:
+        tab_id, tab_title = active_notes_tab(campaign)
+        action_log_id, action_log_text, _party_updated = finalize_session_action_log(
+            session, campaign
+        )
         campaign.play_session_json = "{}"
         session.add(campaign)
         session.commit()
         session.refresh(campaign)
+        status = build_session_status(
+            campaign,
+            is_owner=True,
+            character_id=None,
+            character_name=None,
+            session=session,
+        )
+        return status.model_copy(
+            update={
+                "action_log_text": action_log_text or None,
+                "last_action_log_id": action_log_id,
+                "play_session_notes_tab_id": tab_id,
+                "play_session_notes_tab_title": tab_title,
+            }
+        )
     else:
         session.add(campaign)
         session.commit()

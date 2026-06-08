@@ -8,7 +8,7 @@ const ABILITY_LABELS = {
   cha: "CHA",
 };
 
-const DEFAULT_SKILLS = [
+export const DEFAULT_SKILLS = [
   ["Athletics", "str"],
   ["Acrobatics", "dex"],
   ["Sleight of Hand", "dex"],

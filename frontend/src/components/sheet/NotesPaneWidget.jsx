@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArchiveRestore, Plus, X } from "lucide-react";
+import { ArchiveRestore, FolderOpen, Plus, X } from "lucide-react";
 import { normalizeNotesText, parseNotesToBlocks } from "../../lib/notesFormat";
 
 export function NotesFormattedBody({ content }) {
@@ -64,6 +64,7 @@ export function NotesPaneWidget({
   activeKey,
   hint = "Double-click a tab name to rename",
   formattedPreview = false,
+  onBrowseArchive,
 }) {
   const [localTabs, setLocalTabs] = useState(tabs);
   const [localClosedTabs, setLocalClosedTabs] = useState(closedTabs);
@@ -287,6 +288,17 @@ export function NotesPaneWidget({
               </div>
             )}
           </div>
+        )}
+        {onBrowseArchive && (
+          <button
+            type="button"
+            onClick={onBrowseArchive}
+            className="flex shrink-0 items-center gap-0.5 rounded-sm border border-border px-1.5 py-1 text-[9px] font-black uppercase text-ink-muted hover:border-neon-cyan/50 hover:text-neon-cyan"
+            title="Browse all archived notes"
+          >
+            <FolderOpen className="h-3 w-3" />
+            <span className="hidden sm:inline">Archive</span>
+          </button>
         )}
       </div>
 

@@ -408,6 +408,59 @@ def speed_from_character(character: Any) -> int | None:
     return effective_speed_from_sheet(parse_sheet_json(character.sheet_json))
 
 
+def _proficiency_bonus(sheet: dict) -> int:
+    raw = sheet.get("proficiency_bonus")
+    try:
+        return int(raw) if raw is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def computed_skill_bonus(sheet: dict, skill_name: str) -> int:
+    target = str(skill_name or "").strip().casefold()
+    for row in sheet.get("skills") or []:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("name") or "").strip().casefold() != target:
+            continue
+        explicit = row.get("bonus")
+        if explicit is not None:
+            try:
+                return int(explicit)
+            except (TypeError, ValueError):
+                pass
+        ability = str(row.get("ability") or "").lower()
+        mod = ability_modifier((sheet.get("abilities") or {}).get(ability)) or 0
+        prof = _proficiency_bonus(sheet)
+        total = mod
+        if row.get("proficient"):
+            total += prof
+        if row.get("expertise"):
+            total += prof
+        return total
+    return 0
+
+
+def computed_save_bonus(sheet: dict, ability: str) -> int:
+    ability_key = str(ability or "").lower()
+    for row in sheet.get("saving_throws") or []:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("ability") or "").lower() != ability_key:
+            continue
+        explicit = row.get("bonus")
+        if explicit is not None:
+            try:
+                return int(explicit)
+            except (TypeError, ValueError):
+                pass
+        mod = ability_modifier((sheet.get("abilities") or {}).get(ability_key)) or 0
+        prof = _proficiency_bonus(sheet) if row.get("proficient") else 0
+        return mod + prof
+    mod = ability_modifier((sheet.get("abilities") or {}).get(ability_key)) or 0
+    return mod
+
+
 def skill_bonus(sheet: dict, skill_name: str) -> int | None:
     """Look up a skill's total bonus from the sheet, if present."""
     target = str(skill_name or "").strip().casefold()

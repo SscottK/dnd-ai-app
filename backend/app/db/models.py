@@ -51,6 +51,7 @@ class Campaign(SQLModel, table=True):
     encounter_json: str = Field(default="{}")
     session_active: bool = Field(default=False)
     play_session_json: str = Field(default="{}")
+    action_log_json: str = Field(default="[]")
     created_at: datetime = Field(default_factory=utc_now)
 
     owner: Optional[User] = Relationship(back_populates="owned_campaigns")
@@ -143,6 +144,28 @@ class HistoricalEncounter(SQLModel, table=True):
     recorded_at: datetime = Field(default_factory=utc_now)
     round_count: Optional[int] = Field(default=None)
     combat_log_json: str = Field(default="[]")
+    formatted_log_text: str = Field(default="")
     defeated_monsters_json: str = Field(default="[]")
 
     campaign: Optional[Campaign] = Relationship(back_populates="historical_encounters")
+
+
+class SessionActionLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    campaign_id: int = Field(foreign_key="campaign.id", index=True)
+    recorded_at: datetime = Field(default_factory=utc_now)
+    formatted_log_text: str = Field(default="")
+    entry_count: int = Field(default=0)
+
+    campaign: Optional[Campaign] = Relationship()
+
+
+class UserCampaignNotes(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    campaign_id: int = Field(foreign_key="campaign.id", index=True)
+    notes_json: str = Field(default="{}")
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    user: Optional[User] = Relationship()
+    campaign: Optional[Campaign] = Relationship()

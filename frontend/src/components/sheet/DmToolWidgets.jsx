@@ -450,13 +450,14 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
   );
 }
 
-export function DmNotesWidget({ tabs, closedTabs, activeTabId, onChange }) {
+export function DmNotesWidget({ tabs, closedTabs, activeTabId, onChange, onBrowseArchive }) {
   return (
     <NotesPaneWidget
       tabs={tabs}
       closedTabs={closedTabs}
       activeTabId={activeTabId}
       onChange={onChange}
+      onBrowseArchive={onBrowseArchive}
       tabsKey="dmNotesTabs"
       closedTabsKey="closedNotesTabs"
       activeKey="activeNotesTabId"
@@ -522,10 +523,15 @@ export function DmGeneratorsWidget({
   );
 }
 
-export function DmToolboxWidget({ campaignId, token, rollerLabel }) {
+export function DmToolboxWidget({ campaignId, token, rollerLabel, combatActive = false }) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto [&>div]:border-border [&>div]:bg-void-deep/40">
-      <DiceRoller campaignId={campaignId} token={token} rollerLabel={rollerLabel} />
+      <DiceRoller
+        campaignId={campaignId}
+        token={token}
+        rollerLabel={rollerLabel}
+        combatActive={combatActive}
+      />
     </div>
   );
 }

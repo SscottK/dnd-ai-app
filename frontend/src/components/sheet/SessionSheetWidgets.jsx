@@ -278,17 +278,32 @@ export function PartyWidget({ campaignId, token, characterId, isOwner = false })
   );
 }
 
-function ClickableRow({ label, value, sub, onClick }) {
+function ClickableRow({ label, value, sub, onClick, onRoll }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full flex items-center justify-between gap-2 px-2 py-1 text-left hover:bg-neon-magenta/10 border border-transparent hover:border-neon-magenta/30"
-    >
-      <span className="text-xs sm:text-sm text-zinc-400 truncate">{label}</span>
-      <span className="text-xs font-black text-starlight shrink-0">{value}</span>
-      {sub && <span className="text-xs sm:text-sm text-zinc-600 shrink-0">{sub}</span>}
-    </button>
+    <div className="flex items-center gap-1 border border-transparent hover:border-neon-magenta/30 hover:bg-neon-magenta/10">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-1 text-left"
+      >
+        <span className="truncate text-xs sm:text-sm text-zinc-400">{label}</span>
+        <span className="shrink-0 text-xs font-black text-starlight">{value}</span>
+        {sub && <span className="shrink-0 text-xs sm:text-sm text-zinc-600">{sub}</span>}
+      </button>
+      {onRoll && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRoll();
+          }}
+          className="shrink-0 px-1.5 py-1 text-[9px] font-black uppercase text-neon-cyan hover:text-starlight"
+          title={`Roll ${label}`}
+        >
+          d20
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -454,7 +469,7 @@ export function AbilitiesWidget({ sheet, onShowDetail, onSheetChange }) {
   );
 }
 
-export function SkillsSavesWidget({ sheet, onShowDetail }) {
+export function SkillsSavesWidget({ sheet, onShowDetail, onRollCheck }) {
   const proficientSkills = sheet.skills?.filter((s) => s.proficient || s.expertise) || [];
   const otherSkills = sheet.skills?.filter((s) => !s.proficient && !s.expertise) || [];
 
@@ -477,6 +492,11 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
                     subtitle: save.proficient ? "Proficient" : "Not proficient",
                     body: `Bonus: ${formatModifier(bonus)}`,
                   })
+                }
+                onRoll={
+                  onRollCheck
+                    ? () => onRollCheck({ roll_kind: "save", label: save.ability })
+                    : undefined
                 }
               />
             );
@@ -502,6 +522,11 @@ export function SkillsSavesWidget({ sheet, onShowDetail }) {
                     subtitle: `${skill.ability?.toUpperCase()} · ${skill.expertise ? "Expertise" : skill.proficient ? "Proficient" : "Not proficient"}`,
                     body: `Bonus: ${formatModifier(bonus)}`,
                   })
+                }
+                onRoll={
+                  onRollCheck
+                    ? () => onRollCheck({ roll_kind: "skill", label: skill.name })
+                    : undefined
                 }
               />
             );
@@ -816,13 +841,14 @@ function CombatantAvatar({ portraitUrl, token, name, size = "sm", onPreview }) {
   );
 }
 
-export function PlayerNotesWidget({ tabs, closedTabs, activeTabId, onChange }) {
+export function PlayerNotesWidget({ tabs, closedTabs, activeTabId, onChange, onBrowseArchive }) {
   return (
     <NotesPaneWidget
       tabs={tabs}
       closedTabs={closedTabs}
       activeTabId={activeTabId}
       onChange={onChange}
+      onBrowseArchive={onBrowseArchive}
       tabsKey="playerNotesTabs"
       closedTabsKey="closedNotesTabs"
       activeKey="activeNotesTabId"
@@ -1785,6 +1811,7 @@ export function InitiativeWidget({
           activeTurnName={activeCombatant?.name}
           onEncounterUpdate={setEncounter}
           onSheetRefresh={handleSheetRefresh}
+          onCombatEnded={onCombatEnded}
           onError={setActionError}
         />
       )}
@@ -1803,6 +1830,7 @@ export function InitiativeWidget({
           actionSheetLoading={dmSheetLoading}
           onEncounterUpdate={setEncounter}
           onSheetRefresh={handleSheetRefresh}
+          onCombatEnded={onCombatEnded}
           onError={setActionError}
         />
       )}

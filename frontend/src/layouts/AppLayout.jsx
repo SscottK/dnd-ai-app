@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, LogOut, MessageSquare, Scroll } from "lucide-react";
+import { LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { APP_NAME, APP_TAGLINE } from "../constants/branding";
 
@@ -37,6 +37,10 @@ export function AppLayout() {
             <NavLink to="/chat" className={navLinkClass}>
               <MessageSquare className="w-3.5 h-3.5" />
               Rules
+            </NavLink>
+            <NavLink to="/notes" className={navLinkClass}>
+              <ScrollText className="w-3.5 h-3.5" />
+              Notes
             </NavLink>
           </nav>
         </div>

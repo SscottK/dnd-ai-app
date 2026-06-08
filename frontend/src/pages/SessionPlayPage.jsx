@@ -9,6 +9,7 @@ import { StackedSessionLayout } from "../components/sheet/StackedSessionLayout";
 import { DetailSlideOver } from "../components/sheet/DetailSlideOver";
 import { FullSheetModal } from "../components/sheet/FullSheetModal";
 import { DiceRoller } from "../components/DiceRoller";
+import { postActionRoll } from "../lib/actionRoll";
 import {
   DmGeneratorsWidget,
   DmNotesWidget,
@@ -36,9 +37,11 @@ import {
   MIN_PANE_HEIGHT,
   paneOptionsForSession,
   SINGLETON_WIDGET_TYPES,
-  appendCombatLogToDmSessionNotes,
   appendEncounterDmNotesTab,
+  applyServerNotesToLayout,
   ensurePlaySessionNotesTab,
+  extractNotesPayloadFromLayout,
+  notesDocHasContent,
   clampWidget,
   bringWidgetToFront,
   buildDefaultLayout,
@@ -58,7 +61,12 @@ import {
   WIDGET_TYPES,
   writeStoredDmLayout,
 } from "../lib/sheetLayout";
-import { applyEquipmentToCharacter, parseSheetJson, sheetToJson } from "../lib/characterSheet";
+import { NotesArchiveModal } from "../components/notes/NotesArchiveModal";
+import {
+  fetchCampaignNotes,
+  saveCampaignNotes,
+  serverNotesToClient,
+} from "../lib/campaignNotes";
 
 const WIDGET_LABELS = Object.fromEntries(WIDGET_TYPES.map((w) => [w.type, w.label]));
 
@@ -89,8 +97,12 @@ export function SessionPlayPage() {
   const sheetRef = useRef(sheet);
   const sessionStatusRef = useRef(sessionStatus);
   const lastCombatLogIdRef = useRef(null);
+  const lastActionLogIdRef = useRef(null);
   const playSessionTabIdRef = useRef(null);
   const dirtyRef = useRef(false);
+  const notesSaveTimer = useRef(null);
+  const [combatActive, setCombatActive] = useState(false);
+  const [notesArchiveOpen, setNotesArchiveOpen] = useState(false);
 
   const characterId = sessionStatus?.character_id;
   const isDmSession =
@@ -305,6 +317,83 @@ export function SessionPlayPage() {
     []
   );
 
+  const persistNotesToServer = useCallback(
+    async (layoutSnapshot) => {
+      if (!token || !campaignId) return;
+      const status = sessionStatusRef.current;
+      const dmMode = Boolean(status?.is_owner && !status?.character_id);
+      const payload = extractNotesPayloadFromLayout(layoutSnapshot, dmMode);
+      if (!payload) return;
+      try {
+        await saveCampaignNotes(campaignId, token, payload);
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [campaignId, token]
+  );
+
+  const scheduleNotesServerSave = useCallback(
+    (layoutSnapshot) => {
+      if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
+      notesSaveTimer.current = setTimeout(() => {
+        void persistNotesToServer(layoutSnapshot);
+      }, 700);
+    },
+    [persistNotesToServer]
+  );
+
+  const refreshCampaignNotesFromServer = useCallback(async () => {
+    if (!token || !campaignId) return;
+    const status = sessionStatusRef.current;
+    const dmMode = Boolean(status?.is_owner && !status?.character_id);
+    const { width, height } = canvasBoundsRef.current;
+    try {
+      const data = await fetchCampaignNotes(campaignId, token);
+      const clientDoc = serverNotesToClient(data);
+      setLayout((prev) => {
+        const next = applyServerNotesToLayout(prev, clientDoc, {
+          dmMode,
+          canvasW: width || 1280,
+          canvasH: height || 800,
+        });
+        layoutRef.current = next;
+        if (dmMode) {
+          writeStoredDmLayout(campaignId, next);
+        } else if (characterRef.current) {
+          void persistCharacter(buildPatch(characterRef.current, sheetRef.current, next));
+        }
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }, [campaignId, token, buildPatch, persistCharacter]);
+
+  const syncCampaignNotesOnLoad = useCallback(
+    async (layoutSnapshot, dmMode) => {
+      if (!token || !campaignId) return layoutSnapshot;
+      const { width, height } = canvasBoundsRef.current;
+      try {
+        const data = await fetchCampaignNotes(campaignId, token);
+        let clientDoc = serverNotesToClient(data);
+        const localDoc = extractNotesPayloadFromLayout(layoutSnapshot, dmMode);
+        if (localDoc && notesDocHasContent(localDoc) && !notesDocHasContent(clientDoc)) {
+          await saveCampaignNotes(campaignId, token, localDoc);
+          clientDoc = localDoc;
+        }
+        return applyServerNotesToLayout(layoutSnapshot, clientDoc, {
+          dmMode,
+          canvasW: width || 1280,
+          canvasH: height || 800,
+        });
+      } catch {
+        return layoutSnapshot;
+      }
+    },
+    [campaignId, token]
+  );
+
   const applyPlaySessionNotesTab = useCallback(
     (status, { save = false } = {}) => {
       const tabId = status?.play_session_notes_tab_id;
@@ -337,34 +426,48 @@ export function SessionPlayPage() {
     [campaignId, persistCharacter, buildPatch]
   );
 
-  const handleCombatEnded = useCallback(
-    (combatLogText) => {
-      if (!combatLogText) return;
-      const tabId =
-        sessionStatusRef.current?.play_session_notes_tab_id || "notes-session";
-      const tabTitle =
-        sessionStatusRef.current?.play_session_notes_tab_title || "Session";
-      const { width, height } = canvasBoundsRef.current;
-      setLayout((prev) => {
-        const next = appendCombatLogToDmSessionNotes(
-          prev,
-          combatLogText,
-          width || 1280,
-          height || 800,
-          tabId,
-          tabTitle
-        );
-        layoutRef.current = next;
-        if (isDmSession) {
-          writeStoredDmLayout(campaignId, next);
-        } else if (characterRef.current) {
-          void persistCharacter(buildPatch(characterRef.current, sheetRef.current, next));
-        }
-        return next;
+  const handleActionLogEnded = useCallback(async () => {
+    dirtyRef.current = false;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    await refreshCampaignNotesFromServer();
+  }, [refreshCampaignNotesFromServer]);
+
+  const rollActionLogCheck = useCallback(
+    async (body) => {
+      if (!token || !campaignId || combatActive) return;
+      await postActionRoll(campaignId, token, {
+        character_id: characterRef.current?.id,
+        ...body,
       });
     },
-    [campaignId, isDmSession, persistCharacter, buildPatch]
+    [token, campaignId, combatActive]
   );
+
+  useEffect(() => {
+    if (!token || !campaignId || !sessionStatus?.session_active) {
+      setCombatActive(false);
+      return undefined;
+    }
+    const pollEncounter = async () => {
+      try {
+        const res = await apiFetch(`/campaigns/${campaignId}/encounter`, { token });
+        if (!res.ok) return;
+        const data = await res.json();
+        setCombatActive((data.combatants || []).length > 0);
+      } catch {
+        // ignore
+      }
+    };
+    pollEncounter();
+    const timer = setInterval(pollEncounter, 5000);
+    return () => clearInterval(timer);
+  }, [token, campaignId, sessionStatus?.session_active]);
+
+  const handleCombatEnded = useCallback(async () => {
+    dirtyRef.current = false;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    await refreshCampaignNotesFromServer();
+  }, [refreshCampaignNotesFromServer]);
 
   const loadSession = useCallback(async () => {
     if (!token || !campaignId) return;
@@ -376,6 +479,7 @@ export function SessionPlayPage() {
       const status = await sessionRes.json();
       setSessionStatus(status);
       lastCombatLogIdRef.current = status.last_combat_log_id ?? null;
+      lastActionLogIdRef.current = status.last_action_log_id ?? null;
       playSessionTabIdRef.current = status.play_session_notes_tab_id ?? null;
 
       if (!status.session_active) {
@@ -387,13 +491,32 @@ export function SessionPlayPage() {
         const charRes = await apiFetch(`/characters/${status.character_id}`, { token });
         if (!charRes.ok) throw new Error("Character not found");
         const migrated = hydrateCharacter(await charRes.json());
+        const { width, height } = canvasBoundsRef.current;
+        let nextLayout = layoutRef.current;
+        if (status.play_session_notes_tab_id && status.play_session_notes_tab_title) {
+          nextLayout = ensurePlaySessionNotesTab(
+            nextLayout,
+            status.play_session_notes_tab_id,
+            status.play_session_notes_tab_title,
+            {
+              widgetType: "player_notes",
+              tabsKey: "playerNotesTabs",
+              canvasW: width || 1280,
+              canvasH: height || 800,
+            }
+          );
+        }
+        nextLayout = await syncCampaignNotesOnLoad(nextLayout, false);
+        layoutRef.current = nextLayout;
+        setLayout(nextLayout);
         if (migrated) {
           scheduleSave({
-            ...buildPatch(characterRef.current, sheetRef.current, layoutRef.current),
+            ...buildPatch(characterRef.current, sheetRef.current, nextLayout),
             notes: "",
           });
+        } else {
+          scheduleSave(buildPatch(characterRef.current, sheetRef.current, nextLayout));
         }
-        applyPlaySessionNotesTab(status, { save: true });
         return;
       }
 
@@ -402,8 +525,24 @@ export function SessionPlayPage() {
         setSheet(parseSheetJson(null));
         const stored = readStoredDmLayout(campaignId);
         const hydrated = stored ? hydrateLayout(stored, 1280, 800) : null;
-        setLayout(hydrated || { widgets: [], viewport: defaultViewport() });
-        applyPlaySessionNotesTab(status, { save: true });
+        let nextLayout = hydrated || { widgets: [], viewport: defaultViewport() };
+        if (status.play_session_notes_tab_id && status.play_session_notes_tab_title) {
+          nextLayout = ensurePlaySessionNotesTab(
+            nextLayout,
+            status.play_session_notes_tab_id,
+            status.play_session_notes_tab_title,
+            {
+              widgetType: "dm_notes",
+              tabsKey: "dmNotesTabs",
+              canvasW: 1280,
+              canvasH: 800,
+            }
+          );
+        }
+        nextLayout = await syncCampaignNotesOnLoad(nextLayout, true);
+        layoutRef.current = nextLayout;
+        setLayout(nextLayout);
+        writeStoredDmLayout(campaignId, nextLayout);
         return;
       }
 
@@ -414,7 +553,7 @@ export function SessionPlayPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, campaignId, hydrateCharacter, scheduleSave, buildPatch, applyPlaySessionNotesTab]);
+  }, [token, campaignId, hydrateCharacter, scheduleSave, buildPatch, syncCampaignNotesOnLoad]);
 
   useEffect(() => {
     loadSession();
@@ -437,11 +576,14 @@ export function SessionPlayPage() {
         const logId = status.last_combat_log_id ?? null;
         if (logId != null && logId !== lastCombatLogIdRef.current) {
           lastCombatLogIdRef.current = logId;
-          const charId = status.character_id ?? characterRef.current?.id;
-          if (charId) {
-            const charRes = await apiFetch(`/characters/${charId}`, { token });
-            if (charRes.ok) hydrateCharacter(await charRes.json());
-          }
+          await handleCombatEnded();
+          return;
+        }
+
+        const actionLogId = status.last_action_log_id ?? null;
+        if (actionLogId != null && actionLogId !== lastActionLogIdRef.current) {
+          lastActionLogIdRef.current = actionLogId;
+          await handleActionLogEnded();
           return;
         }
 
@@ -473,7 +615,7 @@ export function SessionPlayPage() {
     pollNotes();
     const timer = setInterval(pollNotes, 8000);
     return () => clearInterval(timer);
-  }, [token, campaignId, sessionStatus?.session_active, hydrateCharacter, applyPlaySessionNotesTab]);
+  }, [token, campaignId, sessionStatus?.session_active, hydrateCharacter, applyPlaySessionNotesTab, handleCombatEnded, handleActionLogEnded, refreshCampaignNotesFromServer]);
 
   const saveLayoutSnapshot = useCallback(
     (nextLayout) => {
@@ -608,10 +750,43 @@ export function SessionPlayPage() {
       const prev = layoutRef.current;
       const nextWidgets = prev.widgets.map((w) => (w.id === widgetId ? { ...w, ...patch } : w));
       const nextLayout = { ...prev, widgets: nextWidgets };
+      layoutRef.current = nextLayout;
       setLayout(nextLayout);
       saveLayoutSnapshot(nextLayout);
+      if (
+        patch.playerNotesTabs ||
+        patch.dmNotesTabs ||
+        patch.closedNotesTabs ||
+        patch.activeNotesTabId
+      ) {
+        scheduleNotesServerSave(nextLayout);
+      }
     },
-    [saveLayoutSnapshot]
+    [saveLayoutSnapshot, scheduleNotesServerSave]
+  );
+
+  const handleImportArchivedTab = useCallback(
+    (tab) => {
+      const prev = layoutRef.current;
+      const widgetType = isDmSession ? "dm_notes" : "player_notes";
+      const tabsKey = isDmSession ? "dmNotesTabs" : "playerNotesTabs";
+      const notesWidget = prev.widgets.find((widget) => widget.type === widgetType);
+      if (!notesWidget) return;
+
+      const existingTabs = notesWidget[tabsKey] || [];
+      const nextClosed = (notesWidget.closedNotesTabs || []).filter((item) => item.id !== tab.id);
+      const nextTabs = existingTabs.some((item) => item.id === tab.id)
+        ? existingTabs
+        : [...existingTabs, { id: tab.id, title: tab.title, content: tab.content || "" }];
+
+      updateWidgetMeta(notesWidget.id, {
+        [tabsKey]: nextTabs,
+        closedNotesTabs: nextClosed,
+        activeNotesTabId: tab.id,
+      });
+      setNotesArchiveOpen(false);
+    },
+    [isDmSession, updateWidgetMeta]
   );
 
   const addEncounterToDmNotes = useCallback(
@@ -624,8 +799,9 @@ export function SessionPlayPage() {
       layoutRef.current = nextLayout;
       setLayout(nextLayout);
       saveLayoutSnapshot(nextLayout);
+      scheduleNotesServerSave(nextLayout);
     },
-    [saveLayoutSnapshot]
+    [saveLayoutSnapshot, scheduleNotesServerSave]
   );
 
   const setInitiativeOrientation = useCallback(
@@ -894,7 +1070,13 @@ export function SessionPlayPage() {
           <AbilitiesWidget sheet={sheet} onShowDetail={showDetail} onSheetChange={onSheetChange} />
         );
       case "skills_saves":
-        return guard(<SkillsSavesWidget sheet={sheet} onShowDetail={showDetail} />);
+        return guard(
+          <SkillsSavesWidget
+            sheet={sheet}
+            onShowDetail={showDetail}
+            onRollCheck={combatActive ? undefined : rollActionLogCheck}
+          />
+        );
       case "character_tabs":
         return guard(
           <CharacterTabsWidget sheet={sheet} onSheetChange={onSheetChange} onShowDetail={showDetail} />
@@ -926,6 +1108,7 @@ export function SessionPlayPage() {
             closedTabs={widget.closedNotesTabs || []}
             activeTabId={widget.activeNotesTabId}
             onChange={(patch) => updateWidgetMeta(widget.id, patch)}
+            onBrowseArchive={() => setNotesArchiveOpen(true)}
           />
         );
       case "dice_roller":
@@ -934,6 +1117,9 @@ export function SessionPlayPage() {
             campaignId={campaignId}
             token={token}
             rollerLabel={user?.username}
+            combatActive={combatActive}
+            sheet={sheet}
+            characterId={character?.id}
           />
         );
       case "vtt_zone":
@@ -988,6 +1174,7 @@ export function SessionPlayPage() {
             closedTabs={widget.closedNotesTabs || []}
             activeTabId={widget.activeNotesTabId}
             onChange={(patch) => updateWidgetMeta(widget.id, patch)}
+            onBrowseArchive={() => setNotesArchiveOpen(true)}
           />
         );
       case "dm_toolbox":
@@ -996,6 +1183,7 @@ export function SessionPlayPage() {
             campaignId={campaignId}
             token={token}
             rollerLabel={user?.username}
+            combatActive={combatActive}
           />
         );
       default:
@@ -1232,6 +1420,19 @@ export function SessionPlayPage() {
           onResync={handleResyncPdf}
         />
       )}
+
+      <NotesArchiveModal
+        open={notesArchiveOpen}
+        campaignId={campaignId}
+        token={token}
+        openTabs={
+          isDmSession
+            ? layout.widgets.find((widget) => widget.type === "dm_notes")?.dmNotesTabs || []
+            : layout.widgets.find((widget) => widget.type === "player_notes")?.playerNotesTabs || []
+        }
+        onClose={() => setNotesArchiveOpen(false)}
+        onImportTab={handleImportArchivedTab}
+      />
     </div>
   );
 }

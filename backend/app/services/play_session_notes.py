@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlmodel import Session, select
 
 from app.db.models import Campaign, CampaignMember, Character
+from app.services.campaign_notes import distribute_play_session_tab_to_notes
 
 
 def utc_now() -> datetime:
@@ -169,4 +170,5 @@ def distribute_play_session_tabs(session: Session, campaign: Campaign, tab_id: s
         )
         session.add(character)
         updated += 1
+    updated += distribute_play_session_tab_to_notes(session, campaign, tab_id, tab_title)
     return updated

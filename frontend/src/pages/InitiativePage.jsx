@@ -870,7 +870,12 @@ export function InitiativePage() {
           </section>
 
           <aside className="space-y-4">
-            <DiceRoller campaignId={campaignId} token={token} rollerLabel={user?.username} />
+            <DiceRoller
+              campaignId={campaignId}
+              token={token}
+              rollerLabel={user?.username}
+              combatActive={(encounter.combatants || []).length > 0}
+            />
           </aside>
         </div>
       </div>

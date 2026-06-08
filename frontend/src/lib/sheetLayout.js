@@ -954,3 +954,57 @@ export function createWidget(type, canvasW, canvasH) {
   };
   return clampWidget(widget, canvasW, canvasH);
 }
+
+/** Merge server-backed notes into the session layout notes widget. */
+export function applyServerNotesToLayout(
+  layout,
+  notesDoc,
+  { dmMode, canvasW, canvasH }
+) {
+  const widgetType = dmMode ? "dm_notes" : "player_notes";
+  const tabsKey = dmMode ? "dmNotesTabs" : "playerNotesTabs";
+  const base = layout && typeof layout === "object" ? layout : { widgets: [], viewport: {} };
+  let widgets = [...(base.widgets || [])];
+  let notesWidget = widgets.find((widget) => widget.type === widgetType);
+
+  if (!notesWidget) {
+    notesWidget = createWidget(widgetType, canvasW || 1280, canvasH || 800);
+    widgets = [...widgets, notesWidget];
+  }
+
+  const tabs = Array.isArray(notesDoc?.tabs) ? notesDoc.tabs : [];
+  const closedTabs = Array.isArray(notesDoc?.closedTabs) ? notesDoc.closedTabs : [];
+  const activeTabId =
+    notesDoc?.activeTabId || tabs[0]?.id || (dmMode ? "notes-session" : "notes-session");
+
+  const nextWidgets = widgets.map((widget) =>
+    widget.id === notesWidget.id
+      ? {
+          ...widget,
+          [tabsKey]: tabs,
+          closedNotesTabs: closedTabs,
+          activeNotesTabId: activeTabId,
+        }
+      : widget
+  );
+
+  return { ...base, widgets: nextWidgets };
+}
+
+export function extractNotesPayloadFromLayout(layout, dmMode) {
+  const widgetType = dmMode ? "dm_notes" : "player_notes";
+  const tabsKey = dmMode ? "dmNotesTabs" : "playerNotesTabs";
+  const widget = (layout?.widgets || []).find((item) => item.type === widgetType);
+  if (!widget) return null;
+  return {
+    tabs: widget[tabsKey] || [],
+    closedTabs: widget.closedNotesTabs || [],
+    activeTabId: widget.activeNotesTabId || null,
+  };
+}
+
+export function notesDocHasContent(notesDoc) {
+  const tabs = [...(notesDoc?.tabs || []), ...(notesDoc?.closedTabs || [])];
+  if (!tabs.length) return false;
+  return tabs.some((tab) => String(tab?.content || "").trim().length > 0);
+}

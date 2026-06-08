@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.routes import auth, campaigns, characters, chat, conversations, health, rules
+from app.api.v1.routes import auth, campaigns, characters, chat, conversations, health, notes, rules
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ api_router.include_router(conversations.router, tags=["conversations"])
 api_router.include_router(campaigns.router, tags=["campaigns"])
 api_router.include_router(characters.router, tags=["characters"])
 api_router.include_router(rules.router, tags=["rules"])
+api_router.include_router(notes.router, prefix="/notes", tags=["notes"])

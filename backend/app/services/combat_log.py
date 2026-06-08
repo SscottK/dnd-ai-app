@@ -15,6 +15,7 @@ from app.services.encounter_actions import (
     sorted_combatants,
     sorted_combatants_for_display,
 )
+from app.services.campaign_notes import distribute_text_to_campaign_notes
 from app.services.play_session_notes import active_notes_tab, append_text_to_notes_tab
 
 
@@ -43,6 +44,13 @@ def all_enemies_defeated(state: EncounterState) -> bool:
     if not enemies:
         return False
     return all(not is_alive(combatant) for combatant in enemies)
+
+
+def all_pcs_defeated(state: EncounterState) -> bool:
+    pcs = [combatant for combatant in state.combatants if combatant.is_pc]
+    if not pcs:
+        return False
+    return all(not is_alive(combatant) for combatant in pcs)
 
 
 def format_initiative_order(state: EncounterState) -> list[str]:
@@ -110,7 +118,7 @@ def append_combat_log_to_layout(
 
 
 def distribute_combat_log(session: Session, campaign: Campaign, combat_log_text: str) -> int:
-    tab_id, _ = active_notes_tab(campaign)
+    tab_id, tab_title = active_notes_tab(campaign)
     members = session.exec(
         select(CampaignMember).where(CampaignMember.campaign_id == campaign.id)
     ).all()
@@ -128,6 +136,9 @@ def distribute_combat_log(session: Session, campaign: Campaign, combat_log_text:
         )
         session.add(character)
         updated += 1
+    updated += distribute_text_to_campaign_notes(
+        session, campaign, tab_id, combat_log_text, tab_title=tab_title
+    )
     return updated
 
 
@@ -163,6 +174,31 @@ def log_hp_changes(before: EncounterState, after: EncounterState) -> None:
         )
 
 
+def latest_formatted_combat_log(session: Session, campaign_id: int) -> tuple[int, str] | None:
+    record = session.exec(
+        select(HistoricalEncounter)
+        .where(HistoricalEncounter.campaign_id == campaign_id)
+        .order_by(HistoricalEncounter.id.desc())
+    ).first()
+    if record is None or record.id is None:
+        return None
+    text = (getattr(record, "formatted_log_text", None) or "").strip()
+    if not text:
+        try:
+            entries = json.loads(record.combat_log_json or "[]")
+        except (json.JSONDecodeError, TypeError, ValueError):
+            entries = []
+        lines = [
+            str(entry.get("message") or "").strip()
+            for entry in entries
+            if isinstance(entry, dict) and entry.get("message")
+        ]
+        text = "\n".join(line for line in lines if line)
+    if not text:
+        return None
+    return record.id, text
+
+
 def latest_combat_log_id(session: Session, campaign_id: int) -> int | None:
     record = session.exec(
         select(HistoricalEncounter)
@@ -183,11 +219,11 @@ def end_combat(
     if not state.combatants:
         raise ValueError("no_combat")
 
-    footer = (
-        "Party defeated all monsters."
-        if reason == "victory"
-        else "Combat ended by DM."
-    )
+    footer = {
+        "victory": "Party defeated all monsters.",
+        "defeat": "Party defeated — all player characters down.",
+        "dm": "Combat ended by DM.",
+    }.get(reason, "Combat ended.")
     combat_log_text = build_combat_log_text(state, footer)
 
     defeated = [
@@ -199,6 +235,7 @@ def end_combat(
         campaign_id=campaign.id,
         round_count=state.round,
         combat_log_json=json.dumps([entry.model_dump() for entry in state.combat_log]),
+        formatted_log_text=combat_log_text,
         defeated_monsters_json=json.dumps(defeated),
     )
     session.add(record)

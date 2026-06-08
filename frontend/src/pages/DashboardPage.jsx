@@ -20,6 +20,13 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch, apiUpload } from "../lib/api";
 import { APP_NAME } from "../constants/branding";
+import {
+  applyServerNotesToLayout,
+  hydrateLayout,
+  readStoredDmLayout,
+  writeStoredDmLayout,
+} from "../lib/sheetLayout";
+import { fetchCampaignNotes, serverNotesToClient } from "../lib/campaignNotes";
 
 const emptyCharacterForm = {
   name: "",
@@ -339,6 +346,23 @@ export function DashboardPage() {
     if (!response.ok) {
       setError(active ? "Could not start session." : "Could not end session.");
       return;
+    }
+    const status = await response.json();
+    if (!active && status.action_log_text && token) {
+      try {
+        const notesRes = await fetchCampaignNotes(campaignId, token);
+        const clientDoc = serverNotesToClient(notesRes);
+        const stored = readStoredDmLayout(campaignId);
+        const layout = stored ? hydrateLayout(stored, 1280, 800) : { widgets: [], viewport: {} };
+        const next = applyServerNotesToLayout(layout, clientDoc, {
+          dmMode: true,
+          canvasW: 1280,
+          canvasH: 800,
+        });
+        writeStoredDmLayout(campaignId, next);
+      } catch {
+        // session notes were still saved server-side
+      }
     }
     await loadDashboard();
   };

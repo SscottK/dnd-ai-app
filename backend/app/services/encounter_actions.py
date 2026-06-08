@@ -92,6 +92,43 @@ def advance_turn(state: EncounterState) -> None:
     begin_turn(state, ordered[next_index].id)
 
 
+def reset_active_to_top_of_initiative(state: EncounterState) -> bool:
+    """Set the active turn to the highest-initiative living combatant."""
+    from app.services.turn_actions import begin_turn, ensure_turn_economy
+
+    ordered = sorted_combatants(state)
+    if not ordered:
+        if state.active_combatant_id is not None:
+            state.active_combatant_id = None
+            state.active_index = 0
+            return True
+        return False
+
+    top = ordered[0]
+    if state.active_combatant_id == top.id:
+        state.active_index = 0
+        ensure_turn_economy(state)
+        return False
+
+    state.active_combatant_id = top.id
+    state.active_index = 0
+    begin_turn(state, top.id)
+    return True
+
+
+def combat_has_started(state: EncounterState) -> bool:
+    if state.round > 1:
+        return True
+    return any(entry.kind == "turn" for entry in state.combat_log)
+
+
+def sync_initiative_order_after_setup_change(state: EncounterState) -> bool:
+    """Keep active turn at the top of order while assembling initiative; preserve mid-combat."""
+    if combat_has_started(state):
+        return ensure_active_combatant(state)
+    return reset_active_to_top_of_initiative(state)
+
+
 def ensure_active_combatant(state: EncounterState) -> bool:
     """Point active turn at a living combatant when missing or stale. Returns True if state changed."""
     from app.services.turn_actions import begin_turn, ensure_turn_economy
@@ -204,6 +241,7 @@ def add_enemies_to_encounter(
                 combat_actions=list(raw_actions),
             )
             state.combatants.append(apply_monster_catalog_to_combatant(combatant))
+    sync_initiative_order_after_setup_change(state)
     return persist_encounter(session, campaign, state)
 
 
@@ -240,4 +278,5 @@ def add_roster_to_encounter(
         )
         if existing is None:
             upsert_pc_combatant(state, character, initiative=0)
+    sync_initiative_order_after_setup_change(state)
     return persist_encounter(session, campaign, state)

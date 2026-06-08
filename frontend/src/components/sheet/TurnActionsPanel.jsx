@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { loadActionRulesCatalog } from "../../lib/actionRules";
 import { impliesIncapacitated } from "../../lib/conditions";
-import { formatCombatResources, turnStatusLabels } from "../../lib/encounterDisplay";
+import { formatCombatResources, parseCombatEndPayload, turnStatusLabels } from "../../lib/encounterDisplay";
 import {
   ACTION_TYPES,
   actionHasOptions,
@@ -98,6 +98,7 @@ export function TurnActionsPanel({
   canAdjustMovement = false,
   onEncounterUpdate,
   onSheetRefresh,
+  onCombatEnded,
   onError,
 }) {
   const [step, setStep] = useState("pick_type");
@@ -221,10 +222,13 @@ export function TurnActionsPanel({
         throw new Error(formatApiErrorDetail(err.detail, "Could not use action"));
       }
       const payload = await res.json();
-      const nextEncounter = payload.encounter || payload;
-      onEncounterUpdate?.(nextEncounter);
+      const parsed = parseCombatEndPayload(payload);
+      onEncounterUpdate?.(parsed.encounter);
       const messages = payload.action_messages || [];
       setLastOutcome(messages.length ? messages.join(" · ") : `${actorCombatant.name} used ${action.name}.`);
+      if (parsed.combatEnded) {
+        onCombatEnded?.(parsed.combatLogText, parsed.reason);
+      }
       if (actorCombatant.character_id) {
         onSheetRefresh?.();
       }

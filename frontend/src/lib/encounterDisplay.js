@@ -35,6 +35,11 @@ export function shouldShowCombatantAc(combatant, isDmView) {
 
 /** Normalize PATCH /encounter response (wraps encounter when combat auto-ends). */
 export function parseEncounterPatchResponse(data) {
+  return parseCombatEndPayload(data);
+}
+
+/** Normalize encounter PATCH or use-action responses when combat may auto-end. */
+export function parseCombatEndPayload(data) {
   if (data?.encounter) {
     return {
       encounter: data.encounter,
