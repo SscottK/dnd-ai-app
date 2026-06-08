@@ -91,6 +91,8 @@ export function emptySheet() {
     initiative_bonus: null,
     passive_perception: null,
     hit_dice: null,
+    race: null,
+    species: null,
     saving_throws: ABILITIES.map((ability) => ({
       ability,
       proficient: false,
@@ -133,6 +135,8 @@ export function parseSheetJson(text) {
       "initiative_bonus",
       "passive_perception",
       "hit_dice",
+      "race",
+      "species",
       "notes",
     ]) {
       if (raw[key] != null) base[key] = raw[key];

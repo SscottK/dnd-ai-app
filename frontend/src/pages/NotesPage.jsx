@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ChevronDown, Plus, ScrollText, Trash2 } from "lucide-react";
+import { CampaignNotesEditor } from "../components/notes/CampaignNotesEditor";
 import { useAuth } from "../hooks/useAuth";
 import {
   createUserNote,
   deleteUserNote,
-  fetchAllNotes,
   fetchUserNotesPage,
-  serverNotesToClient,
   updateUserNote,
 } from "../lib/campaignNotes";
 
@@ -83,58 +82,45 @@ function UserNoteEditor({ note, campaigns, onChange, onDelete, saving }) {
   );
 }
 
-function SessionNoteBlock({ tab }) {
-  return (
-    <div className="rounded-sm border border-border/50 bg-void-deep/20 p-3 space-y-1">
-      <p className="text-[10px] font-black uppercase text-starlight">{tab.title}</p>
-      {tab.archived && (
-        <span className="inline-block rounded-sm border border-border px-1.5 py-0.5 text-[8px] font-black uppercase text-ink-faint">
-          Archived
-        </span>
-      )}
-      <p className="whitespace-pre-wrap text-[11px] font-mono leading-relaxed text-ink-muted">
-        {tab.content || "(empty)"}
-      </p>
-    </div>
-  );
-}
-
 export function NotesPage() {
   const { token } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [notes, setNotes] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
-  const [sessionNotes, setSessionNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingIds, setSavingIds] = useState({});
-  const [expanded, setExpanded] = useState({ [PERSONAL_GROUP]: true });
-  const [showSessionNotes, setShowSessionNotes] = useState(false);
+  const [expanded, setExpanded] = useState({ personal: true, session: true });
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState({ title: "", content: "", campaignId: null });
+
+  const selectedCampaignId = useMemo(() => {
+    const raw = searchParams.get("campaign");
+    if (!raw) return campaigns[0]?.id ?? null;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return campaigns[0]?.id ?? null;
+    return campaigns.some((campaign) => campaign.id === parsed) ? parsed : campaigns[0]?.id ?? null;
+  }, [searchParams, campaigns]);
+
+  const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId) || null;
+
+  const setSelectedCampaignId = (campaignId) => {
+    if (campaignId == null) {
+      searchParams.delete("campaign");
+    } else {
+      searchParams.set("campaign", String(campaignId));
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
 
   const loadNotes = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError("");
     try {
-      const [pageData, sessionData] = await Promise.all([
-        fetchUserNotesPage(token),
-        fetchAllNotes(token).catch(() => ({ campaigns: [] })),
-      ]);
+      const pageData = await fetchUserNotesPage(token);
       setNotes(pageData.notes || []);
       setCampaigns(pageData.campaigns || []);
-      const sessionRows = (sessionData.campaigns || []).map((row) => {
-        const doc = serverNotesToClient(row);
-        return {
-          campaignId: row.campaign_id,
-          campaignName: row.campaign_name,
-          tabs: [
-            ...doc.tabs.map((tab) => ({ ...tab, archived: false })),
-            ...doc.closedTabs.map((tab) => ({ ...tab, archived: true })),
-          ],
-        };
-      });
-      setSessionNotes(sessionRows);
     } catch (err) {
       setError(err.message || "Could not load notes.");
     } finally {
@@ -170,7 +156,9 @@ export function NotesPage() {
       groups.get(key).notes.push(note);
     }
 
-    return Array.from(groups.values()).filter((group) => group.notes.length > 0 || group.id === PERSONAL_GROUP);
+    return Array.from(groups.values()).filter(
+      (group) => group.notes.length > 0 || group.id === PERSONAL_GROUP
+    );
   }, [notes, campaigns]);
 
   const handleCreate = async () => {
@@ -241,8 +229,11 @@ export function NotesPage() {
               <ScrollText className="h-4 w-4 text-neon-cyan" />
               Notes
             </h1>
-            <p className="mt-1 text-[11px] font-mono text-ink-muted">
-              Your notes live on your account. Assign them to a campaign or keep them personal.
+            <p className="mt-1 max-w-xl text-[11px] font-mono text-ink-muted">
+              <span className="text-starlight">Campaign session tabs</span> are the same tabbed
+              notes from live play (prep, logs, archives).{" "}
+              <span className="text-starlight">Personal notes</span> are separate long-form entries
+              on your account.
             </p>
           </div>
           <Link
@@ -259,10 +250,71 @@ export function NotesPage() {
           </p>
         )}
 
+        <section className="rounded-sm border border-neon-magenta/40 bg-void-panel/60">
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => ({ ...prev, session: !prev.session }))}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          >
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide text-neon-magenta">
+                Campaign session tabs
+              </p>
+              <p className="text-[10px] font-mono text-ink-faint">
+                Edit anytime — no live session required. Archive and reopen closed tabs here.
+              </p>
+            </div>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-ink-faint transition ${expanded.session ? "rotate-180" : ""}`}
+            />
+          </button>
+          {expanded.session && (
+            <div className="space-y-3 border-t border-border px-4 py-4">
+              {loading ? (
+                <p className="text-[11px] font-mono text-ink-faint">Loading campaigns…</p>
+              ) : campaigns.length === 0 ? (
+                <p className="text-[11px] font-mono text-ink-muted">
+                  Join or create a campaign to use session tab notes.
+                </p>
+              ) : (
+                <>
+                  <label className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-ink-muted">
+                    <span className="font-black uppercase text-starlight">Campaign</span>
+                    <select
+                      value={selectedCampaignId ?? ""}
+                      onChange={(event) => setSelectedCampaignId(Number(event.target.value))}
+                      className="min-w-[200px] rounded-sm border border-border bg-black px-2 py-1 text-[10px] font-mono text-ink"
+                    >
+                      {campaigns.map((campaign) => (
+                        <option key={campaign.id} value={campaign.id}>
+                          {campaign.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedCampaignId && token && (
+                    <CampaignNotesEditor
+                      key={selectedCampaignId}
+                      campaignId={selectedCampaignId}
+                      token={token}
+                      campaignName={selectedCampaign?.name}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
         <section className="rounded-sm border border-neon-cyan/30 bg-void-panel/60 p-4 space-y-3">
-          <h2 className="text-[10px] font-black uppercase tracking-widest text-neon-cyan">
-            New note
-          </h2>
+          <div>
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-neon-cyan">
+              New personal note
+            </h2>
+            <p className="mt-1 text-[10px] font-mono text-ink-faint">
+              Separate from session tabs — good for backstory, reminders, or cross-campaign ideas.
+            </p>
+          </div>
           <input
             value={draft.title}
             onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
@@ -278,7 +330,7 @@ export function NotesPage() {
           />
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-[10px] font-mono text-ink-muted">
-              <span>Campaign</span>
+              <span>Optional campaign tag</span>
               <CampaignSelect
                 value={draft.campaignId}
                 campaigns={campaigns}
@@ -292,16 +344,16 @@ export function NotesPage() {
               className="inline-flex items-center gap-1 rounded-sm border border-neon-cyan bg-neon-cyan/10 px-3 py-1.5 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/20 disabled:opacity-50"
             >
               <Plus className="h-3.5 w-3.5" />
-              {creating ? "Creating…" : "Create note"}
+              {creating ? "Creating…" : "Create personal note"}
             </button>
           </div>
         </section>
 
-        {loading && <p className="text-[11px] font-mono text-ink-faint">Loading notes…</p>}
+        {loading && <p className="text-[11px] font-mono text-ink-faint">Loading personal notes…</p>}
 
         {!loading && notes.length === 0 && (
           <p className="rounded-sm border border-dashed border-border px-4 py-6 text-center text-[11px] font-mono text-ink-muted">
-            No notes yet. Use the form above to create your first one.
+            No personal notes yet. Session tabs are above; use the form here for standalone notes.
           </p>
         )}
 
@@ -316,7 +368,7 @@ export function NotesPage() {
               >
                 <div>
                   <p className="text-xs font-black uppercase tracking-wide text-starlight">
-                    {group.label}
+                    Personal notes — {group.label}
                   </p>
                   <p className="text-[10px] font-mono text-ink-faint">
                     {group.notes.length} note{group.notes.length === 1 ? "" : "s"}
@@ -330,7 +382,7 @@ export function NotesPage() {
               {isOpen && (
                 <div className="space-y-3 border-t border-border px-4 py-4">
                   {group.notes.length === 0 ? (
-                    <p className="text-[10px] font-mono text-ink-faint">No notes in this group.</p>
+                    <p className="text-[10px] font-mono text-ink-faint">No personal notes here.</p>
                   ) : (
                     group.notes.map((note) => (
                       <UserNoteEditor
@@ -348,44 +400,6 @@ export function NotesPage() {
             </section>
           );
         })}
-
-        {sessionNotes.some((row) => row.tabs.length > 0) && (
-          <section className="rounded-sm border border-border/70 bg-void-panel/40">
-            <button
-              type="button"
-              onClick={() => setShowSessionNotes((open) => !open)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-            >
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-ink-muted">
-                  Session notes
-                </p>
-                <p className="text-[10px] font-mono text-ink-faint">
-                  Auto-appended combat and action logs from live play
-                </p>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 shrink-0 text-ink-faint transition ${showSessionNotes ? "rotate-180" : ""}`}
-              />
-            </button>
-            {showSessionNotes && (
-              <div className="space-y-4 border-t border-border px-4 py-4">
-                {sessionNotes.map((row) =>
-                  row.tabs.length > 0 ? (
-                    <div key={row.campaignId} className="space-y-2">
-                      <p className="text-[10px] font-black uppercase text-starlight">
-                        {row.campaignName}
-                      </p>
-                      {row.tabs.map((tab) => (
-                        <SessionNoteBlock key={tab.id} tab={tab} />
-                      ))}
-                    </div>
-                  ) : null
-                )}
-              </div>
-            )}
-          </section>
-        )}
       </div>
     </div>
   );

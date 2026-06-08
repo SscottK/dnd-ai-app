@@ -80,7 +80,7 @@ from app.services.encounter_actions import (
 )
 from app.services.character_assets import portrait_download_url
 from app.services.character_sheet import parse_sheet_json
-from app.services.character_sheet import speed_from_character
+from app.services.character_sheet import roster_fields_from_character, speed_from_character
 from app.services.encounter_sync import (
     encounter_for_viewer,
     enrich_encounter_movement,
@@ -318,6 +318,7 @@ def get_campaign_roster(campaign_id: int, current_user: CurrentUser, session: Se
         character = session.get(Character, member.character_id)
         if user is None or character is None or member.id is None:
             continue
+        extras = roster_fields_from_character(character)
         roster.append(
             CampaignMemberRead(
                 member_id=member.id,
@@ -326,11 +327,14 @@ def get_campaign_roster(campaign_id: int, current_user: CurrentUser, session: Se
                 character_name=character.name,
                 class_name=character.class_name,
                 level=character.level,
+                race=extras.get("race"),
                 ac=character.ac,
                 hp=character.hp,
                 max_hp=character.max_hp,
                 speed=speed_from_character(character),
                 portrait_url=portrait_download_url(character, session),
+                heroic_inspiration=extras.get("heroic_inspiration"),
+                i_know_a_guy=extras.get("i_know_a_guy"),
             )
         )
 

@@ -137,16 +137,6 @@ export function SessionPlayPage() {
     dirtyRef.current = dirty;
   }, [dirty]);
 
-  const getCanvasBounds = useCallback(() => canvasBoundsRef.current, []);
-
-  const startPaneInteraction = useCallback(() => {
-    interactingRef.current = true;
-  }, []);
-
-  const endPaneInteraction = useCallback(() => {
-    interactingRef.current = false;
-  }, []);
-
   const measureCanvas = useCallback(() => {
     const el = canvasRef.current;
     if (!el) return null;
@@ -154,6 +144,25 @@ export function SessionPlayPage() {
     const height = el.clientHeight;
     if (width <= 0 || height <= 0) return null;
     return { width, height };
+  }, []);
+
+  const getCanvasBounds = useCallback(() => {
+    const measured = measureCanvas();
+    if (measured) {
+      canvasBoundsRef.current = measured;
+      return measured;
+    }
+    const cached = canvasBoundsRef.current;
+    if (cached.width > 0 && cached.height > 0) return cached;
+    return { width: 1280, height: 800 };
+  }, [measureCanvas]);
+
+  const startPaneInteraction = useCallback(() => {
+    interactingRef.current = true;
+  }, []);
+
+  const endPaneInteraction = useCallback(() => {
+    interactingRef.current = false;
   }, []);
 
   const captureCanvasBounds = useCallback(
@@ -541,8 +550,11 @@ export function SessionPlayPage() {
         setCharacter(null);
         setSheet(parseSheetJson(null));
         const stored = readStoredDmLayout(campaignId);
-        const hydrated = stored ? hydrateLayout(stored, 1280, 800) : null;
-        let nextLayout = hydrated || { widgets: [], viewport: defaultViewport() };
+        const bootSize = measureCanvas() || canvasBoundsRef.current;
+        const bootW = bootSize.width > 0 ? bootSize.width : 1280;
+        const bootH = bootSize.height > 0 ? bootSize.height : 800;
+        const hydrated = stored ? hydrateLayout(stored, bootW, bootH) : null;
+        let nextLayout = hydrated || { widgets: [], viewport: defaultViewport(DEFAULT_ZOOM, bootW, bootH) };
         if (status.play_session_notes_tab_id && status.play_session_notes_tab_title) {
           nextLayout = ensurePlaySessionNotesTab(
             nextLayout,
@@ -551,8 +563,8 @@ export function SessionPlayPage() {
             {
               widgetType: "dm_notes",
               tabsKey: "dmNotesTabs",
-              canvasW: 1280,
-              canvasH: 800,
+              canvasW: bootW,
+              canvasH: bootH,
             }
           );
         }
@@ -1285,9 +1297,16 @@ export function SessionPlayPage() {
             <ArrowLeft className="w-3 h-3" />
             Campaigns
           </Link>
-          <h1 className="truncate text-sm font-black uppercase text-starlight sm:text-base">
-            {isDmSession ? sessionStatus.campaign_name : character.name}
-          </h1>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-black uppercase text-starlight sm:text-base">
+              {sessionStatus?.campaign_name || "Campaign"}
+            </h1>
+            {!isDmSession && character?.name && (
+              <p className="truncate text-[10px] font-mono text-ink-faint sm:text-xs">
+                {character.name}
+              </p>
+            )}
+          </div>
           {isDmSession ? (
             <span className="text-[10px] text-neon-cyan font-black uppercase hidden sm:inline">DM</span>
           ) : (

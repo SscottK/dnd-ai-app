@@ -48,6 +48,8 @@ def empty_sheet() -> dict[str, Any]:
         "initiative_bonus": None,
         "passive_perception": None,
         "hit_dice": None,
+        "race": None,
+        "species": None,
         "saving_throws": [
             {"ability": key, "proficient": False, "bonus": None} for key in ABILITY_KEYS
         ],
@@ -240,6 +242,8 @@ def normalize_sheet(
         "initiative_bonus",
         "passive_perception",
         "hit_dice",
+        "race",
+        "species",
         "notes",
     ):
         if sheet.get(field) is not None:
@@ -430,6 +434,54 @@ def effective_speed_from_sheet(sheet: dict[str, Any]) -> int | None:
 
 def speed_from_character(character: Any) -> int | None:
     return effective_speed_from_sheet(parse_sheet_json(character.sheet_json))
+
+
+def species_from_sheet(sheet: dict[str, Any]) -> str | None:
+    for key in ("race", "species"):
+        value = sheet.get(key)
+        if value and str(value).strip():
+            return str(value).strip()
+    for feature in sheet.get("features") or []:
+        if not isinstance(feature, dict):
+            continue
+        source = str(feature.get("source") or "").lower()
+        if "species" in source or source == "race":
+            name = str(feature.get("name") or "").strip()
+            if name:
+                return name
+    return None
+
+
+def _resource_current(sheet: dict[str, Any], *needles: str) -> int | None:
+    for row in sheet.get("resources") or []:
+        if not isinstance(row, dict):
+            continue
+        hay = f"{row.get('id') or ''} {row.get('name') or ''}".lower()
+        if not any(needle in hay for needle in needles):
+            continue
+        for key in ("current", "max"):
+            if row.get(key) is None:
+                continue
+            try:
+                return int(row[key])
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def roster_fields_from_character(character: Any) -> dict[str, Any]:
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=getattr(character, "class_name", None),
+        level=getattr(character, "level", None),
+    )
+    return {
+        "race": species_from_sheet(sheet),
+        "heroic_inspiration": _resource_current(
+            sheet, "heroic-inspiration", "heroic inspiration"
+        ),
+        "i_know_a_guy": _resource_current(sheet, "i-know-a-guy", "i know a guy", "know a guy"),
+    }
 
 
 def _proficiency_bonus(sheet: dict) -> int:

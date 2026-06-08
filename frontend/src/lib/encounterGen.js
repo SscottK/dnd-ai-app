@@ -41,9 +41,20 @@ export function encounterTabTitle({ title, summary, enemies }) {
 }
 
 /** Plain-text notes body for a generated encounter tab. */
-export function formatEncounterNotesContent({ title, summary, enemies, partyLevel, difficulty, setting }) {
+export function formatEncounterNotesContent({
+  title,
+  summary,
+  enemies,
+  partyLevel,
+  partySize,
+  difficulty,
+  setting,
+}) {
   const heading = title || encounterTabTitle({ summary, enemies });
-  const lines = [heading, `Level ${partyLevel} · ${difficulty}${setting ? ` · ${setting}` : ""}`, ""];
+  const partyLabel = partySize
+    ? `${partySize} PCs, level ${partyLevel}`
+    : `Level ${partyLevel}`;
+  const lines = [heading, `${partyLabel} · ${difficulty}${setting ? ` · ${setting}` : ""}`, ""];
   if (summary) {
     lines.push(summary, "");
   }
@@ -98,7 +109,9 @@ function toOptionalInt(value) {
 }
 
 export function buildEncounterPrompt(form) {
-  return `You are a D&D 5e DM assistant. Generate a combat encounter for a party of level ${form.partyLevel} characters. Difficulty: ${form.difficulty}. Setting: ${form.setting || "generic fantasy"}.
+  const partySize = Math.max(1, parseInt(form.partySize, 10) || 4);
+  const partyLevel = form.partyLevel || "5";
+  return `You are a D&D 5e DM assistant. Generate a combat encounter for a party of ${partySize} level ${partyLevel} characters. Difficulty: ${form.difficulty}. Setting: ${form.setting || "generic fantasy"}.
 
 Respond with ONLY valid JSON (no markdown prose outside the JSON). Schema:
 {

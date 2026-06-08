@@ -59,6 +59,11 @@ function mergePartyWithEncounter(members, combatants) {
   });
 }
 
+function formatPartyResource(label, value) {
+  if (value == null) return null;
+  return `${label}: ${value}`;
+}
+
 function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortraitPreview }) {
   const hpLabel =
     member.hp != null && member.max_hp != null
@@ -68,9 +73,17 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortrait
         : "—";
   const acLabel = member.ac != null ? String(member.ac) : "—";
   const speedLabel = member.speed != null ? `${member.speed} ft` : "—";
-  const subtitle = [member.class_name, member.level != null ? `Lv ${member.level}` : null]
+  const subtitle = [
+    member.race,
+    member.class_name,
+    member.level != null ? `Lv ${member.level}` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
+  const resourceLabels = [
+    formatPartyResource("Heroic Inspiration", member.heroic_inspiration),
+    formatPartyResource("I Know a Guy", member.i_know_a_guy),
+  ].filter(Boolean);
 
   const openSheet = () => onViewSheet?.(member);
 
@@ -99,6 +112,18 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortrait
           {isYou && <span className="ml-1.5 text-[11px] sm:text-xs text-neon-cyan">YOU</span>}
         </p>
         {subtitle && <p className="truncate text-xs sm:text-sm font-mono text-ink-faint">{subtitle}</p>}
+        {resourceLabels.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {resourceLabels.map((label) => (
+              <span
+                key={label}
+                className="rounded-sm border border-neon-magenta/30 bg-neon-magenta/5 px-1.5 py-0.5 text-[10px] font-mono text-neon-magenta"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs sm:text-sm font-mono">
           <span>
             <span className="text-ink-faint">AC </span>

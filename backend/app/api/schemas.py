@@ -218,11 +218,14 @@ class CampaignMemberRead(BaseModel):
     character_name: str
     class_name: str | None
     level: int | None
+    race: str | None = None
     ac: int | None
     hp: int | None
     max_hp: int | None
     speed: int | None = None
     portrait_url: str | None = None
+    heroic_inspiration: int | None = None
+    i_know_a_guy: int | None = None
 
 
 class CampaignRosterResponse(BaseModel):

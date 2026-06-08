@@ -53,6 +53,7 @@ Return ONLY valid JSON (no markdown, no commentary) with this shape:
     "spells": [
       { "name": "Fire Bolt", "level": 0, "action_type": "action", "targeting": "one_enemy", "prepared": true, "description": "Ranged spell attack" }
     ],
+    "race": "Elf",
     "classes": [
       { "name": "Monk", "level": 5, "subclass": "Way of the Open Hand" }
     ],
@@ -91,6 +92,7 @@ Rules:
 - Do NOT put armor base, shield, DEX, unarmored "Base" (10), or ability modifiers in ac_bonuses — only true extras like Defense, magic bonuses, or feats.
 - ac_breakdown kinds must be: armor, shield, dex, base, ability, or bonus. Only kind "bonus" rows belong in ac_bonuses.
 - Parse character notes/backstory from NOTES, CHARACTER BACKSTORY, and ADDITIONAL NOTES sections into sheet.notes.
+- race: species/race name from the sheet (e.g. "Elf", "Human") as top-level sheet.race when visible.
 - classes: every class on the sheet with name, level, and subclass (if shown). Multiclass = multiple entries.
 - resources: every spendable pool or use tracker visible on the sheet (Focus Points for Monk, Sorcery Points, Rage, Wild Shape uses, Channel Divinity, Bardic Inspiration, Lay on Hands pool, spell slots, Heroic Inspiration, etc.) with id (canonical slug: focus-points, wild-shape, rage, channel-divinity, bardic-inspiration, lay-on-hands, sorcery-points), name, current, max, recharge (short_rest|long_rest|turn), source_class.
 - Features: passive or narrative class/race/background features (Unarmored Defense, Martial Arts rules text). Mark purely passive features with "passive": true (Extra Attack, Martial Arts, Unarmored Defense). Do NOT put spendable ki options only in features — also list them in combat_actions.

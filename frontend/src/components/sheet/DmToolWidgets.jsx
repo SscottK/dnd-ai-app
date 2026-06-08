@@ -305,6 +305,7 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
 
 function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
   const [form, setForm] = useState({
+    partySize: "4",
     partyLevel: "5",
     difficulty: "Medium",
     setting: "",
@@ -328,6 +329,7 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
       setEnemies(parsed.enemies);
       onEncounterGenerated?.({
         ...parsed,
+        partySize: form.partySize,
         partyLevel: form.partyLevel,
         difficulty: form.difficulty,
         setting: form.setting,
@@ -367,15 +369,30 @@ function EncounterGeneratorPanel({ campaignId, token, onEncounterGenerated }) {
     <div className="flex h-full min-h-0 flex-col gap-2">
       <form onSubmit={handleGenerate} className="shrink-0 space-y-2">
         <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-ink-faint">Encounter generator</p>
-        <label className="block">
-          <span className="text-[8px] font-mono uppercase text-ink-faint">Party level</span>
-          <input
-            type="number"
-            value={form.partyLevel}
-            onChange={(e) => setForm((prev) => ({ ...prev, partyLevel: e.target.value }))}
-            className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
-          />
-        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="text-[8px] font-mono uppercase text-ink-faint">Party size</span>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={form.partySize}
+              onChange={(e) => setForm((prev) => ({ ...prev, partySize: e.target.value }))}
+              className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[8px] font-mono uppercase text-ink-faint">Party level</span>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={form.partyLevel}
+              onChange={(e) => setForm((prev) => ({ ...prev, partyLevel: e.target.value }))}
+              className="mt-0.5 w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-ink"
+            />
+          </label>
+        </div>
         <label className="block">
           <span className="text-[8px] font-mono uppercase text-ink-faint">Difficulty</span>
           <select

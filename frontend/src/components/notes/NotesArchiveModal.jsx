@@ -65,8 +65,8 @@ export function NotesArchiveModal({ open, campaignId, token, openTabs, onClose, 
           {error && <p className="text-[11px] font-mono text-danger">{error}</p>}
           {!loading && !error && archivedTabs.length === 0 && (
             <p className="text-[11px] font-mono text-ink-muted">
-              No archived notes for this campaign yet. Close a tab in the notes pane to archive it,
-              or create notes on the Notes page.
+              No archived tabs for this campaign yet. Close a tab in the notes pane to archive it,
+              or edit campaign session tabs on the Notes page.
             </p>
           )}
           {!loading && !error && archivedTabs.length > 0 && (
@@ -97,8 +97,8 @@ export function NotesArchiveModal({ open, campaignId, token, openTabs, onClose, 
 
         <div className="border-t border-border px-4 py-2">
           <p className="text-[9px] font-mono text-ink-faint">
-            Reopening adds the note back to your session pane. Manage or delete notes permanently
-            from the Notes page.
+            Reopening adds the tab back to your open tabs. Edit anytime on the Notes page — live
+            session not required.
           </p>
         </div>
       </div>

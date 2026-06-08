@@ -119,9 +119,8 @@ export function DashboardPage() {
       setCampaigns(loadedCampaigns);
       setCharacters(characterData.characters || []);
 
-      const owned = loadedCampaigns.filter((c) => c.is_owner);
       const rosterEntries = await Promise.all(
-        owned.map(async (campaign) => {
+        loadedCampaigns.map(async (campaign) => {
           const res = await apiFetch(`/campaigns/${campaign.id}/roster`, { token });
           if (!res.ok) return [campaign.id, []];
           const data = await res.json();
@@ -715,6 +714,13 @@ export function DashboardPage() {
                             </LinkButton>
                           )}
                         <LinkButton
+                          to={`/notes?campaign=${campaign.id}`}
+                          className="border-border text-starlight hover:border-neon-cyan hover:text-neon-cyan"
+                        >
+                          <Scroll className="h-4 w-4" />
+                          Notes
+                        </LinkButton>
+                        <LinkButton
                           to={`/initiative/${campaign.id}`}
                           className="border-neon-cyan/60 text-neon-cyan hover:bg-neon-cyan/10"
                         >
@@ -747,10 +753,10 @@ export function DashboardPage() {
                       </div>
                     </div>
 
-                    {campaign.is_owner && rosters[campaign.id]?.length > 0 && (
+                    {rosters[campaign.id]?.length > 0 && (
                       <div className="mt-4 border-t border-border pt-4">
                         <p className="mb-2 text-xs font-black uppercase tracking-wide text-neon-magenta sm:text-sm">
-                          Party roster
+                          Party ({rosters[campaign.id].length})
                         </p>
                         <ul className="space-y-2">
                           {rosters[campaign.id].map((member) => (
@@ -764,20 +770,28 @@ export function DashboardPage() {
                                 </span>
                                 {" · "}
                                 {member.username}
+                                {member.race ? ` · ${member.race}` : ""}
                                 {member.class_name ? ` · ${member.class_name}` : ""}
+                                {member.level != null ? ` · Lv ${member.level}` : ""}
                                 {member.ac != null ? ` · AC ${member.ac}` : ""}
                                 {member.hp != null && member.max_hp != null
                                   ? ` · HP ${member.hp}/${member.max_hp}`
                                   : ""}
+                                {member.heroic_inspiration != null
+                                  ? ` · HI ${member.heroic_inspiration}`
+                                  : ""}
+                                {member.i_know_a_guy != null ? ` · IKaG ${member.i_know_a_guy}` : ""}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => handleKickMember(campaign.id, member.member_id)}
-                                className="inline-flex items-center gap-1 font-black uppercase text-ink-faint hover:text-danger"
-                              >
-                                <UserMinus className="h-3.5 w-3.5" />
-                                Remove
-                              </button>
+                              {campaign.is_owner && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleKickMember(campaign.id, member.member_id)}
+                                  className="inline-flex items-center gap-1 font-black uppercase text-ink-faint hover:text-danger"
+                                >
+                                  <UserMinus className="h-3.5 w-3.5" />
+                                  Remove
+                                </button>
+                              )}
                             </li>
                           ))}
                         </ul>
