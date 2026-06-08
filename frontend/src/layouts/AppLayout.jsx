@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText } from "lucide-react";
+import { LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText, UserPlus } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { APP_NAME, APP_TAGLINE, RULE_WIZARD_LABEL } from "../constants/branding";
 
@@ -42,6 +42,12 @@ export function AppLayout() {
               <ScrollText className="w-3.5 h-3.5" />
               Notes
             </NavLink>
+            {user?.is_admin && (
+              <NavLink to="/admin/access" className={navLinkClass}>
+                <UserPlus className="w-3.5 h-3.5" />
+                Access
+              </NavLink>
+            )}
           </nav>
         </div>
 

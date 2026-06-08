@@ -10,6 +10,7 @@ import { CharacterViewPage } from "./pages/CharacterViewPage";
 import { SessionPlayPage } from "./pages/SessionPlayPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { NotesPage } from "./pages/NotesPage";
+import { AdminAccessPage } from "./pages/AdminAccessPage";
 
 function LegacySheetRedirect() {
   const { characterId } = useParams();
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/session/:campaignId" element={<SessionPlayPage />} />
             <Route path="/initiative/:campaignId" element={<InitiativePage />} />
             <Route path="/notes" element={<NotesPage />} />
+            <Route path="/admin/access" element={<AdminAccessPage />} />
             <Route path="/sheet/:characterId" element={<LegacySheetRedirect />} />
           </Route>
 

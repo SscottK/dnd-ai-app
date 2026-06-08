@@ -49,7 +49,32 @@ class TokenResponse(BaseModel):
 class UserRead(BaseModel):
     id: int
     username: str
+    is_admin: bool = False
     created_at: datetime
+
+
+class RegistrationStatusResponse(BaseModel):
+    registration_open: bool
+
+
+class AccessRequestCreate(BaseModel):
+    username: str = Field(min_length=2, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
+    password: str = Field(min_length=8, max_length=128)
+    message: str = Field(default="", max_length=500)
+
+
+class AccessRequestRead(BaseModel):
+    id: int
+    username: str
+    message: str
+    status: str
+    created_at: datetime
+    reviewed_at: datetime | None = None
+
+
+class AccessRequestActionResponse(BaseModel):
+    request: AccessRequestRead
+    message: str
 
 
 class AuthStatusResponse(BaseModel):

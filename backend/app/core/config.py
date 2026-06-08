@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     bootstrap_admin_username: str = ""
     bootstrap_admin_password: str = ""
 
+    # When false, /auth/register is disabled; new users submit access requests instead
+    registration_open: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

@@ -12,6 +12,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True, max_length=50)
     password_hash: str = Field(max_length=255)
+    is_admin: bool = Field(default=False)
     created_at: datetime = Field(default_factory=utc_now)
 
     conversations: list["Conversation"] = Relationship(back_populates="user")
@@ -169,6 +170,17 @@ class UserCampaignNotes(SQLModel, table=True):
 
     user: Optional[User] = Relationship()
     campaign: Optional[Campaign] = Relationship()
+
+
+class AccessRequest(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, max_length=50)
+    password_hash: str = Field(max_length=255)
+    message: str = Field(default="", max_length=500)
+    status: str = Field(default="pending", max_length=20, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    reviewed_at: Optional[datetime] = Field(default=None)
+    reviewed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
 
 class UserNote(SQLModel, table=True):

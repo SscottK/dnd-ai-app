@@ -3,14 +3,19 @@ from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.api.schemas import (
+    AccessRequestCreate,
+    AccessRequestRead,
     AuthStatusResponse,
     LoginRequest,
     RegisterRequest,
+    RegistrationStatusResponse,
     TokenResponse,
     UserRead,
 )
+from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.models import User
+from app.services.access_requests import create_access_request
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -25,7 +30,19 @@ def to_user_read(user: User) -> UserRead:
     return UserRead(
         id=user.id,
         username=user.username,
+        is_admin=user.is_admin,
         created_at=user.created_at,
+    )
+
+
+def to_access_request_read(request) -> AccessRequestRead:
+    return AccessRequestRead(
+        id=request.id,
+        username=request.username,
+        message=request.message,
+        status=request.status,
+        created_at=request.created_at,
+        reviewed_at=request.reviewed_at,
     )
 
 
@@ -34,8 +51,36 @@ def auth_health():
     return {"status": "ok"}
 
 
+@router.get("/registration-status", response_model=RegistrationStatusResponse)
+def registration_status():
+    return RegistrationStatusResponse(registration_open=settings.registration_open)
+
+
+@router.post("/access-request", response_model=AccessRequestRead, status_code=status.HTTP_201_CREATED)
+def request_access(data: AccessRequestCreate, session: SessionDep):
+    if settings.registration_open:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration is open — create an account directly instead",
+        )
+
+    request = create_access_request(
+        session,
+        username=data.username,
+        password_hash=hash_password(data.password),
+        message=data.message,
+    )
+    return to_access_request_read(request)
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(data: RegisterRequest, session: SessionDep):
+    if not settings.registration_open:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is closed. Submit an access request instead.",
+        )
+
     username = data.username.lower()
     existing = session.exec(select(User).where(User.username == username)).first()
     if existing:

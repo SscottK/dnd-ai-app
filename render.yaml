@@ -22,6 +22,8 @@ services:
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
         sync: false
+      - key: REGISTRATION_OPEN
+        value: "false"
 
 databases:
   - name: dnd-ai-db

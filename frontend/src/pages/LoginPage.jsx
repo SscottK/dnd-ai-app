@@ -85,9 +85,9 @@ export function LoginPage() {
           </button>
 
           <p className="text-center text-[10px] text-zinc-500 uppercase tracking-widest">
-            No account?{" "}
+            Need access?{" "}
             <Link to="/register" className="text-neon-cyan hover:text-starlight">
-              Create one
+              Request to join
             </Link>
           </p>
         </div>
