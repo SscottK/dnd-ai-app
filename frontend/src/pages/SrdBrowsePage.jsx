@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Search, X } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useMediaQuery, APP_MOBILE_QUERY } from "../hooks/useMediaQuery";
 import { apiFetch } from "../lib/api";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 
@@ -36,23 +37,31 @@ function entryBody(entry) {
   return text;
 }
 
-function BrowseListPanel({ title, titleClassName = "text-starlight", children }) {
+function BrowseListPanel({ title, titleClassName = "text-starlight", children, fillHeight = true }) {
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-md border border-border-bright bg-void-panel">
+    <div
+      className={`flex flex-col rounded-md border border-border-bright bg-void-panel ${
+        fillHeight ? "h-full min-h-0" : "max-h-[min(58dvh,28rem)]"
+      }`}
+    >
       <p
         className={`shrink-0 border-b border-border px-3 py-2 text-xs font-black uppercase ${titleClassName}`}
       >
         {title}
       </p>
-      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
     </div>
   );
 }
 
-function EntryDetailPanel({ title, onClose, children }) {
+function EntryDetailPanel({ title, onClose, children, fillHeight = false }) {
   return (
-    <div className="w-full shrink-0 rounded-md border border-border-bright bg-void-panel lg:w-[min(100%,26rem)]">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+    <div
+      className={`w-full rounded-md border border-border-bright bg-void-panel lg:w-[min(100%,26rem)] ${
+        fillHeight ? "flex min-h-0 flex-1 flex-col" : "shrink-0"
+      }`}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
         <p className="min-w-0 truncate text-xs font-black uppercase text-starlight">{title}</p>
         <button
           type="button"
@@ -64,7 +73,13 @@ function EntryDetailPanel({ title, onClose, children }) {
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="max-h-[min(70vh,28rem)] overflow-y-auto p-3 text-sm font-mono text-ink-muted sm:p-4">
+      <div
+        className={`p-3 text-sm font-mono text-ink-muted sm:p-4 ${
+          fillHeight
+            ? "min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+            : "max-h-[min(70vh,28rem)] overflow-y-auto overscroll-y-contain"
+        }`}
+      >
         {children}
       </div>
     </div>
@@ -73,6 +88,7 @@ function EntryDetailPanel({ title, onClose, children }) {
 
 export function SrdBrowsePage() {
   const { token } = useAuth();
+  const isMobile = useMediaQuery(APP_MOBILE_QUERY);
   const [activeCategory, setActiveCategory] = useState("spells");
   const [entries, setEntries] = useState([]);
   const [selectedName, setSelectedName] = useState(null);
@@ -171,6 +187,7 @@ export function SrdBrowsePage() {
   };
 
   const showDetail = Boolean(selectedName);
+  const mobileDetailOpen = isMobile && showDetail;
 
   return (
     <div className="session-ui flex h-full min-h-0 flex-col overflow-hidden bg-void">
@@ -215,7 +232,7 @@ export function SrdBrowsePage() {
           </p>
         )}
 
-        {searchResults.length > 0 && (
+        {searchResults.length > 0 && !mobileDetailOpen && (
           <section className="shrink-0 rounded-md border border-neon-magenta/40 bg-void-panel p-3">
             <p className="mb-2 text-xs font-black uppercase text-neon-magenta">Search results</p>
             <ul className="flex max-h-24 flex-wrap gap-2 overflow-y-auto">
@@ -235,7 +252,7 @@ export function SrdBrowsePage() {
         )}
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:gap-4">
-          <aside className="shrink-0 lg:w-44 xl:w-52">
+          <aside className={`shrink-0 lg:w-44 xl:w-52 ${mobileDetailOpen ? "hidden lg:block" : ""}`}>
             <p className="mb-2 text-xs font-black uppercase text-ink-faint">Categories</p>
             <div className="flex gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:flex-col lg:overflow-visible lg:pb-0 [&::-webkit-scrollbar]:hidden">
               {CATEGORIES.map((cat) => (
@@ -259,8 +276,10 @@ export function SrdBrowsePage() {
           </aside>
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:items-start">
+            {(!isMobile || !showDetail) && (
             <div className="min-h-0 w-full shrink-0 lg:w-[22rem] xl:w-[24rem]">
               <BrowseListPanel
+                fillHeight={!isMobile}
                 title={
                   <>
                     {categoryMeta.label}
@@ -298,9 +317,14 @@ export function SrdBrowsePage() {
                 </ul>
               </BrowseListPanel>
             </div>
+            )}
 
             {showDetail && (
-              <EntryDetailPanel title={selectedName} onClose={closeEntry}>
+              <EntryDetailPanel
+                title={selectedName}
+                onClose={closeEntry}
+                fillHeight={isMobile}
+              >
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
                   <div className="space-y-3">
