@@ -569,6 +569,66 @@ function InventoryBlock({ sheet, onSheetChange, readOnly = false }) {
   );
 }
 
+function SpellsBlock({ sheet, onShowDetail }) {
+  const spells = sheet.spells || [];
+  if (!spells.length) {
+    return <p className="text-sm text-zinc-600">No spells parsed yet.</p>;
+  }
+
+  const byLevel = spells.reduce((groups, spell) => {
+    const level = spell.level ?? spell.spell_level ?? 0;
+    const key = String(level);
+    groups[key] = groups[key] || [];
+    groups[key].push(spell);
+    return groups;
+  }, {});
+
+  const levels = Object.keys(byLevel).sort((left, right) => Number(left) - Number(right));
+
+  return (
+    <div className="space-y-3">
+      {levels.map((level) => (
+        <div key={level} className="rounded-sm border border-zinc-800">
+          <p className="border-b border-zinc-900 px-3 py-2 text-xs font-black uppercase text-zinc-500">
+            {Number(level) === 0 ? "Cantrips" : `Level ${level}`}
+          </p>
+          <div className="divide-y divide-zinc-900/80">
+            {byLevel[level].map((spell, index) => (
+              <button
+                key={spell.id || `${level}-${spell.name}-${index}`}
+                type="button"
+                onClick={() =>
+                  onShowDetail({
+                    title: spell.name,
+                    subtitle: [
+                      spell.school,
+                      spell.casting_time || spell.action_type,
+                      spell.range,
+                    ]
+                      .filter(Boolean)
+                      .join(" · "),
+                    body: spell.description || "No description.",
+                  })
+                }
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-zinc-900/80"
+              >
+                <span className="truncate text-sm font-semibold text-starlight lg:text-base">
+                  {spell.name}
+                </span>
+                {spell.concentration && (
+                  <span className="shrink-0 text-[10px] font-black uppercase text-neon-magenta">
+                    C
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FeaturesBlock({ sheet, onShowDetail }) {
   return (
     <div className="divide-y divide-zinc-900/80 rounded-sm border border-zinc-800">
@@ -623,6 +683,7 @@ export function DigitalCharacterSheet({
 
   const mainTabs = [
     { id: "actions", label: "Actions" },
+    { id: "spells", label: "Spells" },
     { id: "inventory", label: "Inventory" },
     { id: "features", label: "Features" },
   ];
@@ -720,6 +781,9 @@ export function DigitalCharacterSheet({
           <div className="pt-3">
             {mainTab === "actions" && (
               <ActionsPanel sheet={sheet} filter={actionFilter} onShowDetail={setDetail} />
+            )}
+            {mainTab === "spells" && (
+              <SpellsBlock sheet={sheet} onShowDetail={setDetail} />
             )}
             {mainTab === "inventory" && (
               <InventoryBlock sheet={sheet} onSheetChange={onSheetChange} readOnly={readOnly} />

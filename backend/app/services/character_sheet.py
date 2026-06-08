@@ -105,6 +105,10 @@ def apply_equipped_overrides(sheet: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def _resource_merge_key(entry: dict[str, Any]) -> str:
+    return str(entry.get("id") or entry.get("name") or "").strip().casefold()
+
+
 def merge_sheet_on_resync(old_sheet: dict[str, Any], new_sheet: dict[str, Any]) -> dict[str, Any]:
     merged = dict(new_sheet)
     old_overrides = dict(old_sheet.get("equipped_overrides") or {})
@@ -115,6 +119,26 @@ def merge_sheet_on_resync(old_sheet: dict[str, Any], new_sheet: dict[str, Any]) 
     new_notes = str(new_sheet.get("notes") or "").strip()
     if old_notes and not new_notes:
         merged["notes"] = old_notes
+
+    old_conditions = old_sheet.get("conditions") or []
+    new_conditions = new_sheet.get("conditions") or []
+    if old_conditions and not new_conditions:
+        merged["conditions"] = list(old_conditions)
+
+    old_resources = {
+        _resource_merge_key(entry): entry
+        for entry in (old_sheet.get("resources") or [])
+        if _resource_merge_key(entry)
+    }
+    resources: list[dict[str, Any]] = []
+    for entry in new_sheet.get("resources") or []:
+        merged_entry = dict(entry)
+        old_entry = old_resources.get(_resource_merge_key(entry))
+        if old_entry is not None and old_entry.get("current") is not None:
+            merged_entry["current"] = old_entry["current"]
+        resources.append(merged_entry)
+    if resources:
+        merged["resources"] = resources
 
     old_inventory = old_sheet.get("inventory") or []
     new_inventory = _ensure_item_ids(new_sheet.get("inventory") or [])

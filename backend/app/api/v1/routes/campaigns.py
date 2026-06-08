@@ -641,14 +641,7 @@ def update_encounter(
 
     log_hp_changes(before, state)
     sync_encounter_combatants_to_characters(session, before, state)
-
-    if state.active_combatant_id and not any(
-        combatant.id == state.active_combatant_id
-        for combatant in sorted_combatants(state)
-    ):
-        ordered = sorted_combatants(state)
-        state.active_combatant_id = ordered[0].id if ordered else None
-        state.active_index = 0
+    ensure_active_combatant(state)
 
     end_response = _combat_end_response_if_needed(
         session, campaign, state, is_owner=True
@@ -945,6 +938,7 @@ def use_encounter_action(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     sync_encounter_combatants_to_characters(session, before, state)
+    ensure_active_combatant(state)
 
     victory = _combat_end_response_if_needed(session, campaign, state, is_owner=is_owner)
     if victory:

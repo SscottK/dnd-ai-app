@@ -1651,9 +1651,11 @@ export function InitiativeWidget({
   const removeCombatant = (id) => {
     const nextCombatants = encounter.combatants.filter((c) => c.id !== id);
     if (selectedId === id) setSelectedId(null);
+    const removedActive = encounter.active_combatant_id === id;
     saveEncounter({
       ...encounter,
       combatants: nextCombatants,
+      active_combatant_id: removedActive ? null : encounter.active_combatant_id,
       active_index: Math.min(encounter.active_index, Math.max(0, nextCombatants.length - 1)),
     });
   };

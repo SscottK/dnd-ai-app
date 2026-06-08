@@ -66,6 +66,32 @@ def sorted_combatants_for_display(state: EncounterState) -> list[EncounterCombat
     return sorted(living, key=key, reverse=True) + sorted(defeated, key=key, reverse=True)
 
 
+def _initiative_search_order(state: EncounterState, *, after_combatant_id: str | None) -> list[EncounterCombatant]:
+    """Living combatants in initiative order, starting after a reference id (wraps)."""
+    ordered = sorted_combatants(state)
+    if not ordered:
+        return []
+    if not after_combatant_id:
+        return ordered
+
+    all_sorted = sorted(state.combatants, key=lambda combatant: combatant.initiative, reverse=True)
+    old_idx = next(
+        (index for index, combatant in enumerate(all_sorted) if combatant.id == after_combatant_id),
+        -1,
+    )
+    if old_idx < 0:
+        return ordered
+
+    seen: set[str] = set()
+    rotated: list[EncounterCombatant] = []
+    for candidate in all_sorted[old_idx + 1 :] + all_sorted[:old_idx]:
+        if not can_take_turn(candidate) or candidate.id in seen:
+            continue
+        seen.add(candidate.id)
+        rotated.append(candidate)
+    return rotated or ordered
+
+
 def resolve_active_index(state: EncounterState) -> int:
     ordered = sorted_combatants(state)
     if not ordered:
@@ -74,21 +100,47 @@ def resolve_active_index(state: EncounterState) -> int:
         for index, combatant in enumerate(ordered):
             if combatant.id == state.active_combatant_id:
                 return index
+        next_candidates = _initiative_search_order(
+            state, after_combatant_id=state.active_combatant_id
+        )
+        if next_candidates:
+            next_id = next_candidates[0].id
+            for index, combatant in enumerate(ordered):
+                if combatant.id == next_id:
+                    return index
     return min(state.active_index, len(ordered) - 1)
 
 
 def advance_turn(state: EncounterState) -> None:
+    from app.services.turn_actions import begin_turn
+
     ordered = sorted_combatants(state)
     if not ordered:
         return
+
+    if state.active_combatant_id:
+        active = next(
+            (combatant for combatant in state.combatants if combatant.id == state.active_combatant_id),
+            None,
+        )
+        if active is None or not can_take_turn(active):
+            next_candidates = _initiative_search_order(
+                state, after_combatant_id=state.active_combatant_id
+            )
+            if next_candidates:
+                for index, combatant in enumerate(ordered):
+                    if combatant.id == next_candidates[0].id:
+                        state.active_combatant_id = combatant.id
+                        state.active_index = index
+                        begin_turn(state, combatant.id)
+                        return
+
     current_index = resolve_active_index(state)
     next_index = (current_index + 1) % len(ordered)
     if next_index == 0:
         state.round += 1
     state.active_index = next_index
     state.active_combatant_id = ordered[next_index].id
-    from app.services.turn_actions import begin_turn
-
     begin_turn(state, ordered[next_index].id)
 
 
@@ -137,15 +189,41 @@ def ensure_active_combatant(state: EncounterState) -> bool:
     if not ordered:
         if state.active_combatant_id is not None:
             state.active_combatant_id = None
+            state.active_index = 0
             return True
         return False
 
     if state.active_combatant_id:
-        for index, combatant in enumerate(ordered):
-            if combatant.id == state.active_combatant_id:
-                state.active_index = index
-                ensure_turn_economy(state)
-                return False
+        active = next(
+            (combatant for combatant in state.combatants if combatant.id == state.active_combatant_id),
+            None,
+        )
+        if active and can_take_turn(active):
+            for index, combatant in enumerate(ordered):
+                if combatant.id == active.id:
+                    if state.active_index != index:
+                        state.active_index = index
+                        return True
+                    ensure_turn_economy(state)
+                    return False
+
+        next_candidates = _initiative_search_order(
+            state, after_combatant_id=state.active_combatant_id
+        )
+        for candidate in next_candidates:
+            for index, combatant in enumerate(ordered):
+                if combatant.id == candidate.id:
+                    if state.active_combatant_id == candidate.id and state.active_index == index:
+                        ensure_turn_economy(state)
+                        return False
+                    state.active_combatant_id = candidate.id
+                    state.active_index = index
+                    begin_turn(state, candidate.id)
+                    return True
+
+    if state.active_combatant_id == ordered[0].id and state.active_index == 0:
+        ensure_turn_economy(state)
+        return False
 
     state.active_combatant_id = ordered[0].id
     state.active_index = 0

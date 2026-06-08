@@ -46,6 +46,7 @@ router = APIRouter(prefix="/characters", tags=["characters"])
 
 UPLOADS_DIR = BACKEND_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
+MAX_PDF_BYTES = 10 * 1024 * 1024
 
 
 def pdf_download_url(character: Character) -> str | None:
@@ -144,6 +145,70 @@ def get_owned_character(character_id: int, current_user: CurrentUser, session: S
     return character
 
 
+def delete_stored_pdf(character: Character) -> None:
+    if not character.pdf_path:
+        return
+    (UPLOADS_DIR / character.pdf_path).unlink(missing_ok=True)
+
+
+async def read_and_store_pdf(current_user: CurrentUser, file: UploadFile) -> tuple[Path, str]:
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please upload a PDF file",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_PDF_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PDF must be under 10MB",
+        )
+
+    user_dir = UPLOADS_DIR / str(current_user.id)
+    user_dir.mkdir(exist_ok=True)
+    stored_name = f"{uuid.uuid4().hex}.pdf"
+    dest = user_dir / stored_name
+    dest.write_bytes(content)
+    return dest, stored_name
+
+
+async def parse_and_apply_pdf(character: Character, pdf_file: Path, session: SessionDep) -> None:
+    try:
+        parsed = await parse_character_from_pdf(pdf_file)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not parse character sheet from PDF",
+        ) from exc
+
+    parsed.pop("parse_warning", None)
+    apply_parsed_to_character(character, parsed)
+    session.add(character)
+    session.commit()
+    session.refresh(character)
+
+    if character.campaign_id:
+        sheet = parse_sheet_json(
+            character.sheet_json,
+            class_name=character.class_name,
+            level=character.level,
+        )
+        sync_character_combat_stats(
+            session,
+            character.campaign_id,
+            character.id,
+            hp=character.hp,
+            max_hp=character.max_hp,
+            ac=character.ac,
+            conditions=sheet.get("conditions"),
+        )
+        session.commit()
+        session.refresh(character)
+
+
 def apply_parsed_to_character(character: Character, parsed: dict) -> None:
     for field in ("name", "class_name", "level", "hp", "max_hp", "skills"):
         if parsed.get(field) is not None:
@@ -196,25 +261,15 @@ async def parse_pdf_upload(
     current_user: CurrentUser,
     file: UploadFile = File(...),
 ):
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
+    try:
+        dest, stored_name = await read_and_store_pdf(current_user, file)
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please upload a PDF file",
-        )
-
-    user_dir = UPLOADS_DIR / str(current_user.id)
-    user_dir.mkdir(exist_ok=True)
-    stored_name = f"{uuid.uuid4().hex}.pdf"
-    dest = user_dir / stored_name
-
-    content = await file.read()
-    if len(content) > 10 * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PDF must be under 10MB",
-        )
-
-    dest.write_bytes(content)
+            detail="Could not store PDF upload",
+        ) from exc
 
     try:
         parsed = await parse_character_from_pdf(dest)
@@ -402,33 +457,46 @@ async def refresh_character_from_pdf(
             detail="Stored PDF not found. Please re-upload.",
         )
 
+    await parse_and_apply_pdf(character, pdf_file, session)
+    return to_character_read(character, session)
+
+
+@router.post("/{character_id}/upload-pdf", response_model=CharacterRead)
+async def upload_character_pdf(
+    character_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+    file: UploadFile = File(...),
+):
+    """Replace the stored PDF, re-parse, and refresh the digital sheet."""
+    character = get_owned_character(character_id, current_user, session)
+    dest, stored_name = await read_and_store_pdf(current_user, file)
+
     try:
-        parsed = await parse_character_from_pdf(pdf_file)
+        await parse_character_from_pdf(dest)
     except ValueError as exc:
+        dest.unlink(missing_ok=True)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:
+        dest.unlink(missing_ok=True)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not re-parse character sheet from PDF",
+            detail="Could not parse character sheet from PDF",
         ) from exc
 
-    parsed.pop("parse_warning", None)
-    apply_parsed_to_character(character, parsed)
-    session.add(character)
-    session.commit()
-    session.refresh(character)
-
-    if character.campaign_id:
-        sync_character_combat_stats(
-            session,
-            character.campaign_id,
-            character.id,
-            hp=character.hp,
-            max_hp=character.max_hp,
-            ac=character.ac,
-        )
-        session.commit()
-        session.refresh(character)
+    try:
+        delete_stored_pdf(character)
+        character.pdf_path = f"{current_user.id}/{stored_name}"
+        await parse_and_apply_pdf(character, dest, session)
+    except HTTPException:
+        dest.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not replace character PDF",
+        ) from exc
 
     return to_character_read(character, session)
 
@@ -510,6 +578,11 @@ def update_character(
     session.add(character)
 
     if combat_changed and character.campaign_id:
+        sheet = parse_sheet_json(
+            character.sheet_json,
+            class_name=character.class_name,
+            level=character.level,
+        )
         sync_character_combat_stats(
             session,
             character.campaign_id,
@@ -517,6 +590,7 @@ def update_character(
             hp=character.hp,
             max_hp=character.max_hp,
             ac=character.ac,
+            conditions=sheet.get("conditions"),
         )
 
     session.commit()
@@ -534,9 +608,7 @@ def delete_character(character_id: int, current_user: CurrentUser, session: Sess
             detail="Leave the campaign before deleting this character",
         )
 
-    if character.pdf_path:
-        pdf_file = UPLOADS_DIR / character.pdf_path
-        pdf_file.unlink(missing_ok=True)
+    delete_stored_pdf(character)
     delete_all_character_photos(session, character)
 
     session.delete(character)

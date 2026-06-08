@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   RefreshCw,
   Swords,
@@ -191,6 +189,19 @@ export function InitiativePage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!token || !campaignId || saving) return undefined;
+    const timer = setInterval(() => {
+      void apiFetch(`/campaigns/${campaignId}/encounter`, { token })
+        .then(async (res) => {
+          if (!res.ok) return;
+          setEncounter(await res.json());
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [token, campaignId, saving]);
+
   const displaySorted = sortCombatantsForDisplay(encounter.combatants);
   const turnSorted = sortCombatantsForTurns(encounter.combatants);
   const activeCombatant = encounter.active_combatant_id
@@ -198,10 +209,6 @@ export function InitiativePage() {
       turnSorted[encounter.active_index] ||
       null
     : turnSorted[encounter.active_index] || null;
-  const turnIndex = activeCombatant
-    ? turnSorted.findIndex((c) => c.id === activeCombatant.id)
-    : 0;
-  const resolvedTurnIndex = turnIndex >= 0 ? turnIndex : 0;
   const activeEconomy = activeCombatant ? encounter.turn_economy?.[activeCombatant.id] : null;
 
   useEffect(() => {
@@ -339,9 +346,11 @@ export function InitiativePage() {
 
   const removeCombatant = (id) => {
     const nextCombatants = encounter.combatants.filter((c) => c.id !== id);
+    const removedActive = encounter.active_combatant_id === id;
     const next = {
       ...encounter,
       combatants: nextCombatants,
+      active_combatant_id: removedActive ? null : encounter.active_combatant_id,
       active_index: Math.min(encounter.active_index, Math.max(0, nextCombatants.length - 1)),
     };
     pushEncounter(next);
@@ -387,21 +396,6 @@ export function InitiativePage() {
     } finally {
       setMovementBusy(false);
     }
-  };
-
-  const prevTurn = () => {
-    if (!turnSorted.length) return;
-    const nextIndex = (resolvedTurnIndex - 1 + turnSorted.length) % turnSorted.length;
-    const nextRound =
-      nextIndex === turnSorted.length - 1 && resolvedTurnIndex === 0
-        ? Math.max(1, encounter.round - 1)
-        : encounter.round;
-    pushEncounter({
-      ...encounter,
-      active_index: nextIndex,
-      active_combatant_id: turnSorted[nextIndex]?.id ?? null,
-      round: nextRound,
-    });
   };
 
   const clearEncounter = () => {
@@ -506,13 +500,6 @@ export function InitiativePage() {
             <span className="text-sm font-black text-neon-cyan">Round {encounter.round}</span>
             {isOwner && (
               <>
-                <button
-                  type="button"
-                  onClick={prevTurn}
-                  className="p-2 border border-zinc-700 hover:border-neon-cyan"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
                 <button
                   type="button"
                   onClick={nextTurn}

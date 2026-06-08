@@ -2,7 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronDown, FileText, LayoutGrid, Plus, RotateCcw, Save, Swords } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiUpload } from "../lib/api";
+import {
+  applyEquipmentToCharacter,
+  parseSheetJson,
+  sheetToJson,
+} from "../lib/characterSheet";
 import { useMediaQuery, SESSION_MOBILE_QUERY } from "../hooks/useMediaQuery";
 import { SheetPane } from "../components/sheet/SheetPane";
 import { StackedSessionLayout } from "../components/sheet/StackedSessionLayout";
@@ -81,6 +86,7 @@ export function SessionPlayPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [paneMenuOpen, setPaneMenuOpen] = useState(false);
   const [fullSheetOpen, setFullSheetOpen] = useState(false);
@@ -925,27 +931,15 @@ export function SessionPlayPage() {
     }
   };
 
-  const handleResyncPdf = async () => {
-    if (!token || !characterId) return;
-    const preservedNotesWidget = layoutRef.current.widgets?.find(
-      (widget) => widget.type === "player_notes"
-    );
-    const preservedNotesTabs = preservedNotesWidget?.playerNotesTabs || [];
-    const preservedClosedNotesTabs = preservedNotesWidget?.closedNotesTabs || [];
-    const preservedEquippedOverrides = sheetRef.current?.equipped_overrides || {};
+  const applyPdfRefreshPayload = useCallback(
+    async (data) => {
+      const preservedNotesWidget = layoutRef.current.widgets?.find(
+        (widget) => widget.type === "player_notes"
+      );
+      const preservedNotesTabs = preservedNotesWidget?.playerNotesTabs || [];
+      const preservedClosedNotesTabs = preservedNotesWidget?.closedNotesTabs || [];
+      const preservedEquippedOverrides = sheetRef.current?.equipped_overrides || {};
 
-    setSyncing(true);
-    setError("");
-    try {
-      const res = await apiFetch(`/characters/${characterId}/refresh-from-pdf`, {
-        token,
-        method: "POST",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Re-sync failed");
-      }
-      const data = await res.json();
       if (Object.keys(preservedEquippedOverrides).length > 0 && data.sheet_json) {
         try {
           const mergedSheet = JSON.parse(data.sheet_json);
@@ -970,8 +964,8 @@ export function SessionPlayPage() {
           // keep server payload if merge fails
         }
       }
-      const notesMigrated = hydrateCharacter(data);
 
+      const notesMigrated = hydrateCharacter(data);
       const { width, height } = canvasBoundsRef.current;
       const canvasW = width || 1280;
       const canvasH = height || 800;
@@ -990,10 +984,48 @@ export function SessionPlayPage() {
         setLayout(notesMerge.layout);
         scheduleSave(buildPatch(characterRef.current, sheetRef.current, notesMerge.layout));
       }
+    },
+    [hydrateCharacter, scheduleSave, buildPatch]
+  );
+
+  const handleResyncPdf = async () => {
+    if (!token || !characterId) return;
+
+    setSyncing(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/characters/${characterId}/refresh-from-pdf`, {
+        token,
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Re-sync failed");
+      }
+      await applyPdfRefreshPayload(await res.json());
     } catch (err) {
       setError(err.message || "Could not re-sync from PDF.");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleUploadPdf = async (file) => {
+    if (!token || !characterId || !file) return;
+
+    setUploadingPdf(true);
+    setError("");
+    try {
+      const res = await apiUpload(`/characters/${characterId}/upload-pdf`, { token, file });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "PDF upload failed");
+      }
+      await applyPdfRefreshPayload(await res.json());
+    } catch (err) {
+      setError(err.message || "Could not upload PDF.");
+    } finally {
+      setUploadingPdf(false);
     }
   };
 
@@ -1416,8 +1448,10 @@ export function SessionPlayPage() {
           character={character}
           token={token}
           syncing={syncing}
+          uploading={uploadingPdf}
           onClose={handleFullSheetClose}
           onResync={handleResyncPdf}
+          onUploadPdf={handleUploadPdf}
         />
       )}
 

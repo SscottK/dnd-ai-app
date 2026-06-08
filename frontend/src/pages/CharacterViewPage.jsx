@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, FileText, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ExternalLink, FileText, RefreshCw, Upload } from "lucide-react";
 import { AuthenticatedPdfFrame, openAuthenticatedPdfInTab } from "../components/sheet/AuthenticatedPdfFrame";
 import { DigitalSheetEditor } from "../components/sheet/DigitalSheetEditor";
 import { useAuth } from "../hooks/useAuth";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiUpload } from "../lib/api";
 
 export function CharacterViewPage() {
   const { characterId } = useParams();
+  const [searchParams] = useSearchParams();
   const { token } = useAuth();
+  const uploadInputRef = useRef(null);
   const [character, setCharacter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
-  const [view, setView] = useState("pdf");
+  const [uploading, setUploading] = useState(false);
+  const [view, setView] = useState(() =>
+    searchParams.get("view") === "digital" ? "digital" : "pdf"
+  );
 
   const loadCharacter = useCallback(async () => {
     if (!token || !characterId) return;
@@ -86,6 +91,29 @@ export function CharacterViewPage() {
     }
   };
 
+  const handleReplacePdf = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !token || !characterId) return;
+
+    setUploading(true);
+    setError("");
+    try {
+      const res = await apiUpload(`/characters/${characterId}/upload-pdf`, { token, file });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "PDF upload failed");
+      }
+      const data = await res.json();
+      setCharacter(data);
+      setView("digital");
+    } catch (err) {
+      setError(err.message || "Could not replace PDF.");
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  };
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <header className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 border-b-2 border-neon-magenta bg-zinc-950">
@@ -113,11 +141,27 @@ export function CharacterViewPage() {
               D&amp;D Beyond
             </a>
           )}
+          <button
+            type="button"
+            disabled={uploading || syncing}
+            onClick={() => uploadInputRef.current?.click()}
+            className="text-[10px] font-black uppercase text-neon-cyan hover:text-starlight inline-flex items-center gap-1 disabled:opacity-40"
+          >
+            <Upload className={`w-3 h-3 ${uploading ? "animate-pulse" : ""}`} />
+            {uploading ? "Uploading…" : hasPdf ? "Replace PDF" : "Upload PDF"}
+          </button>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".pdf"
+            className="hidden"
+            onChange={handleReplacePdf}
+          />
           {hasPdf && (
             <>
               <button
                 type="button"
-                disabled={syncing}
+                disabled={syncing || uploading}
                 onClick={handleResync}
                 className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan inline-flex items-center gap-1 disabled:opacity-40"
               >
@@ -206,8 +250,8 @@ export function CharacterViewPage() {
             <FileText className="w-12 h-12 text-zinc-700 mb-4" />
             <h2 className="text-lg font-black text-starlight uppercase mb-2">No sheet file</h2>
             <p className="text-xs font-mono text-zinc-500 max-w-md mb-4">
-              Upload a PDF or add a D&amp;D Beyond link from the campaigns page. Use the Digital
-              sheet tab to equip inventory and save AC.
+              Upload a PDF with the button above, or add a D&amp;D Beyond link from Campaigns. Use
+              the Digital sheet tab to equip inventory and save AC.
             </p>
             <div className="text-left text-xs font-mono text-zinc-400 border border-zinc-800 p-4 max-w-sm">
               <p>

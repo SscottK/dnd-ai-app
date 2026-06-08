@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ChevronDown,
   ChevronUp,
@@ -73,6 +73,8 @@ function LinkButton({ to, children, className = "" }) {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
+  const replacePdfInputRef = useRef(null);
   const { token, user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [characters, setCharacters] = useState([]);
@@ -220,6 +222,43 @@ export function DashboardPage() {
     await loadDashboard();
   };
 
+  const handleReplacePdfForEdit = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !token || !editingCharacterId) return;
+
+    setParsingPdf(true);
+    setError("");
+    try {
+      const response = await apiUpload(`/characters/${editingCharacterId}/upload-pdf`, {
+        token,
+        file,
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "PDF upload failed");
+      }
+      const updated = await response.json();
+      setCharacterForm((form) => ({
+        ...form,
+        name: updated.name || form.name,
+        class_name: updated.class_name || "",
+        level: String(updated.level ?? form.level),
+        ac: updated.ac != null ? String(updated.ac) : "",
+        hp: updated.hp != null ? String(updated.hp) : "",
+        max_hp: updated.max_hp != null ? String(updated.max_hp) : "",
+        skills: updated.skills || form.skills,
+        sheet_json: updated.sheet_json || form.sheet_json,
+      }));
+      setParseWarning("");
+      await loadDashboard();
+    } catch (err) {
+      setError(err.message || "Could not replace PDF.");
+    } finally {
+      setParsingPdf(false);
+      e.target.value = "";
+    }
+  };
+
   const handlePdfUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !token) return;
@@ -311,6 +350,8 @@ export function DashboardPage() {
           const err = await response.json().catch(() => ({}));
           throw new Error(err.detail || "Failed to update character.");
         }
+        resetCharacterForm();
+        await loadDashboard();
       } else {
         const response = await apiFetch("/characters", {
           token,
@@ -325,10 +366,14 @@ export function DashboardPage() {
           const err = await response.json().catch(() => ({}));
           throw new Error(err.detail || "Failed to create character.");
         }
+        const created = await response.json();
+        const openDigital = Boolean(characterForm.pdf_stored_name || characterForm.sheet_json);
+        resetCharacterForm();
+        await loadDashboard();
+        if (openDigital && created?.id) {
+          navigate(`/character/${created.id}?view=digital`);
+        }
       }
-
-      resetCharacterForm();
-      await loadDashboard();
     } catch (err) {
       setError(err.message || "Could not save character.");
     } finally {
@@ -776,9 +821,35 @@ export function DashboardPage() {
                 </div>
                 <p className="text-xs font-mono text-ink-muted sm:text-sm">
                   {editingCharacterId
-                    ? "Basic stats only — gear and notes live in session play."
+                    ? "Update basic stats here, or replace the stored PDF to refresh the digital sheet."
                     : "Upload a PDF from the quick actions, or fill in details here."}
                 </p>
+                {editingCharacterId && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={parsingPdf}
+                      onClick={() => replacePdfInputRef.current?.click()}
+                      className="inline-flex items-center gap-1 rounded-sm border border-neon-cyan px-3 py-1.5 text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      {parsingPdf ? "Uploading…" : "Replace PDF"}
+                    </button>
+                    <Link
+                      to={`/character/${editingCharacterId}?view=digital`}
+                      className="text-xs font-black uppercase text-starlight hover:text-neon-cyan"
+                    >
+                      Open digital sheet
+                    </Link>
+                    <input
+                      ref={replacePdfInputRef}
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={handleReplacePdfForEdit}
+                    />
+                  </div>
+                )}
                 {characterForm.pdf_stored_name && (
                   <p className="text-xs font-mono text-neon-cyan sm:text-sm">
                     PDF attached — review fields, then save.
@@ -916,12 +987,20 @@ export function DashboardPage() {
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <LinkButton
-                        to={`/character/${character.id}`}
+                        to={`/character/${character.id}?view=digital`}
                         className="border-border text-starlight hover:border-neon-cyan hover:text-neon-cyan"
                       >
                         <FileText className="h-4 w-4" />
-                        Open sheet
+                        Digital sheet
                       </LinkButton>
+                      {character.pdf_url && (
+                        <LinkButton
+                          to={`/character/${character.id}`}
+                          className="border-border text-ink-muted hover:border-neon-cyan hover:text-neon-cyan"
+                        >
+                          PDF
+                        </LinkButton>
+                      )}
                       <ActionButton
                         onClick={() => handleEditCharacter(character)}
                         className="border-border text-neon-cyan hover:bg-neon-cyan/10"

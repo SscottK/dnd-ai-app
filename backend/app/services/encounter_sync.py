@@ -94,6 +94,7 @@ def sync_character_combat_stats(
     hp: int | None,
     max_hp: int | None,
     ac: int | None,
+    conditions: list[str] | None = None,
 ) -> None:
     campaign = session.get(Campaign, campaign_id)
     if campaign is None:
@@ -109,6 +110,8 @@ def sync_character_combat_stats(
                 combatant.max_hp = max_hp
             if ac is not None:
                 combatant.ac = ac
+            if conditions is not None:
+                combatant.conditions = sanitize_conditions_list(conditions)
             updated = True
 
     if not updated:

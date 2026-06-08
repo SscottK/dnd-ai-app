@@ -1,4 +1,5 @@
-import { ExternalLink, FileText, RefreshCw, X } from "lucide-react";
+import { useRef } from "react";
+import { ExternalLink, FileText, RefreshCw, Upload, X } from "lucide-react";
 import { AuthenticatedPdfFrame } from "./AuthenticatedPdfFrame";
 
 export function FullSheetModal({
@@ -6,9 +7,12 @@ export function FullSheetModal({
   character,
   token,
   syncing,
+  uploading = false,
   onClose,
   onResync,
+  onUploadPdf,
 }) {
+  const uploadInputRef = useRef(null);
   if (!open || !character) return null;
 
   const hasPdf = !!character.pdf_url;
@@ -31,10 +35,34 @@ export function FullSheetModal({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {onUploadPdf && (
+              <>
+                <button
+                  type="button"
+                  disabled={syncing || uploading}
+                  onClick={() => uploadInputRef.current?.click()}
+                  className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase border border-neon-cyan text-neon-cyan disabled:opacity-40"
+                >
+                  <Upload className={`w-3 h-3 ${uploading ? "animate-pulse" : ""}`} />
+                  {uploading ? "Uploading…" : hasPdf ? "Replace PDF" : "Upload PDF"}
+                </button>
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void onUploadPdf(file);
+                    event.target.value = "";
+                  }}
+                />
+              </>
+            )}
             {hasPdf && (
               <button
                 type="button"
-                disabled={syncing}
+                disabled={syncing || uploading}
                 onClick={onResync}
                 className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase border border-starlight text-starlight disabled:opacity-40"
               >
@@ -66,11 +94,13 @@ export function FullSheetModal({
           </div>
         </header>
         <div className="relative flex-1 overflow-hidden bg-white">
-          {syncing && (
+          {(syncing || uploading) && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 p-6">
               <div className="max-w-sm rounded-sm border-2 border-neon-cyan bg-zinc-950 px-6 py-5 text-center shadow-lg">
                 <RefreshCw className="mx-auto mb-3 h-8 w-8 animate-spin text-neon-cyan" />
-                <p className="text-sm font-black uppercase text-starlight">Re-syncing from PDF</p>
+                <p className="text-sm font-black uppercase text-starlight">
+                  {uploading ? "Uploading PDF" : "Re-syncing from PDF"}
+                </p>
                 <p className="mt-2 text-[11px] font-mono leading-relaxed text-zinc-400">
                   This may take a couple of minutes while we read your sheet. Please wait — your
                   panes will update when it finishes.
