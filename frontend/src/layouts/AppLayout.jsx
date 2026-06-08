@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText, UserPlus } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
 import { APP_NAME, APP_TAGLINE, RULE_WIZARD_LABEL } from "../constants/branding";
 
 const navLinkClass = ({ isActive }) =>
@@ -11,7 +12,8 @@ const navLinkClass = ({ isActive }) =>
   }`;
 
 export function AppLayout() {
-  const { user, logout } = useAuth();
+  const { token, user, logout } = useAuth();
+  const { pendingCount } = usePendingAccessCount(token, Boolean(user?.is_admin));
 
   return (
     <div className="flex h-screen w-full min-w-0 flex-col overflow-hidden bg-void font-sans text-ink">
@@ -44,8 +46,18 @@ export function AppLayout() {
             </NavLink>
             {user?.is_admin && (
               <NavLink to="/admin/access" className={navLinkClass}>
-                <UserPlus className="w-3.5 h-3.5" />
-                Access
+                <span className="relative flex items-center gap-1.5">
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Access
+                  {pendingCount > 0 && (
+                    <span
+                      className="min-w-[1.1rem] rounded-full bg-neon-magenta px-1 text-center text-[9px] font-black leading-4 text-black"
+                      title={`${pendingCount} pending access request${pendingCount === 1 ? "" : "s"}`}
+                    >
+                      {pendingCount}
+                    </span>
+                  )}
+                </span>
               </NavLink>
             )}
           </nav>

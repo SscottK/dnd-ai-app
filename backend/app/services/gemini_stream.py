@@ -8,20 +8,14 @@ import httpx
 from app.api.schemas import ChatMessage
 from app.core.config import settings
 from app.core.exceptions import UpstreamAPIError
-from app.services.conversations import RULES_SYSTEM_PROMPT
 from app.services.gemini import _extract_response_text, _primary_model
+from app.services.rules_prompt import build_prompt_from_chat_messages
 
 logger = logging.getLogger("app.services.gemini_stream")
 
 
 def build_prompt_from_messages(messages: list[ChatMessage]) -> str:
-    lines = [RULES_SYSTEM_PROMPT.strip()]
-    for message in messages:
-        role = "User" if message.role == "user" else "Assistant"
-        lines.append(f"{role}: {message.text}")
-
-    lines.append("Assistant:")
-    return "\n".join(lines)
+    return build_prompt_from_chat_messages(messages)
 
 
 async def gemini_stream(messages: list[ChatMessage]) -> AsyncGenerator[str, None]:

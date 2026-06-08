@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.db.models import AccessRequest, User
@@ -49,10 +50,22 @@ def create_access_request(
     return request
 
 
+def count_access_requests(session: Session, *, status_filter: str = "pending") -> int:
+    statement = select(func.count()).select_from(AccessRequest).where(AccessRequest.status == status_filter)
+    return int(session.exec(statement).one())
+
+
 def list_access_requests(session: Session, *, status_filter: str | None = "pending") -> list[AccessRequest]:
-    query = select(AccessRequest).order_by(AccessRequest.created_at.desc())
-    if status_filter:
-        query = query.where(AccessRequest.status == status_filter)
+    if status_filter == "reviewed":
+        query = (
+            select(AccessRequest)
+            .where(AccessRequest.status.in_(("approved", "rejected")))
+            .order_by(AccessRequest.reviewed_at.desc())
+        )
+    else:
+        query = select(AccessRequest).order_by(AccessRequest.created_at.desc())
+        if status_filter:
+            query = query.where(AccessRequest.status == status_filter)
     return list(session.exec(query).all())
 
 

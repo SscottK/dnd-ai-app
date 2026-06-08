@@ -6,6 +6,8 @@
 | `conditions.json` | [cocoajamworld/srd-5.2.1](https://github.com/cocoajamworld/srd-5.2.1) |
 | `combat_actions.json` | Built from Open5e `wotc-srd` classes + standard 2024 actions (`backend/scripts/build_srd_rules_data.py`) |
 | `spells.json` | Built from Open5e `wotc-srd` spells (`backend/scripts/build_srd_rules_data.py`) |
+| `species.json`, `backgrounds.json`, `feats.json`, `glossary.json` | Parsed from [downfallx/dnd-5e-srd-markdown](https://github.com/downfallx/dnd-5e-srd-markdown) (`backend/scripts/build_srd_extended_data.py`) |
+| `equipment.json` | Open5e weapons/armor + equipment rules sections from downfallx markdown (`backend/scripts/build_srd_extended_data.py`) |
 
 **Source:** D&D System Reference Document v5.2.1, © Wizards of the Coast LLC.
 

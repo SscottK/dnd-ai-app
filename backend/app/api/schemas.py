@@ -70,11 +70,16 @@ class AccessRequestRead(BaseModel):
     status: str
     created_at: datetime
     reviewed_at: datetime | None = None
+    reviewed_by_username: str | None = None
 
 
 class AccessRequestActionResponse(BaseModel):
     request: AccessRequestRead
     message: str
+
+
+class AccessRequestSummaryResponse(BaseModel):
+    pending_count: int
 
 
 class AuthStatusResponse(BaseModel):

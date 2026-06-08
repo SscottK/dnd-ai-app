@@ -1,0 +1,826 @@
+{
+  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0.",
+  "_source_note": "Parsed from downfallx/dnd-5e-srd-markdown (master) — CC-BY 4.0 SRD text conversion. Weapons and armor from Open5e API (https://api.open5e.com/, document slug: wotc-srd), CC-BY 4.0.",
+  "equipment": {
+    "weapons": [
+      {
+        "name": "Battleaxe",
+        "slug": "battleaxe",
+        "category": "Martial Melee Weapons",
+        "cost": "10 gp",
+        "damage_dice": "1d8",
+        "damage_type": "slashing",
+        "weight": "4 lb.",
+        "properties": [
+          "versatile (1d10)"
+        ]
+      },
+      {
+        "name": "Blowgun",
+        "slug": "blowgun",
+        "category": "Martial Ranged Weapons",
+        "cost": "10 gp",
+        "damage_dice": "1",
+        "damage_type": "piercing",
+        "weight": "1 lb.",
+        "properties": [
+          "ammunition (range 25/100)",
+          "loading"
+        ]
+      },
+      {
+        "name": "Club",
+        "slug": "club",
+        "category": "Simple Melee Weapons",
+        "cost": "1 sp",
+        "damage_dice": "1d4",
+        "damage_type": "bludgeoning",
+        "weight": "2 lb.",
+        "properties": [
+          "light"
+        ]
+      },
+      {
+        "name": "Crossbow, hand",
+        "slug": "crossbow-hand",
+        "category": "Martial Ranged Weapons",
+        "cost": "75 gp",
+        "damage_dice": "1d6",
+        "damage_type": "piercing",
+        "weight": "3 lb.",
+        "properties": [
+          "ammunition (range 30/120)",
+          "light",
+          "loading"
+        ]
+      },
+      {
+        "name": "Crossbow, heavy",
+        "slug": "crossbow-heavy",
+        "category": "Martial Ranged Weapons",
+        "cost": "50 gp",
+        "damage_dice": "1d10",
+        "damage_type": "piercing",
+        "weight": "18 lb.",
+        "properties": [
+          "ammunition (range 100/400)",
+          "heavy",
+          "loading",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Crossbow, light",
+        "slug": "crossbow-light",
+        "category": "Simple Ranged Weapons",
+        "cost": "25 gp",
+        "damage_dice": "1d8",
+        "damage_type": "piercing",
+        "weight": "5 lb.",
+        "properties": [
+          "ammunition (range 80/320)",
+          "loading",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Dagger",
+        "slug": "dagger",
+        "category": "Simple Melee Weapons",
+        "cost": "2 gp",
+        "damage_dice": "1d4",
+        "damage_type": "piercing",
+        "weight": "1 lb.",
+        "properties": [
+          "finesse",
+          "light",
+          "thrown (range 20/60)"
+        ]
+      },
+      {
+        "name": "Dart",
+        "slug": "dart",
+        "category": "Simple Ranged Weapons",
+        "cost": "5 cp",
+        "damage_dice": "1d4",
+        "damage_type": "piercing",
+        "weight": "1/4 lb.",
+        "properties": [
+          "finesse",
+          "thrown (range 20/60)"
+        ]
+      },
+      {
+        "name": "Flail",
+        "slug": "flail",
+        "category": "Martial Melee Weapons",
+        "cost": "10 gp",
+        "damage_dice": "1d8",
+        "damage_type": "bludgeoning",
+        "weight": "2 lb.",
+        "properties": []
+      },
+      {
+        "name": "Glaive",
+        "slug": "glaive",
+        "category": "Martial Melee Weapons",
+        "cost": "20 gp",
+        "damage_dice": "1d10",
+        "damage_type": "slashing",
+        "weight": "6 lb.",
+        "properties": [
+          "heavy",
+          "reach",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Greataxe",
+        "slug": "greataxe",
+        "category": "Martial Melee Weapons",
+        "cost": "30 gp",
+        "damage_dice": "1d12",
+        "damage_type": "slashing",
+        "weight": "7 lb.",
+        "properties": [
+          "heavy",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Greatclub",
+        "slug": "greatclub",
+        "category": "Simple Melee Weapons",
+        "cost": "2 sp",
+        "damage_dice": "1d8",
+        "damage_type": "bludgeoning",
+        "weight": "10 lb.",
+        "properties": [
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Greatsword",
+        "slug": "greatsword",
+        "category": "Martial Melee Weapons",
+        "cost": "50 gp",
+        "damage_dice": "2d6",
+        "damage_type": "slashing",
+        "weight": "6 lb.",
+        "properties": [
+          "heavy",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Halberd",
+        "slug": "halberd",
+        "category": "Martial Melee Weapons",
+        "cost": "20 gp",
+        "damage_dice": "1d10",
+        "damage_type": "slashing",
+        "weight": "6 lb.",
+        "properties": [
+          "heavy",
+          "reach",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Handaxe",
+        "slug": "handaxe",
+        "category": "Simple Melee Weapons",
+        "cost": "5 gp",
+        "damage_dice": "1d6",
+        "damage_type": "slashing",
+        "weight": "2 lb.",
+        "properties": [
+          "light",
+          "thrown (range 20/60)"
+        ]
+      },
+      {
+        "name": "Javelin",
+        "slug": "javelin",
+        "category": "Simple Melee Weapons",
+        "cost": "5 sp",
+        "damage_dice": "1d6",
+        "damage_type": "piercing",
+        "weight": "2 lb.",
+        "properties": [
+          "thrown (range 30/120)"
+        ]
+      },
+      {
+        "name": "Lance",
+        "slug": "lance",
+        "category": "Martial Melee Weapons",
+        "cost": "10 gp",
+        "damage_dice": "1d12",
+        "damage_type": "piercing",
+        "weight": "6 lb.",
+        "properties": [
+          "reach",
+          "special"
+        ]
+      },
+      {
+        "name": "Light hammer",
+        "slug": "light-hammer",
+        "category": "Simple Melee Weapons",
+        "cost": "2 gp",
+        "damage_dice": "1d4",
+        "damage_type": "bludgeoning",
+        "weight": "2 lb.",
+        "properties": [
+          "light",
+          "thrown (range 20/60)"
+        ]
+      },
+      {
+        "name": "Longbow",
+        "slug": "longbow",
+        "category": "Martial Ranged Weapons",
+        "cost": "50 gp",
+        "damage_dice": "1d8",
+        "damage_type": "piercing",
+        "weight": "2 lb.",
+        "properties": [
+          "ammunition (range 150/600)",
+          "heavy",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Longsword",
+        "slug": "longsword",
+        "category": "Martial Melee Weapons",
+        "cost": "15 gp",
+        "damage_dice": "1d8",
+        "damage_type": "slashing",
+        "weight": "3 lb.",
+        "properties": [
+          "versatile (1d10)"
+        ]
+      },
+      {
+        "name": "Mace",
+        "slug": "mace",
+        "category": "Simple Melee Weapons",
+        "cost": "5 gp",
+        "damage_dice": "1d6",
+        "damage_type": "bludgeoning",
+        "weight": "4 lb.",
+        "properties": []
+      },
+      {
+        "name": "Maul",
+        "slug": "maul",
+        "category": "Martial Melee Weapons",
+        "cost": "10 gp",
+        "damage_dice": "2d6",
+        "damage_type": "bludgeoning",
+        "weight": "10 lb.",
+        "properties": [
+          "heavy",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Morningstar",
+        "slug": "morningstar",
+        "category": "Martial Melee Weapons",
+        "cost": "15 gp",
+        "damage_dice": "1d8",
+        "damage_type": "piercing",
+        "weight": "4 lb.",
+        "properties": []
+      },
+      {
+        "name": "Net",
+        "slug": "net",
+        "category": "Martial Ranged Weapons",
+        "cost": "1 gp",
+        "damage_dice": "0",
+        "damage_type": "",
+        "weight": "3 lb.",
+        "properties": [
+          "special",
+          "thrown (range 5/15)"
+        ]
+      },
+      {
+        "name": "Pike",
+        "slug": "pike",
+        "category": "Martial Melee Weapons",
+        "cost": "5 gp",
+        "damage_dice": "1d10",
+        "damage_type": "piercing",
+        "weight": "18 lb.",
+        "properties": [
+          "heavy",
+          "reach",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Quarterstaff",
+        "slug": "quarterstaff",
+        "category": "Simple Melee Weapons",
+        "cost": "2 sp",
+        "damage_dice": "1d6",
+        "damage_type": "bludgeoning",
+        "weight": "4 lb.",
+        "properties": [
+          "versatile (1d8)"
+        ]
+      },
+      {
+        "name": "Rapier",
+        "slug": "rapier",
+        "category": "Martial Melee Weapons",
+        "cost": "25 gp",
+        "damage_dice": "1d8",
+        "damage_type": "piercing",
+        "weight": "2 lb.",
+        "properties": [
+          "finesse"
+        ]
+      },
+      {
+        "name": "Scimitar",
+        "slug": "scimitar",
+        "category": "Martial Melee Weapons",
+        "cost": "25 gp",
+        "damage_dice": "1d6",
+        "damage_type": "slashing",
+        "weight": "3 lb.",
+        "properties": [
+          "finesse",
+          "light"
+        ]
+      },
+      {
+        "name": "Shortbow",
+        "slug": "shortbow",
+        "category": "Simple Ranged Weapons",
+        "cost": "25 gp",
+        "damage_dice": "1d6",
+        "damage_type": "piercing",
+        "weight": "2 lb.",
+        "properties": [
+          "ammunition (range 80/320)",
+          "two-handed"
+        ]
+      },
+      {
+        "name": "Shortsword",
+        "slug": "shortsword",
+        "category": "Martial Melee Weapons",
+        "cost": "10 gp",
+        "damage_dice": "1d6",
+        "damage_type": "piercing",
+        "weight": "2 lb.",
+        "properties": [
+          "finesse",
+          "light"
+        ]
+      },
+      {
+        "name": "Sickle",
+        "slug": "sickle",
+        "category": "Simple Melee Weapons",
+        "cost": "1 gp",
+        "damage_dice": "1d4",
+        "damage_type": "slashing",
+        "weight": "2 lb.",
+        "properties": [
+          "light"
+        ]
+      },
+      {
+        "name": "Sling",
+        "slug": "sling",
+        "category": "Simple Ranged Weapons",
+        "cost": "1 sp",
+        "damage_dice": "1d4",
+        "damage_type": "bludgeoning",
+        "weight": "0 lb.",
+        "properties": [
+          "ammunition (range 30/120)"
+        ]
+      },
+      {
+        "name": "Spear",
+        "slug": "spear",
+        "category": "Simple Melee Weapons",
+        "cost": "1 gp",
+        "damage_dice": "1d6",
+        "damage_type": "piercing",
+        "weight": "3 lb.",
+        "properties": [
+          "thrown (range 20/60)",
+          "versatile (1d8)"
+        ]
+      },
+      {
+        "name": "Trident",
+        "slug": "trident",
+        "category": "Martial Melee Weapons",
+        "cost": "5 gp",
+        "damage_dice": "1d6",
+        "damage_type": "piercing",
+        "weight": "4 lb.",
+        "properties": [
+          "thrown (range 20/60)",
+          "versatile (1d8)"
+        ]
+      },
+      {
+        "name": "War pick",
+        "slug": "war-pick",
+        "category": "Martial Melee Weapons",
+        "cost": "5 gp",
+        "damage_dice": "1d8",
+        "damage_type": "piercing",
+        "weight": "2 lb.",
+        "properties": []
+      },
+      {
+        "name": "Warhammer",
+        "slug": "warhammer",
+        "category": "Martial Melee Weapons",
+        "cost": "15 gp",
+        "damage_dice": "1d8",
+        "damage_type": "bludgeoning",
+        "weight": "2 lb.",
+        "properties": [
+          "versatile (1d10)"
+        ]
+      },
+      {
+        "name": "Whip",
+        "slug": "whip",
+        "category": "Martial Melee Weapons",
+        "cost": "2 gp",
+        "damage_dice": "1d4",
+        "damage_type": "slashing",
+        "weight": "3 lb.",
+        "properties": [
+          "finesse",
+          "reach"
+        ]
+      }
+    ],
+    "armor": [
+      {
+        "name": "Breastplate",
+        "slug": "breastplate",
+        "category": "Medium Armor",
+        "cost": "400 gp",
+        "ac_base": 14,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Chain mail",
+        "slug": "chain-mail",
+        "category": "Heavy Armor",
+        "cost": "75 gp",
+        "ac_base": 16,
+        "ac_add_dexmod": false,
+        "ac_cap_dexmod": null,
+        "strength_requirement": 13,
+        "stealth_disadvantage": true,
+        "weight": ""
+      },
+      {
+        "name": "Chain Shirt",
+        "slug": "chain-shirt",
+        "category": "Medium Armor",
+        "cost": "50 gp",
+        "ac_base": 13,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Draconic Resilience",
+        "slug": "draconic-resilience",
+        "category": "Class Feature",
+        "cost": "0 gp",
+        "ac_base": 13,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Half plate",
+        "slug": "half-plate",
+        "category": "Medium Armor",
+        "cost": "750 gp",
+        "ac_base": 15,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": true,
+        "weight": ""
+      },
+      {
+        "name": "Hide",
+        "slug": "hide",
+        "category": "Medium Armor",
+        "cost": "10 gp",
+        "ac_base": 12,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Leather",
+        "slug": "leather",
+        "category": "Light Armor",
+        "cost": "10 gp",
+        "ac_base": 11,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Mage Armor",
+        "slug": "mage-armor",
+        "category": "Spell",
+        "cost": "0 gp",
+        "ac_base": 13,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Padded",
+        "slug": "padded",
+        "category": "Light Armor",
+        "cost": "5 gp",
+        "ac_base": 11,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": true,
+        "weight": ""
+      },
+      {
+        "name": "Plate",
+        "slug": "plate",
+        "category": "Heavy Armor",
+        "cost": "1500 gp",
+        "ac_base": 18,
+        "ac_add_dexmod": false,
+        "ac_cap_dexmod": null,
+        "strength_requirement": 15,
+        "stealth_disadvantage": true,
+        "weight": ""
+      },
+      {
+        "name": "Ring mail",
+        "slug": "ring-mail",
+        "category": "Heavy Armor",
+        "cost": "30 gp",
+        "ac_base": 14,
+        "ac_add_dexmod": false,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": true,
+        "weight": ""
+      },
+      {
+        "name": "Scale mail",
+        "slug": "scale-mail",
+        "category": "Medium Armor",
+        "cost": "50 gp",
+        "ac_base": 14,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": true,
+        "weight": ""
+      },
+      {
+        "name": "Shield",
+        "slug": "shield",
+        "category": "Shield",
+        "cost": "10 gp",
+        "ac_base": 0,
+        "ac_add_dexmod": false,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Splint",
+        "slug": "splint",
+        "category": "Heavy Armor",
+        "cost": "200 gp",
+        "ac_base": 17,
+        "ac_add_dexmod": false,
+        "ac_cap_dexmod": null,
+        "strength_requirement": 15,
+        "stealth_disadvantage": true,
+        "weight": ""
+      },
+      {
+        "name": "Studded Leather",
+        "slug": "studded-leather",
+        "category": "Light Armor",
+        "cost": "45 gp",
+        "ac_base": 12,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Unarmored",
+        "slug": "unarmored",
+        "category": "No Armor",
+        "cost": "5 gp",
+        "ac_base": 10,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Unarmored Defense (Barbarian)",
+        "slug": "unarmored-defense-barbarian",
+        "category": "Class Feature",
+        "cost": "0 gp",
+        "ac_base": 10,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      },
+      {
+        "name": "Unarmored Defense (Monk)",
+        "slug": "unarmored-defense-monk",
+        "category": "Class Feature",
+        "cost": "0 gp",
+        "ac_base": 10,
+        "ac_add_dexmod": true,
+        "ac_cap_dexmod": null,
+        "strength_requirement": null,
+        "stealth_disadvantage": false,
+        "weight": ""
+      }
+    ],
+    "rules_sections": [
+      {
+        "name": "Weapon Proficiency",
+        "slug": "weapon-proficiency",
+        "description": "Anyone can wield a weapon, but you must have proficiency with it to add your Proficiency Bonus to an attack roll you make with it. A player character's features can provide weapon proficiencies. A monster is proficient with any weapon in its stat block."
+      },
+      {
+        "name": "Properties",
+        "slug": "properties",
+        "description": "Here are definitions of the properties in the Properties column of the Weapons table.\n\n**Ammunition.**\n\nYou can use a weapon that has the Ammunition property to make a ranged attack only if you have ammunition to fire from it. The type of ammunition required is specified with the weapon's range. Each attack expends one piece of ammunition. Drawing the ammunition is part of the attack (you need a free hand to load a one-handed weapon). After a fight, you can spend 1 minute to recover half the ammunition (round down) you used in the fight; the rest is lost.\n\n**Finesse.** When making an attack with a Finesse weapon, use your choice of your Strength or Dexterity modifier for the attack and damage rolls. You must use the same modifier for both rolls.\n\n**Heavy.** You have Disadvantage on attack rolls with a Heavy weapon if it's a Melee weapon and your Strength score isn't at least 13 or if it's a Ranged weapon and your Dexterity score isn't at least 13.\n\n**Light.** When you take the Attack action on your turn and attack with a Light weapon, you can make one extra attack as a Bonus Action later on the same turn. That extra attack must be made with a different Light weapon, and you don't add your ability modifier to the extra attack's damage unless that modifier is negative. For example, you can attack with a Shortsword in one hand and a Dagger in the other using the Attack action and a Bonus Action, but you don't add your Strength or Dexterity modifier to the damage roll of the Bonus Action unless that modifier is negative.\n\n**Loading.** You can fire only one piece of ammunition from a Loading weapon when you use an action, a Bonus Action, or a Reaction to fire it, regardless of the number of attacks you can normally make.\n\n**Range.** A Range weapon has a range in parentheses after the Ammunition or Thrown property. The range lists two numbers. The first is the weapon's normal range in feet, and the second is the weapon's long range. When attacking a target beyond normal range, you have Disadvantage on the attack roll. You can't attack a target beyond the long range.\n\n**Reach.** A Reach weapon adds 5 feet to your reach when you attack with it, as well as when determining your reach for Opportunity Attacks with it.\n\n**Thrown.** If a weapon has the Thrown property, you can throw the weapon to make a ranged attack, and you can draw that weapon as part of the attack. If the weapon is a Melee weapon, use the same ability modifier for the attack and damage rolls that you use for a melee attack with that weapon.\n\n**Two-Handed.** A Two-Handed weapon requires two hands when you attack with it.\n\n**Versatile.** A Versatile weapon can be used with one or two hands. A damage value in parentheses appears with the property. The weapon deals that damage when used with two hands to make a melee attack."
+      },
+      {
+        "name": "Mastery Properties",
+        "slug": "mastery-properties",
+        "description": "Each weapon has a mastery property, which is usable only by a character who has a feature, such as Weapon Mastery, that unlocks the property for the character. The properties are defined below.\n\n> **Improvised Weapons**\n>\n> If you use an object—such as a table leg, frying pan, or bottle—as a makeshift weapon, see \"Improvised Weapons\" in \"Rules Glossary.\" Also see those rules if you wield a weapon in an unusual way, such as using a Ranged weapon to make a melee attack.\n\n**Cleave.** If you hit a creature with a melee attack roll using this weapon, you can make a melee attack roll with the weapon against a second creature within 5 feet of the first that is also within your reach. On a hit, the second creature takes the weapon's damage, but don't add your ability modifier to that damage unless that modifier is negative. You can make this extra attack only once per turn.\n\n**Graze.** If your attack roll with this weapon misses a creature, you can deal damage to that creature equal to the ability modifier you used to make the attack roll. This damage is the same type dealt by the weapon, and the damage can be increased only by increasing the ability modifier.\n\n**Nick.** When you make the extra attack of the Light property, you can make it as part of the Attack action instead of as a Bonus Action. You can make this extra attack only once per turn.\n\n**Push.** If you hit a creature with this weapon, you can push the creature up to 10 feet straight away from yourself if it is Large or smaller.\n\n**Sap.** If you hit a creature with this weapon, that creature has Disadvantage on its next attack roll before the start of your next turn.\n\n**Slow.** If you hit a creature with this weapon and deal damage to it, you can reduce its Speed by 10 feet until the start of your next turn. If the creature is hit more than once by weapons that have this property, the Speed reduction doesn't exceed 10 feet.\n\n**Topple.** If you hit a creature with this weapon, you can force the creature to make a Constitution saving throw (DC 8 plus the ability modifier used to make the attack roll and your Proficiency Bonus). On a failed save, the creature has the Prone condition.\n\n**Vex.** If you hit a creature with this weapon and deal damage to the creature, you have Advantage on your next attack roll against that creature before the end of your next turn.\n\n**Weapons**\n\n<table>\n  <thead>\n    <tr>\n      <th>Name</th>\n      <th>Damage</th>\n      <th>Properties</th>\n      <th>Mastery</th>\n      <th>Weight</th>\n      <th>Cost</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th colspan=\"6\"><em>Simple Melee Weapons</em></th>\n    </tr>\n    <tr>\n      <td>Club</td>\n      <td>1d4 Bludgeoning</td>\n      <td>Light</td>\n      <td>Slow</td>\n      <td>2 lb.</td>\n      <td>1 SP</td>\n    </tr>\n    <tr>\n      <td>Dagger</td>\n      <td>1d4 Piercing</td>\n      <td>Finesse, Light, Thrown (Range 20/60)</td>\n      <td>Nick</td>\n      <td>1 lb.</td>\n      <td>2 GP</td>\n    </tr>\n    <tr>\n      <td>Greatclub</td>\n      <td>1d8 Bludgeoning</td>\n      <td>Two-Handed</td>\n      <td>Push</td>\n      <td>10 lb.</td>\n      <td>2 SP</td>\n    </tr>\n    <tr>\n      <td>Handaxe</td>\n      <td>1d6 Slashing</td>\n      <td>Light, Thrown (Range 20/60)</td>\n      <td>Vex</td>\n      <td>2 lb.</td>\n      <td>5 GP</td>\n    </tr>\n    <tr>\n      <td>Javelin</td>\n      <td>1d6 Piercing</td>\n      <td>Thrown (Range 30/120)</td>\n      <td>Slow</td>\n      <td>2 lb.</td>\n      <td>5 SP</td>\n    </tr>\n    <tr>\n      <td>Light H"
+      },
+      {
+        "name": "Armor Training",
+        "slug": "armor-training",
+        "description": "Anyone can don armor or hold a Shield, but only those with training can use them effectively, as explained below. A character's class and other features determine the character's armor training. A monster has training with any armor in its stat block.\n\n**Light, Medium, or Heavy Armor.** If you wear Light, Medium, or Heavy armor and lack training with it, you have Disadvantage on any D20 Test that involves Strength or Dexterity, and you can't cast spells.\n\n**Shield.** You gain the Armor Class benefit of a Shield only if you have training with it."
+      },
+      {
+        "name": "One at a Time",
+        "slug": "one-at-a-time",
+        "description": "A creature can wear only one suit of armor at a time and wield only one Shield at a time.\n\n## Tools\n\nA tool helps you make specialized ability checks, craft certain items, or both. A tool's description includes the tool's cost and weight, as well as the following entries:\n\n**Ability.** This entry lists the ability to use when making an ability check with the tool.\n\n**Utilize.** This entry lists things you can do with the tool when you take the Utilize action. You can do one of those things each time you take the action. This entry also provides the DC for the action.\n\n**Craft.** This entry lists what, if anything, you can craft with the tool. For crafting rules, see \"Crafting Nonmagical Items,\" \"Brewing Potions of Healing,\" and \"Scribing Spell Scrolls\" later in \"Equipment.\"\n\n**Variants.** This entry appears if the tool has variants, which are listed. Each requires a separate proficiency."
+      },
+      {
+        "name": "Tool Proficiency",
+        "slug": "tool-proficiency",
+        "description": "If you have proficiency with a tool, add your Proficiency Bonus to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have Advantage on the check too.\n\nYour features might give you proficiency with a tool. A monster has proficiency with any tool in its stat block.\n\n#### Artisan's Tools\n\nArtisan's Tools are each focused on crafting items and pursuing a trade. Each of these tools requires a separate proficiency.\n\n**Alchemist's Supplies (50 GP)**\n\n**Ability:** Intelligence **Weight:** 8 lb.\n**Utilize:** Identify a substance (DC 15), or start a fire (DC 15)\n**Craft:** Acid, Alchemist's Fire, Component Pouch, Oil, Paper, Perfume\n\n**Brewer's Supplies (20 GP)**\n\n**Ability:** Intelligence **Weight:** 9 lb.\n**Utilize:** Detect poisoned drink (DC 15), or identify alcohol (DC 10)\n**Craft:** Antitoxin\n\n**Calligrapher's Supplies (10 GP)**\n\n**Ability:** Dexterity **Weight:** 5 lb.\n**Utilize:** Write text with impressive flourishes that guard against forgery (DC 15)\n**Craft:** Ink, _Spell Scroll_\n\n**Carpenter's Tools (8 GP)**\n\n**Ability:** Strength **Weight:** 6 lb.\n**Utilize:** Seal or pry open a door or container (DC 20)\n**Craft:** Club, Greatclub, Quarterstaff, Barrel, Chest, Ladder, Pole, Portable Ram, Torch\n\n**Cartographer's Tools (15 GP)**\n\n**Ability:** Wisdom **Weight:** 6 lb.\n**Utilize:** Draft a map of a small area (DC 15)\n**Craft:** Map\n\n**Cobbler's Tools (5 GP)**\n\n**Ability:** Dexterity **Weight:** 5 lb.\n**Utilize:** Modify footwear to give Advantage on the wearer's next Dexterity (Acrobatics) check (DC 10)\n**Craft:** Climber's Kit\n\n**Cook's Utensils (1 GP)**\n\n**Ability:** Wisdom **Weight:** 8 lb.\n**Utilize:** Improve food's flavor (DC 10), or detect spoiled or poisoned food (DC 15)\n**Craft:** Rations\n\n**Glassblower's Tools (30 GP)**\n\n**Ability:** Intelligence **Weight:** 5 lb.\n**Utilize:** Discern what a glass object held in the past 24 hours (DC 15)\n**Craft:** Glass Bottle, Magnifying Glass, Spyglass, Vial\n\n**Jeweler's Tools (25 GP)**\n\n**Ability:** Intelligence **Weight:** 2 lb.\n**Utilize:** Discern a gem's value (DC 15)\n**Craft:** Arcane Focus, Holy Symbol\n\n**Leatherworker's Tools (5 GP)**\n\n**Ability:** Dexterity **Weight:** 5 lb.\n**Utilize:** Add a design to a leather item (DC 10)\n**Craft:** Sling, Whip, Hide Armor, Leather Armor, Studded Leather Armor, Backpack, Crossbow Bolt Case, Map or Scroll Case, Parchment, Pouch, Quiver, Waterskin\n\n**Mason's Tools (10 GP)**\n\n**Ability:** Strength **Weight:** 8 lb.\n**Utilize:** Chisel a symbol or hole in stone (DC 10)\n**Craft:** Block and Tackle\n\n**Painter's Supplies (10 GP)**\n\n**Ability:** Wisdom **Weight:** 5 lb.\n**Utilize:** Paint a recognizable image of something you've seen (DC 10)\n**Craft:** Druidic Focus, Holy Symbol\n\n**Potter's Tools (10 GP)**\n\n**Ability:** Intelligence **Weight:** 3 lb.\n**Utilize:** Discern what a ceramic object held in the past 24 hours (DC 15)\n**Craft:** Jug, Lamp\n\n**Smith's Tools (20 GP)**\n\n**Ability:** Strength **Weight:** 8 lb.\n**Utilize:** Pry open a door or container (DC 20)\n**Craft:** Any Melee weapon (except Club, Greatclub, Quarterstaff, and Whip), Medium armor (except Hide), Heavy armor, Ball Bearings, Bucket, Caltrops, Chain, Crowbar, Firearm Bullets, Grappling Hook, Iron Pot, Iron Spikes, Sling Bullets\n\n**Tinker's Tools (50 GP)**\n**Ability:** Dexterity **Weight:** 10 lb.\n**Utilize:** Assemble a Tiny item composed of scrap, which falls apart in 1 minute (DC 20)\n**Craft:** Musket, Pistol, Bell, Bul"
+      },
+      {
+        "name": "Mounts and Cargo",
+        "slug": "mounts-and-cargo",
+        "description": "An animal pulling a carriage, cart, chariot, sled, or wagon can move weight up to five times its base carrying capacity, including the weight of the vehicle. If multiple animals pull the same vehicle, add their carrying capacities together."
+      },
+      {
+        "name": "Barding",
+        "slug": "barding",
+        "description": "Barding is armor designed for a mount. Any type of armor on the Armor table in \"Equipment\" can be purchased as barding. The cost is four times the normal cost, and it weighs twice as much."
+      },
+      {
+        "name": "Saddles",
+        "slug": "saddles",
+        "description": "A saddle comes with a bit, a bridle, reins, and any other equipment needed to use the saddle. A Military Saddle gives Advantage on any ability check you make to remain mounted. An Exotic Saddle is required for riding an aquatic or a flying mount.\n\n**Mounts and Other Animals**\n\n<table>\n  <thead>\n    <tr>\n      <th>Item</th>\n      <th>Carrying Capacity</th>\n      <th>Cost</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>Camel</td>\n      <td>450 lb.</td>\n      <td>50 GP</td>\n    </tr>\n    <tr>\n      <td>Elephant</td>\n      <td>1,320 lb.</td>\n      <td>200 GP</td>\n    </tr>\n    <tr>\n      <td>Horse, Draft</td>\n      <td>540 lb.</td>\n      <td>50 GP</td>\n    </tr>\n    <tr>\n      <td>Horse, Riding</td>\n      <td>480 lb.</td>\n      <td>75 GP</td>\n    </tr>\n    <tr>\n      <td>Mastiff</td>\n      <td>195 lb.</td>\n      <td>25 GP</td>\n    </tr>\n    <tr>\n      <td>Mule</td>\n      <td>420 lb.</td>\n      <td>8 GP</td>\n    </tr>\n    <tr>\n      <td>Pony</td>\n      <td>225 lb.</td>\n      <td>30 GP</td>\n    </tr>\n    <tr>\n      <td>Warhorse</td>\n      <td>540 lb.</td>\n      <td>400 GP</td>\n    </tr>\n  </tbody>\n</table>\n\n**Tack, Harness, and Drawn Vehicles**\n\n<table>\n  <thead>\n    <tr>\n      <th>Item</th>\n      <th>Weight</th>\n      <th>Cost</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>Carriage</td>\n      <td>600 lb.</td>\n      <td>100 GP</td>\n    </tr>\n    <tr>\n      <td>Cart</td>\n      <td>200 lb.</td>\n      <td>15 GP</td>\n    </tr>\n    <tr>\n      <td>Chariot</td>\n      <td>100 lb.</td>\n      <td>250 GP</td>\n    </tr>\n    <tr>\n      <td>Feed per day</td>\n      <td>10 lb.</td>\n      <td>5 CP</td>\n    </tr>\n    <tr>\n      <td>Saddle</td>\n      <td></td>\n      <td></td>\n    </tr>\n    <tr>\n      <td>Exotic</td>\n      <td>40 lb.</td>\n      <td>60 GP</td>\n    </tr>\n    <tr>\n      <td>Military</td>\n      <td>30 lb.</td>\n      <td>20 GP</td>\n    </tr>\n    <tr>\n      <td>Riding</td>\n      <td>25 lb.</td>\n      <td>10 GP</td>\n    </tr>\n    <tr>\n      <td>Sled</td>\n      <td>300 lb.</td>\n      <td>20 GP</td>\n    </tr>\n    <tr>\n      <td>Stabling per day</td>\n      <td>—</td>\n      <td>5 SP</td>\n    </tr>\n    <tr>\n      <td>Wagon</td>\n      <td>400 lb.</td>\n      <td>35 GP</td>\n    </tr>\n  </tbody>\n</table>"
+      },
+      {
+        "name": "Large Vehicles",
+        "slug": "large-vehicles",
+        "description": "The Airborne and Waterborne Vehicles table provides statistics for various types of large vehicles. The following notes apply.\n\n#### Speed\n\nA ship sailing against a strong wind moves at half speed. In a dead calm (no wind), waterborne ships can't move under sail and must be rowed. Keelboats and Rowboats are used on lakes and rivers. If going downstream, add the speed of the current (typically 3 miles per hour) to the speed of the vehicle. These vehicles can't be rowed against any significant current, but they can be pulled upstream by draft animals on the shores. A Rowboat can be carried and weighs 100 pounds.\n\n<table>\n  <thead>\n    <tr>\n      <th>Ship</th>\n      <th>Speed</th>\n      <th>Crew</th>\n      <th>Passengers</th>\n      <th>Cargo (Tons)</th>\n      <th>AC</th>\n      <th>HP</th>\n      <th>Damage Threshold</th>\n      <th>Cost</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>Airship</td>\n      <td>8 mph</td>\n      <td>10</td>\n      <td>20</td>\n      <td>1</td>\n      <td>13</td>\n      <td>300</td>\n      <td>—</td>\n      <td>40,000 GP</td>\n    </tr>\n    <tr>\n      <td>Galley</td>\n      <td>4 mph</td>\n      <td>80</td>\n      <td>—</td>\n      <td>150</td>\n      <td>15</td>\n      <td>500</td>\n      <td>20</td>\n      <td>30,000 GP</td>\n    </tr>\n    <tr>\n      <td>Keelboat</td>\n      <td>1 mph</td>\n      <td>1</td>\n      <td>6</td>\n      <td>1/2</td>\n      <td>15</td>\n      <td>100</td>\n      <td>10</td>\n      <td>3,000 GP</td>\n    </tr>\n    <tr>\n      <td>Longship</td>\n      <td>3 mph</td>\n      <td>40</td>\n      <td>150</td>\n      <td>10</td>\n      <td>15</td>\n      <td>300</td>\n      <td>15</td>\n      <td>10,000 GP</td>\n    </tr>\n    <tr>\n      <td>Rowboat</td>\n      <td>1½ mph</td>\n      <td>1</td>\n      <td>3</td>\n      <td>—</td>\n      <td>11</td>\n      <td>50</td>\n      <td>—</td>\n      <td>50 GP</td>\n    </tr>\n    <tr>\n      <td>Sailing Ship</td>\n      <td>2 mph</td>\n      <td>20</td>\n      <td>20</td>\n      <td>100</td>\n      <td>15</td>\n      <td>300</td>\n      <td>15</td>\n      <td>10,000 GP</td>\n    </tr>\n    <tr>\n      <td>Warship</td>\n      <td>2½ mph</td>\n      <td>60</td>\n      <td>60</td>\n      <td>200</td>\n      <td>15</td>\n      <td>500</td>\n      <td>20</td>\n      <td>25,000 GP</td>\n    </tr>\n  </tbody>\n</table>\n\n#### Crew\n\nA ship larger than a Keelboat or Rowboat needs a crew of skilled hirelings (see \"Hirelings\" later in \"Equipment\") to function. The minimum number of skilled hirelings needed to crew a ship depends on the type of ship, as shown in the table.\n\n#### Passengers\n\nThe table lists the number of Small and Medium passengers the ship can accommodate using hammocks. A ship outfitted with private accommodations can carry one-fifth as many passengers. A passenger usually pays 5 SP per day for a hammock, but prices can vary from ship to ship. A small private cabin usually costs 2 GP per day.\n\n#### Damage Threshold\n\nIf a vehicle has a damage threshold (see \"Rules Glossary\"), it's noted in the table.\n\n#### Ship Repair\n\nRepairs to a damaged ship can be made while the vessel is berthed. Repairing 1 Hit Point of damage requires 1 day and costs 20 GP for materials and labor. If the repairs are made in a location where supplies and skilled labor are abundant, such as a city shipyard, the repair time and cost are halved.\n\n## Lifestyle Expenses\n\nLifestyle expenses summarize the cost of living in a fantasy world. They cover lodging, food, equipment maintenance, and other necessities.\n\nAt the start of each week or mo"
+      },
+      {
+        "name": "Wretched (Free)",
+        "slug": "wretched-free",
+        "description": "You survive via chance and charity. You're often exposed to natural dangers as a result of sleeping outside."
+      },
+      {
+        "name": "Squalid (1 SP per Day)",
+        "slug": "squalid-1-sp-per-day",
+        "description": "You spend the bare minimum for your necessities. You might be exposed to unhealthy conditions and opportunistic criminals."
+      },
+      {
+        "name": "Poor (2 SP per Day)",
+        "slug": "poor-2-sp-per-day",
+        "description": "You spend frugally for your necessities."
+      },
+      {
+        "name": "Modest (1 GP per Day)",
+        "slug": "modest-1-gp-per-day",
+        "description": "You support yourself at an average level."
+      },
+      {
+        "name": "Comfortable (2 GP per Day)",
+        "slug": "comfortable-2-gp-per-day",
+        "description": "You spend modestly for your necessities and enjoy a few luxuries."
+      },
+      {
+        "name": "Wealthy (4 GP per Day)",
+        "slug": "wealthy-4-gp-per-day",
+        "description": "You're accustomed to the finer things in life and might have servants."
+      },
+      {
+        "name": "Aristocratic (10 GP per Day)",
+        "slug": "aristocratic-10-gp-per-day",
+        "description": "You pay for the best and might have a staff that supports your lifestyle. Others notice your wealth and might encourage you to share it, either legally or otherwise.\n\n## Food, Drink, and Lodging\n\nThe Food, Drink, and Lodging table gives prices for food and a single night's lodging. Prices for daily lodging and meals are included in your lifestyle's expenses.\n\n**Food, Drink, and Lodging**\n\n<table>\n  <thead>\n    <tr>\n      <th>Item</th>\n      <th>Cost</th>\n      <th>Item</th>\n      <th>Cost</th>\n    </tr>\n    <tr>\n      <th>Inn Stay per Day</th>\n      <th></th>\n      <th>Meal</th>\n      <th></th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>Ale (mug)</td>\n      <td>4 CP</td>\n      <td>Comfortable</td>\n      <td>8 SP</td>\n    </tr>\n    <tr>\n      <td>Bread (loaf)</td>\n      <td>2 CP</td>\n      <td>Wealthy</td>\n      <td>2 GP</td>\n    </tr>\n    <tr>\n      <td>Cheese (wedge)</td>\n      <td>1 SP</td>\n      <td>Aristocratic</td>\n      <td>4 GP</td>\n    </tr>\n    <tr>\n      <td>Squalid</td>\n      <td>7 CP</td>\n      <td>Squalid</td>\n      <td>1 CP</td>\n    </tr>\n    <tr>\n      <td>Poor</td>\n      <td>1 SP</td>\n      <td>Poor</td>\n      <td>2 CP</td>\n    </tr>\n    <tr>\n      <td>Modest</td>\n      <td>5 SP</td>\n      <td>Modest</td>\n      <td>1 SP</td>\n    </tr>\n    <tr>\n      <td>Comfortable</td>\n      <td>2 SP</td>\n      <td>Wine (bottle)</td>\n      <td></td>\n    </tr>\n    <tr>\n      <td>Wealthy</td>\n      <td>3 SP</td>\n      <td>Common</td>\n      <td>2 SP</td>\n    </tr>\n    <tr>\n      <td>Aristocratic</td>\n      <td>6 SP</td>\n      <td>Fine</td>\n      <td>10 GP</td>\n    </tr>\n  </tbody>\n</table>\n\n## Hirelings\n\nSkilled hirelings include anyone hired to perform a service that involves a proficiency (including weapon, tool, or skill): a mercenary, an artisan, a scribe, or the like. The pay shown on the Hirelings table is a minimum; some expert hirelings require more pay. Untrained hirelings are hired for work that requires no particular proficiencies; they include laborers and porters.\n\n**Hirelings**\n\n<table>\n  <thead>\n    <tr>\n      <th>Service</th>\n      <th>Cost</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>Skilled hireling</td>\n      <td>2 GP per day</td>\n    </tr>\n    <tr>\n      <td>Untrained hireling</td>\n      <td>2 SP per day</td>\n    </tr>\n    <tr>\n      <td>Messenger</td>\n      <td>2 CP per mile</td>\n    </tr>\n  </tbody>\n</table>\n\n## Spellcasting\n\nMost settlements contain individuals who are willing to cast spells in exchange for payment. If a spell has expensive components, add the cost of those components to the cost listed in the Spellcasting Services table. The higher the level of a desired spell, the harder it is to find someone to cast it.\n\n**Spellcasting Services**\n\n<table>\n  <thead>\n    <tr>\n      <th>Spell Level</th>\n      <th>Availability</th>\n      <th>Cost</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>Cantrip</td>\n      <td>Village, town, or city</td>\n      <td>30 GP</td>\n    </tr>\n    <tr>\n      <td>1</td>\n      <td>Village, town, or city</td>\n      <td>50 GP</td>\n    </tr>\n    <tr>\n      <td>2</td>\n      <td>Village, town, or city</td>\n      <td>200 GP</td>\n    </tr>\n    <tr>\n      <td>3</td>\n      <td>Town or city only</td>\n      <td>300 GP</td>\n    </tr>\n    <tr>\n      <td>4–5</td>\n      <td>Town or city only</td>\n      <td>2,000 GP</td>\n    </tr>\n    <tr>\n      <td>6–8</td>\n      <td>City only</td>\n      <td>20,000 GP</td>\n    </tr>\n    <tr>\n      <td>9</td>\n      <td>City only</td>\n      <td>100,"
+      },
+      {
+        "name": "Identifying a Magic Item",
+        "slug": "identifying-a-magic-item",
+        "description": "Some magic items are indistinguishable from their nonmagical counterparts, while others are conspicuously magical. Handling a magic item is enough to give you a sense that it is extraordinary, but learning a magic item's properties isn't automatic.\n\nThe _Identify_ spell is the fastest way to reveal an item's properties. Alternatively, you can focus on one magic item during a Short Rest while being in physical contact with the item. At the end of the rest, you learn its properties and how to use them (but not any curse the item might bear).\n\nSometimes a magic item carries a clue to its properties. The command word to activate a ring might be etched inside the band, or a feathered design might hint that it's a _Ring of Feather Falling_.\n\nWearing or experimenting with an item can also offer hints about its properties. In the specific case of Potions, a little taste is enough to tell the taster what a potion does. Other items might require more experimentation. For example, if your character puts on a _Ring of Swimming_, the GM might say, \"Your movement feels strangely fluid.\" Perhaps you then dive into a river to see what happens. The GM would then say you swim unexpectedly well."
+      },
+      {
+        "name": "Attunement",
+        "slug": "attunement",
+        "description": "Some magic items require a creature to form a bond—called Attunement—with them before the creature can use an item's magical properties. Without becoming attuned to an item that requires Attunement, you gain only its nonmagical benefits unless its description states otherwise. For example, a magic Shield that requires Attunement provides the benefits of a normal Shield if you aren't attuned to it, but none of its magical properties.\n\n#### Attune during a Short Rest\n\nAttuning to an item requires you to spend a Short Rest focused on only that item while being in physical contact with it (this can't be the same Short Rest used to learn the item's properties). This focus can take the form of weapon practice (for a Weapon), meditation (for a Wand), or some other appropriate activity. If the Short Rest is interrupted, the Attunement attempt fails. Otherwise, at the end of the Short Rest, you're attuned to the magic item and can access its full magical capabilities.\n\n#### No More Than Three Items\n\nYou can be attuned to no more than three magic items at a time. Any attempt to attune to a fourth item fails; you must end your Attunement to an item first. Additionally, you can't attune to more than one copy of an item. For example, you can't attune to more than one _Ring of Protection_ at a time.\n\n#### Ending Attunement\n\nYour Attunement to an item ends if you no longer satisfy the prerequisites for Attunement, if the item has been more than 100 feet away for at least 24 hours, if you die, or if another creature attunes to\nthe item. You can also voluntarily end Attunement by spending another Short Rest focused on the item unless the item is cursed."
+      },
+      {
+        "name": "Wearing and Wielding Items",
+        "slug": "wearing-and-wielding-items",
+        "description": "Using a magic item's properties might mean wearing or wielding it. A magic item meant to be worn must be donned in the intended fashion: boots go on feet, gloves on hands, hats and helmets on a head, and rings on a finger. Magic armor must be donned, a Shield strapped to the arm, a cloak fastened about the shoulders. A weapon must be held.\n\nIn most cases, a magic item that's meant to be worn can fit a creature regardless of size or build. Magic garments are made to be easily adjustable, or they magically adjust themselves to the wearer.\n\n#### Multiple Items of the Same Kind\n\nYou can't wear more than one of certain magic items. You can't normally wear more than one pair of footwear, one pair of gloves or gauntlets, one pair of bracers, one suit of armor, one item of headwear, or one cloak. The GM might make exceptions.\n\n#### Paired Items\n\nItems that come in pairs—such as boots, bracers, gauntlets, and gloves—impart their benefits only if both items of the pair are worn. For example, a character wearing a _Boot of Striding and Springing_ on one foot and a _Boot of Elvenkind_ on the other foot gains no benefit from either.\n\n## Crafting Nonmagical Items\n\nTo craft a nonmagical item, you need tools, raw materials, and time, each of which is detailed below. If you meet the requirements, you make the item, and you can use it or sell it at its normal price."
+      },
+      {
+        "name": "Tools",
+        "slug": "tools",
+        "description": "The \"Tools\" section of \"Equipment\" lists which tools are required to make certain items. The GM assigns required tools for items not listed there.\n\nYou must use the required tool to make an item and have proficiency with that tool. Anyone who helps you must also have proficiency with it."
+      },
+      {
+        "name": "Raw Materials",
+        "slug": "raw-materials",
+        "description": "To make an item, you need raw materials worth half its purchase cost (round down). For example, you need 750 GP of raw materials to make Plate Armor, which sells for 1,500 GP. The GM determines whether appropriate raw materials are available."
+      },
+      {
+        "name": "Time",
+        "slug": "time",
+        "description": "To determine how many days (working 8 hours a day) it takes to make an item, divide its purchase cost in GP by 10 (round a fraction up to a day). For example, you need 5 days to make a Heavy Crossbow, which sells for 50 GP.\n\nIf an item requires multiple days, the days needn't be consecutive.\n\nCharacters can combine their efforts to shorten the crafting time. Divide the time needed to create an item by the number of characters working on it. Normally, only one other character can assist you, but the GM might allow more assistants.\n\n## Brewing Potions of Healing\n\nA character who has proficiency with the Herbalism Kit can create a _Potion of Healing_. Doing so requires using that kit and 25 GP of raw material over the course of 1 day (8 hours of work).\n\n## Scribing Spell Scrolls\n\nA spellcaster can transfer a spell to a scroll and create a _Spell Scroll_, using the rules below."
+      },
+      {
+        "name": "Time and Cost",
+        "slug": "time-and-cost",
+        "description": "Scribing a scroll takes an amount of time and money based on the level of the spell, as shown in the Spell Scroll Costs table. For each day of inscription, you must work for 8 hours. If a scroll requires multiple days, those days needn't be consecutive."
+      },
+      {
+        "name": "Prerequisites for the Scribe",
+        "slug": "prerequisites-for-the-scribe",
+        "description": "To scribe a scroll, you must have proficiency in the Arcana skill or with Calligrapher's Supplies and have the spell prepared on each day of the inscription. You must also have at hand any Material components required by the spell; if the spell consumes its Material components, they are consumed only when you complete the scroll. The scroll's spell uses your spell save DC and spell attack bonus."
+      },
+      {
+        "name": "Cantrips",
+        "slug": "cantrips",
+        "description": "If the scribed spell is a cantrip, the version on the scroll works as if the caster were your level.\n\n**Spell Scroll Costs**\n\n<table>\n  <thead>\n    <tr>\n      <th>Spell Level</th>\n      <th>Time</th>\n      <th>Cost</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>Cantrip</td>\n      <td>1 day</td>\n      <td>15 GP</td>\n    </tr>\n    <tr>\n      <td>1</td>\n      <td>1 day</td>\n      <td>25 GP</td>\n    </tr>\n    <tr>\n      <td>2</td>\n      <td>3 days</td>\n      <td>100 GP</td>\n    </tr>\n    <tr>\n      <td>3</td>\n      <td>5 days</td>\n      <td>150 GP</td>\n    </tr>\n    <tr>\n      <td>4</td>\n      <td>10 days</td>\n      <td>1,000 GP</td>\n    </tr>\n    <tr>\n      <td>5</td>\n      <td>25 days</td>\n      <td>1,500 GP</td>\n    </tr>\n    <tr>\n      <td>6</td>\n      <td>40 days</td>\n      <td>10,000 GP</td>\n    </tr>\n    <tr>\n      <td>7</td>\n      <td>50 days</td>\n      <td>12,500 GP</td>\n    </tr>\n    <tr>\n      <td>8</td>\n      <td>60 days</td>\n      <td>15,000 GP</td>\n    </tr>\n    <tr>\n      <td>9</td>\n      <td>120 days</td>\n      <td>50,000 GP</td>\n    </tr>\n  </tbody>\n</table>"
+      }
+    ]
+  }
+}
