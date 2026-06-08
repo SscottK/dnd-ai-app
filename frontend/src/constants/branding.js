@@ -1,5 +1,6 @@
 export const APP_NAME = "Quest Terminal";
 export const APP_TAGLINE = "Neon Odyssey play space";
+export const RULE_WIZARD_LABEL = "Rule Wizard";
 
 /** Reference palette — tune these with setting art / KS materials. */
 export const NEON_ODYSSEY_PALETTE = {

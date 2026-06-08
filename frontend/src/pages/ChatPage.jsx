@@ -268,7 +268,7 @@ export function ChatPage() {
                     }`}
                   >
                     <div className={`text-[9px] font-black tracking-widest mb-1.5 uppercase ${m.role === "user" ? "text-zinc-800" : "text-starlight"}`}>
-                      {m.role === "user" ? "You" : "Rules Assistant"}
+                      {m.role === "user" ? "You" : "Rule Wizard"}
                     </div>
                     {m.role === "user" ? m.content : <MarkdownRenderer content={m.content} />}
                   </div>
@@ -306,7 +306,7 @@ export function ChatPage() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-void">
             <BookOpen className="w-16 h-16 text-neon-magenta mb-4 animate-pulse" />
-            <h3 className="text-xl font-black text-starlight uppercase tracking-wider">Rules AI Chat</h3>
+            <h3 className="text-xl font-black text-starlight uppercase tracking-wider">Rule Wizard</h3>
             <p className="text-xs text-neon-cyan mt-2 max-w-xs font-mono">
               Select a thread or create a new one to look up D&amp;D 5.5e rules.
             </p>

@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch, apiUpload } from "../lib/api";
-import { APP_NAME } from "../constants/branding";
+import { APP_NAME, RULE_WIZARD_LABEL } from "../constants/branding";
 import {
   applyServerNotesToLayout,
   hydrateLayout,
@@ -467,7 +467,7 @@ export function DashboardPage() {
             className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-magenta/60 hover:bg-neon-magenta/5"
           >
             <MessageSquare className="mb-2 h-5 w-5 text-neon-magenta group-hover:text-starlight" />
-            <h3 className="text-sm font-black uppercase text-starlight">Rules AI</h3>
+            <h3 className="text-sm font-black uppercase text-starlight">{RULE_WIZARD_LABEL}</h3>
             <p className="mt-1 text-xs text-ink-muted sm:text-sm">Spells, monsters, and 5.5e lookups</p>
           </Link>
           <div
