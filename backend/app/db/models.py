@@ -194,8 +194,6 @@ class Feedback(SQLModel, table=True):
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
 
-    user: Optional[User] = Relationship()
-
 
 class UserNote(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
