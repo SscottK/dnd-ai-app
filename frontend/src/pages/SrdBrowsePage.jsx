@@ -36,6 +36,19 @@ function entryBody(entry) {
   return text;
 }
 
+function BrowsePanel({ title, titleClassName = "text-starlight", children }) {
+  return (
+    <div className="flex min-h-0 flex-col rounded-md border border-border-bright bg-void-panel lg:min-h-[280px]">
+      <p
+        className={`shrink-0 border-b border-border px-3 py-2 text-xs font-black uppercase ${titleClassName}`}
+      >
+        {title}
+      </p>
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    </div>
+  );
+}
+
 export function SrdBrowsePage() {
   const { token } = useAuth();
   const [activeCategory, setActiveCategory] = useState("spells");
@@ -130,15 +143,15 @@ export function SrdBrowsePage() {
   }, [entries, searchQuery]);
 
   return (
-    <div className="session-ui h-full overflow-y-auto bg-void">
-      <div className="mx-auto flex h-full max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6">
-        <header>
+    <div className="session-ui flex h-full min-h-0 flex-col overflow-hidden bg-void">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-3 overflow-hidden px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
+        <header className="shrink-0">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan">SRD 5.2.1</p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-black uppercase text-starlight">
-            <BookOpen className="h-6 w-6 text-neon-magenta" />
+          <h1 className="mt-1 flex items-center gap-2 text-xl font-black uppercase text-starlight sm:text-2xl">
+            <BookOpen className="h-5 w-5 text-neon-magenta sm:h-6 sm:w-6" />
             Rules browser
           </h1>
-          <p className="mt-2 text-sm text-ink-muted">
+          <p className="mt-1 text-xs text-ink-muted sm:mt-2 sm:text-sm">
             Browse spells, monsters, magic items, and more from the official System Reference Document.
           </p>
         </header>
@@ -148,7 +161,7 @@ export function SrdBrowsePage() {
             event.preventDefault();
             void runSearch();
           }}
-          className="flex gap-2"
+          className="flex shrink-0 gap-2"
         >
           <input
             type="search"
@@ -159,7 +172,7 @@ export function SrdBrowsePage() {
           />
           <button
             type="submit"
-            className="inline-flex items-center gap-1 rounded-sm border border-neon-cyan px-3 py-2 text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
+            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-neon-cyan px-3 py-2 text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
           >
             <Search className="h-4 w-4" />
             Search
@@ -167,15 +180,15 @@ export function SrdBrowsePage() {
         </form>
 
         {error && (
-          <p className="rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm font-mono text-danger">
+          <p className="shrink-0 rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm font-mono text-danger">
             {error}
           </p>
         )}
 
         {searchResults.length > 0 && (
-          <section className="rounded-md border border-neon-magenta/40 bg-void-panel p-3">
+          <section className="shrink-0 rounded-md border border-neon-magenta/40 bg-void-panel p-3">
             <p className="mb-2 text-xs font-black uppercase text-neon-magenta">Search results</p>
-            <ul className="flex flex-wrap gap-2">
+            <ul className="flex max-h-24 flex-wrap gap-2 overflow-y-auto">
               {searchResults.map((hit) => (
                 <li key={`${hit.category}-${hit.name}`}>
                   <button
@@ -191,8 +204,8 @@ export function SrdBrowsePage() {
           </section>
         )}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-          <aside className="lg:w-52 shrink-0">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:gap-4">
+          <aside className="shrink-0 lg:w-44 xl:w-52">
             <p className="mb-2 text-xs font-black uppercase text-ink-faint">Categories</p>
             <div className="flex flex-wrap gap-1 lg:flex-col">
               {CATEGORIES.map((cat) => (
@@ -203,7 +216,7 @@ export function SrdBrowsePage() {
                     setSearchResults([]);
                     setActiveCategory(cat.id);
                   }}
-                  className={`rounded-sm border px-3 py-2 text-left text-xs font-black uppercase ${
+                  className={`rounded-sm border px-3 py-1.5 text-left text-xs font-black uppercase lg:py-2 ${
                     activeCategory === cat.id
                       ? "border-neon-cyan bg-neon-cyan/10 text-starlight"
                       : "border-border text-ink-muted hover:border-neon-cyan/50 hover:text-starlight"
@@ -215,13 +228,17 @@ export function SrdBrowsePage() {
             </div>
           </aside>
 
-          <section className="grid min-h-[320px] min-w-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-            <div className="min-h-0 rounded-md border border-border-bright bg-void-panel">
-              <p className="border-b border-border px-3 py-2 text-xs font-black uppercase text-neon-cyan">
-                {categoryMeta.label}
-                {loadingList && <span className="ml-2 text-ink-faint">Loading…</span>}
-              </p>
-              <ul className="max-h-[420px] overflow-y-auto p-2">
+          <section className="grid min-h-0 flex-1 grid-rows-2 gap-3 overflow-hidden lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:grid-rows-1">
+            <BrowsePanel
+              title={
+                <>
+                  {categoryMeta.label}
+                  {loadingList && <span className="ml-2 text-ink-faint">Loading…</span>}
+                </>
+              }
+              titleClassName="text-neon-cyan"
+            >
+              <ul className="p-1.5 sm:p-2">
                 {filteredEntries.map((row) => (
                   <li key={row.name}>
                     <button
@@ -244,13 +261,10 @@ export function SrdBrowsePage() {
                   <li className="px-2 py-4 text-center text-xs font-mono text-ink-faint">No entries found.</li>
                 )}
               </ul>
-            </div>
+            </BrowsePanel>
 
-            <div className="min-h-0 rounded-md border border-border-bright bg-void-panel">
-              <p className="border-b border-border px-3 py-2 text-xs font-black uppercase text-starlight">
-                {selectedName || "Select an entry"}
-              </p>
-              <div className="max-h-[420px] overflow-y-auto p-4 text-sm font-mono text-ink-muted">
+            <BrowsePanel title={selectedName || "Select an entry"}>
+              <div className="p-3 text-sm font-mono text-ink-muted sm:p-4">
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
                   <div className="space-y-3">
@@ -270,7 +284,7 @@ export function SrdBrowsePage() {
                   <p className="text-ink-faint">Pick a name from the list or run a search.</p>
                 )}
               </div>
-            </div>
+            </BrowsePanel>
           </section>
         </div>
       </div>
