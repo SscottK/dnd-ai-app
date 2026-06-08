@@ -17,7 +17,7 @@ export function CharacterViewPage() {
   const [syncing, setSyncing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [view, setView] = useState(() =>
-    searchParams.get("view") === "digital" ? "digital" : "pdf"
+    searchParams.get("view") === "pdf" ? "pdf" : "digital"
   );
 
   const loadCharacter = useCallback(async () => {
@@ -190,17 +190,6 @@ export function CharacterViewPage() {
       <div className="shrink-0 flex border-b border-zinc-800 px-4">
         <button
           type="button"
-          onClick={() => setView("pdf")}
-          className={`px-4 py-2 text-[10px] font-black uppercase ${
-            view === "pdf"
-              ? "text-starlight border-b-2 border-neon-magenta"
-              : "text-zinc-600 hover:text-neon-cyan"
-          }`}
-        >
-          PDF (read-only)
-        </button>
-        <button
-          type="button"
           onClick={() => setView("digital")}
           className={`px-4 py-2 text-[10px] font-black uppercase ${
             view === "digital"
@@ -209,6 +198,17 @@ export function CharacterViewPage() {
           }`}
         >
           Digital sheet
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("pdf")}
+          className={`px-4 py-2 text-[10px] font-black uppercase ${
+            view === "pdf"
+              ? "text-starlight border-b-2 border-neon-magenta"
+              : "text-zinc-600 hover:text-neon-cyan"
+          }`}
+        >
+          PDF (read-only)
         </button>
       </div>
 

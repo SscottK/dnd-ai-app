@@ -469,12 +469,58 @@ export function AbilitiesWidget({ sheet, onShowDetail, onSheetChange }) {
   );
 }
 
-export function SkillsSavesWidget({ sheet, onShowDetail, onRollCheck }) {
+export function SkillsSavesWidget({
+  sheet,
+  onShowDetail,
+  onRollCheck,
+  lastRollMessage = "",
+  rollBusy = false,
+}) {
+  const [advantage, setAdvantage] = useState(false);
+  const [disadvantage, setDisadvantage] = useState(false);
   const proficientSkills = sheet.skills?.filter((s) => s.proficient || s.expertise) || [];
   const otherSkills = sheet.skills?.filter((s) => !s.proficient && !s.expertise) || [];
 
+  const rollCheck = (body) => {
+    if (!onRollCheck) return;
+    void onRollCheck({ ...body, advantage, disadvantage });
+  };
+
   return (
     <div className="space-y-3">
+      {onRollCheck && (
+        <div className="space-y-1 rounded-sm border border-zinc-800 bg-void-deep/40 p-2">
+          <div className="flex flex-wrap items-center gap-3 text-[9px] font-mono text-ink-faint">
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={advantage}
+                disabled={rollBusy}
+                onChange={(event) => {
+                  setAdvantage(event.target.checked);
+                  if (event.target.checked) setDisadvantage(false);
+                }}
+              />
+              Adv
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={disadvantage}
+                disabled={rollBusy}
+                onChange={(event) => {
+                  setDisadvantage(event.target.checked);
+                  if (event.target.checked) setAdvantage(false);
+                }}
+              />
+              Dis
+            </label>
+          </div>
+          {lastRollMessage && (
+            <p className="text-[10px] font-mono text-neon-cyan">{lastRollMessage}</p>
+          )}
+        </div>
+      )}
       <div>
         <p className="text-xs sm:text-sm font-black text-neon-magenta uppercase mb-1">Saving Throws</p>
         <div className="space-y-0.5">
@@ -493,11 +539,7 @@ export function SkillsSavesWidget({ sheet, onShowDetail, onRollCheck }) {
                     body: `Bonus: ${formatModifier(bonus)}`,
                   })
                 }
-                onRoll={
-                  onRollCheck
-                    ? () => onRollCheck({ roll_kind: "save", label: save.ability })
-                    : undefined
-                }
+                onRoll={onRollCheck ? () => rollCheck({ roll_kind: "save", label: save.ability }) : undefined}
               />
             );
           })}
@@ -523,11 +565,7 @@ export function SkillsSavesWidget({ sheet, onShowDetail, onRollCheck }) {
                     body: `Bonus: ${formatModifier(bonus)}`,
                   })
                 }
-                onRoll={
-                  onRollCheck
-                    ? () => onRollCheck({ roll_kind: "skill", label: skill.name })
-                    : undefined
-                }
+                onRoll={onRollCheck ? () => rollCheck({ roll_kind: "skill", label: skill.name }) : undefined}
               />
             );
           })}
@@ -2151,7 +2189,7 @@ export function EmptySheetHint({ character, onOpenFullSheet }) {
           onClick={onOpenFullSheet}
           className="text-starlight hover:text-neon-cyan uppercase font-black"
         >
-          Open Full Sheet → Re-sync from PDF
+          Open digital sheet → Re-sync from PDF
         </button>
       ) : (
         <p>Upload a D&amp;D Beyond PDF from Campaigns.</p>

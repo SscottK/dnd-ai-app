@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronDown, FileText, LayoutGrid, Plus, RotateCcw, Save, Swords } from "lucide-react";
+import { ArrowLeft, ChevronDown, LayoutGrid, Plus, RotateCcw, Save, ScrollText, Swords } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { apiFetch, apiUpload } from "../lib/api";
 import {
@@ -14,7 +14,7 @@ import { StackedSessionLayout } from "../components/sheet/StackedSessionLayout";
 import { DetailSlideOver } from "../components/sheet/DetailSlideOver";
 import { FullSheetModal } from "../components/sheet/FullSheetModal";
 import { DiceRoller } from "../components/DiceRoller";
-import { postActionRoll } from "../lib/actionRoll";
+import { formatRollEntry, postActionRoll } from "../lib/actionRoll";
 import {
   DmGeneratorsWidget,
   DmNotesWidget,
@@ -109,6 +109,8 @@ export function SessionPlayPage() {
   const notesSaveTimer = useRef(null);
   const [combatActive, setCombatActive] = useState(false);
   const [notesArchiveOpen, setNotesArchiveOpen] = useState(false);
+  const [checkRollMessage, setCheckRollMessage] = useState("");
+  const [checkRollBusy, setCheckRollBusy] = useState(false);
 
   const characterId = sessionStatus?.character_id;
   const isDmSession =
@@ -441,10 +443,19 @@ export function SessionPlayPage() {
   const rollActionLogCheck = useCallback(
     async (body) => {
       if (!token || !campaignId || combatActive) return;
-      await postActionRoll(campaignId, token, {
-        character_id: characterRef.current?.id,
-        ...body,
-      });
+      setCheckRollBusy(true);
+      setCheckRollMessage("");
+      try {
+        const data = await postActionRoll(campaignId, token, {
+          character_id: characterRef.current?.id,
+          ...body,
+        });
+        setCheckRollMessage(formatRollEntry(data.entry));
+      } catch (err) {
+        setCheckRollMessage(err.message || "Roll failed.");
+      } finally {
+        setCheckRollBusy(false);
+      }
     },
     [token, campaignId, combatActive]
   );
@@ -1107,6 +1118,8 @@ export function SessionPlayPage() {
             sheet={sheet}
             onShowDetail={showDetail}
             onRollCheck={combatActive ? undefined : rollActionLogCheck}
+            lastRollMessage={checkRollMessage}
+            rollBusy={checkRollBusy}
           />
         );
       case "character_tabs":
@@ -1297,8 +1310,8 @@ export function SessionPlayPage() {
               onClick={() => setFullSheetOpen(true)}
               className="flex items-center gap-1 rounded-sm border border-zinc-700 px-2.5 py-1.5 text-xs font-black uppercase text-zinc-400 hover:text-starlight sm:text-sm"
             >
-              <FileText className="w-3 h-3" />
-              Full Sheet
+              <ScrollText className="w-3 h-3" />
+              Digital Sheet
             </button>
           )}
           <div className="relative z-50" ref={paneMenuRef}>
@@ -1446,12 +1459,15 @@ export function SessionPlayPage() {
         <FullSheetModal
           open={fullSheetOpen}
           character={character}
+          sheet={sheet}
           token={token}
           syncing={syncing}
           uploading={uploadingPdf}
           onClose={handleFullSheetClose}
           onResync={handleResyncPdf}
           onUploadPdf={handleUploadPdf}
+          onSheetChange={onSheetChange}
+          onCombatChange={onCombatChange}
         />
       )}
 

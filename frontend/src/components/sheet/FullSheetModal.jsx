@@ -1,49 +1,69 @@
 import { useRef } from "react";
 import { ExternalLink, FileText, RefreshCw, Upload, X } from "lucide-react";
-import { AuthenticatedPdfFrame } from "./AuthenticatedPdfFrame";
+import { openAuthenticatedPdfInTab } from "./AuthenticatedPdfFrame";
+import { DigitalCharacterSheet } from "./DigitalCharacterSheet";
+import { resolveCombatStats } from "../../lib/characterSheet";
 
 export function FullSheetModal({
   open,
   character,
+  sheet,
   token,
   syncing,
   uploading = false,
   onClose,
   onResync,
   onUploadPdf,
+  onSheetChange,
+  onCombatChange,
 }) {
   const uploadInputRef = useRef(null);
   if (!open || !character) return null;
 
   const hasPdf = !!character.pdf_url;
+  const combat = resolveCombatStats(character, sheet);
+
+  const handleOpenPdfTab = async () => {
+    if (!hasPdf || !token) return;
+    try {
+      await openAuthenticatedPdfInTab(character.pdf_url, token);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/80"
-        aria-label="Close full sheet"
+        aria-label="Close digital sheet"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-5xl h-[90vh] bg-black border-4 border-neon-cyan flex flex-col">
-        <header className="flex items-center justify-between gap-3 px-4 py-3 border-b-2 border-neon-magenta bg-zinc-950 shrink-0">
-          <div>
-            <h2 className="font-black text-starlight uppercase text-sm">{character.name}</h2>
-            <p className="text-[10px] text-zinc-500 font-mono">
-              PDF is read-only and cannot be edited here. Equip gear in Inventory panes — changes
-              save to your digital sheet, not the PDF.
+      <div className="relative flex h-[90vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-neon-magenta bg-zinc-950 px-4 py-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-black uppercase text-starlight">{character.name}</h2>
+            <p className="text-[10px] font-mono text-zinc-500">
+              Digital sheet — equip gear and edit stats here. PDF stays read-only
+              {combat.ac != null ? (
+                <>
+                  {" "}
+                  · AC <span className="font-black text-starlight">{combat.ac}</span>
+                </>
+              ) : null}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {onUploadPdf && (
               <>
                 <button
                   type="button"
                   disabled={syncing || uploading}
                   onClick={() => uploadInputRef.current?.click()}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase border border-neon-cyan text-neon-cyan disabled:opacity-40"
+                  className="flex items-center gap-1 border border-neon-cyan px-3 py-1.5 text-[10px] font-black uppercase text-neon-cyan disabled:opacity-40"
                 >
-                  <Upload className={`w-3 h-3 ${uploading ? "animate-pulse" : ""}`} />
+                  <Upload className={`h-3 w-3 ${uploading ? "animate-pulse" : ""}`} />
                   {uploading ? "Uploading…" : hasPdf ? "Replace PDF" : "Upload PDF"}
                 </button>
                 <input
@@ -60,40 +80,51 @@ export function FullSheetModal({
               </>
             )}
             {hasPdf && (
-              <button
-                type="button"
-                disabled={syncing || uploading}
-                onClick={onResync}
-                className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase border border-starlight text-starlight disabled:opacity-40"
-              >
-                <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Re-syncing…" : "Re-sync from PDF"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={syncing || uploading}
+                  onClick={onResync}
+                  className="flex items-center gap-1 border border-starlight px-3 py-1.5 text-[10px] font-black uppercase text-starlight disabled:opacity-40"
+                >
+                  <RefreshCw className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Re-syncing…" : "Re-sync from PDF"}
+                </button>
+                <button
+                  type="button"
+                  disabled={syncing || uploading}
+                  onClick={() => void handleOpenPdfTab()}
+                  className="flex items-center gap-1 border border-zinc-700 px-3 py-1.5 text-[10px] font-black uppercase text-zinc-400 hover:text-starlight disabled:opacity-40"
+                >
+                  <FileText className="h-3 w-3" />
+                  Open PDF
+                </button>
+              </>
             )}
             {character.dnd_beyond_url && (
               <a
                 href={character.dnd_beyond_url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase border border-neon-cyan text-neon-cyan"
+                className="flex items-center gap-1 border border-neon-cyan px-3 py-1.5 text-[10px] font-black uppercase text-neon-cyan"
               >
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="h-3 w-3" />
                 D&amp;D Beyond
               </a>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-[10px] font-black uppercase bg-neon-magenta text-black"
+              className="bg-neon-magenta px-3 py-1.5 text-[10px] font-black uppercase text-black"
             >
               Save session &amp; close
             </button>
-            <button type="button" onClick={onClose} className="text-zinc-500 hover:text-white p-1">
-              <X className="w-5 h-5" />
+            <button type="button" onClick={onClose} className="p-1 text-zinc-500 hover:text-white">
+              <X className="h-5 w-5" />
             </button>
           </div>
         </header>
-        <div className="relative flex-1 overflow-hidden bg-white">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-void">
           {(syncing || uploading) && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 p-6">
               <div className="max-w-sm rounded-sm border-2 border-neon-cyan bg-zinc-950 px-6 py-5 text-center shadow-lg">
@@ -108,34 +139,14 @@ export function FullSheetModal({
               </div>
             </div>
           )}
-          {hasPdf ? (
-            <AuthenticatedPdfFrame
-              pdfUrl={character.pdf_url}
-              token={token}
-              title={`${character.name} character sheet`}
-              className="w-full h-full border-0"
+          <div className="h-full overflow-y-auto px-4 py-4 lg:px-8">
+            <DigitalCharacterSheet
+              character={character}
+              sheet={sheet}
+              onSheetChange={onSheetChange}
+              onCombatChange={onCombatChange}
             />
-          ) : character.dnd_beyond_url ? (
-            <div className="h-full flex flex-col items-center justify-center bg-void p-8 text-center">
-              <FileText className="w-12 h-12 text-neon-magenta mb-4" />
-              <p className="text-xs font-mono text-zinc-400 max-w-md mb-4">
-                Open your character on D&amp;D Beyond, make changes, then export a new PDF and
-                re-upload from Campaigns — or use Re-sync if you replaced the stored PDF.
-              </p>
-              <a
-                href={character.dnd_beyond_url}
-                target="_blank"
-                rel="noreferrer"
-                className="px-6 py-3 bg-neon-cyan text-black font-black text-xs uppercase"
-              >
-                Open D&amp;D Beyond
-              </a>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center bg-void text-xs font-mono text-zinc-500">
-              No PDF or D&amp;D Beyond link on file.
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

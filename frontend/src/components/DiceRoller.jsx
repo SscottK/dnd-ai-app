@@ -8,13 +8,40 @@ import {
   resolveSkillBonus,
 } from "../lib/characterSheet";
 import { formatRollEntry, postActionRoll, postCombatRoll } from "../lib/actionRoll";
+import { appendModifier, formatRollMessage, rollExpression } from "../lib/diceRoll";
 
 const QUICK_DICE = ["d4", "d6", "d8", "d10", "d12", "d20"];
+const COMMON_FORMULAS = ["d20", "2d6", "3d6", "4d6", "2d20kh1", "4d6dl1"];
 
 const SAVE_ROWS = ["str", "dex", "con", "int", "wis", "cha"];
 
-function rollDieLocal(sides) {
-  return Math.floor(Math.random() * sides) + 1;
+function AdvantageToggles({ advantage, disadvantage, disabled, onChange }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono text-ink-faint">
+      <label className="flex items-center gap-1">
+        <input
+          type="checkbox"
+          checked={advantage}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ advantage: event.target.checked, disadvantage: event.target.checked ? false : disadvantage })
+          }
+        />
+        Adv
+      </label>
+      <label className="flex items-center gap-1">
+        <input
+          type="checkbox"
+          checked={disadvantage}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ disadvantage: event.target.checked, advantage: event.target.checked ? false : advantage })
+          }
+        />
+        Dis
+      </label>
+    </div>
+  );
 }
 
 export function DiceRoller({
@@ -27,6 +54,7 @@ export function DiceRoller({
 }) {
   const [mode, setMode] = useState("quick");
   const [expression, setExpression] = useState("1d20");
+  const [modifier, setModifier] = useState("");
   const [advantage, setAdvantage] = useState(false);
   const [disadvantage, setDisadvantage] = useState(false);
   const [skillName, setSkillName] = useState("");
@@ -45,6 +73,34 @@ export function DiceRoller({
     }));
   }, [sheet]);
 
+  const parsedModifier = Number(modifier);
+  const hasModifier = modifier !== "" && !Number.isNaN(parsedModifier) && parsedModifier !== 0;
+
+  const setRollOptions = ({ advantage: nextAdv, disadvantage: nextDis }) => {
+    setAdvantage(nextAdv);
+    setDisadvantage(nextDis);
+  };
+
+  const recordRoll = (message) => {
+    setLastRoll({ message, at: new Date().toLocaleTimeString() });
+  };
+
+  const rollToCombatLog = async (label, rollResult) => {
+    const message = formatRollMessage({
+      label,
+      kept: rollResult.kept,
+      dropped: rollResult.dropped,
+      modifier: rollResult.modifier,
+      total: rollResult.total,
+    });
+    recordRoll(message);
+    await postCombatRoll(campaignId, token, {
+      dice: rollResult.expression,
+      result: rollResult.total,
+      message,
+    });
+  };
+
   const runActionRoll = async (body) => {
     if (!campaignId || !token) return;
     setBusy(true);
@@ -56,10 +112,7 @@ export function DiceRoller({
         disadvantage,
         ...body,
       });
-      setLastRoll({
-        message: formatRollEntry(data.entry),
-        at: new Date().toLocaleTimeString(),
-      });
+      recordRoll(formatRollEntry(data.entry));
     } catch (err) {
       setError(err.message || "Roll failed.");
     } finally {
@@ -67,28 +120,32 @@ export function DiceRoller({
     }
   };
 
-  const handleQuickRoll = async (label) => {
+  const rollFormula = async (rawExpression) => {
+    const expr = appendModifier(rawExpression, hasModifier ? parsedModifier : 0);
     if (combatActive && campaignId && token) {
-      const sides = parseInt(label.slice(1), 10);
-      const result = rollDieLocal(sides);
-      setLastRoll({ message: `${label}: ${result}`, at: new Date().toLocaleTimeString() });
-      setError("");
       setBusy(true);
+      setError("");
       try {
-        await postCombatRoll(campaignId, token, { dice: label, result });
+        const rollResult = rollExpression(expr, { advantage, disadvantage });
+        await rollToCombatLog(expr, rollResult);
       } catch (err) {
-        setError(err.message || "Roll not logged to combat.");
+        setError(err.message || "Roll failed.");
       } finally {
         setBusy(false);
       }
       return;
     }
-    await runActionRoll({ roll_kind: "dice", quick_die: label });
+    await runActionRoll({ roll_kind: "dice", expression: expr });
+  };
+
+  const handleQuickRoll = async (label) => {
+    await rollFormula(label);
   };
 
   const handleExpressionRoll = async (event) => {
     event.preventDefault();
-    await runActionRoll({ roll_kind: "dice", expression: expression.trim() });
+    if (!expression.trim()) return;
+    await rollFormula(expression.trim());
   };
 
   const handleSkillRoll = async () => {
@@ -109,9 +166,7 @@ export function DiceRoller({
     <div className="flex h-full min-h-0 flex-col gap-2 border-2 border-neon-magenta bg-black p-3">
       <div className="flex items-center gap-2">
         <Dices className="h-4 w-4 shrink-0 text-neon-magenta" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-starlight">
-          Dice
-        </span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-starlight">Dice</span>
         {rollerLabel && (
           <span className="truncate text-[8px] font-mono text-ink-faint">as {rollerLabel}</span>
         )}
@@ -135,20 +190,54 @@ export function DiceRoller({
         ))}
       </div>
 
-      {mode === "quick" && (
-        <div className="flex flex-wrap gap-1">
-          {QUICK_DICE.map((die) => (
-            <button
-              key={die}
-              type="button"
-              disabled={busy}
-              onClick={() => handleQuickRoll(die)}
-              className="border border-zinc-700 px-2 py-1 text-[10px] font-black uppercase hover:border-neon-cyan hover:text-starlight disabled:opacity-40"
-            >
-              {die}
-            </button>
-          ))}
+      {(mode === "quick" || mode === "expr") && (
+        <div className="flex items-center gap-2">
+          <label className="text-[9px] font-black uppercase text-ink-faint">Mod</label>
+          <input
+            type="number"
+            value={modifier}
+            onChange={(event) => setModifier(event.target.value)}
+            placeholder="0"
+            className="w-14 border border-border bg-void-deep px-2 py-0.5 text-xs font-mono text-starlight"
+          />
+          <AdvantageToggles
+            advantage={advantage}
+            disadvantage={disadvantage}
+            disabled={busy}
+            onChange={setRollOptions}
+          />
         </div>
+      )}
+
+      {mode === "quick" && (
+        <>
+          <div className="flex flex-wrap gap-1">
+            {QUICK_DICE.map((die) => (
+              <button
+                key={die}
+                type="button"
+                disabled={busy}
+                onClick={() => handleQuickRoll(die)}
+                className="border border-zinc-700 px-2 py-1 text-[10px] font-black uppercase hover:border-neon-cyan hover:text-starlight disabled:opacity-40"
+              >
+                {hasModifier ? appendModifier(die, parsedModifier) : die}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {COMMON_FORMULAS.filter((item) => !QUICK_DICE.includes(item)).map((formula) => (
+              <button
+                key={formula}
+                type="button"
+                disabled={busy}
+                onClick={() => handleQuickRoll(formula)}
+                className="border border-zinc-800 px-2 py-0.5 text-[9px] font-mono uppercase text-ink-faint hover:border-neon-cyan hover:text-starlight disabled:opacity-40"
+              >
+                {hasModifier ? appendModifier(formula, parsedModifier) : formula}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {mode === "expr" && (
@@ -159,24 +248,9 @@ export function DiceRoller({
             placeholder="2d6+3, 4d6dl1, 2d20kh1"
             className="w-full border border-border bg-void-deep px-2 py-1 text-xs font-mono text-starlight"
           />
-          <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono text-ink-faint">
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={advantage}
-                onChange={(event) => setAdvantage(event.target.checked)}
-              />
-              Adv
-            </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={disadvantage}
-                onChange={(event) => setDisadvantage(event.target.checked)}
-              />
-              Dis
-            </label>
-          </div>
+          <p className="text-[8px] font-mono text-ink-faint">
+            Mod field adds to the formula. Use dl/kh/kl for drop/keep.
+          </p>
           <button
             type="submit"
             disabled={busy || !expression.trim()}
@@ -193,6 +267,12 @@ export function DiceRoller({
             <p className="text-[9px] font-mono text-ink-faint">Join with a character to roll checks.</p>
           ) : (
             <>
+              <AdvantageToggles
+                advantage={advantage}
+                disadvantage={disadvantage}
+                disabled={busy}
+                onChange={setRollOptions}
+              />
               <div className="space-y-1">
                 <label className="text-[9px] font-black uppercase text-neon-cyan">Skill</label>
                 <select
@@ -243,24 +323,6 @@ export function DiceRoller({
                   Roll save
                 </button>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono text-ink-faint">
-                <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={advantage}
-                    onChange={(event) => setAdvantage(event.target.checked)}
-                  />
-                  Adv
-                </label>
-                <label className="flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={disadvantage}
-                    onChange={(event) => setDisadvantage(event.target.checked)}
-                  />
-                  Dis
-                </label>
-              </div>
             </>
           )}
         </div>
@@ -275,7 +337,7 @@ export function DiceRoller({
 
       <p className="text-[8px] font-mono text-ink-faint">
         {combatActive
-          ? "Combat active — quick rolls go to the combat log."
+          ? "Combat active — dice rolls go to the combat log."
           : "Rolls are logged to the session action log."}
       </p>
       {error && <p className="text-[9px] font-mono text-danger">{error}</p>}

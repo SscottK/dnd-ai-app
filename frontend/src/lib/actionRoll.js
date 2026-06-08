@@ -16,11 +16,11 @@ export async function postActionRoll(campaignId, token, body) {
   return response.json();
 }
 
-export async function postCombatRoll(campaignId, token, { dice, result }) {
+export async function postCombatRoll(campaignId, token, { dice, result, message }) {
   const response = await apiFetch(`/campaigns/${campaignId}/encounter/roll`, {
     token,
     method: "POST",
-    body: { dice, result },
+    body: { dice, result, message },
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));

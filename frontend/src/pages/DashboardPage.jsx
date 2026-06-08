@@ -995,7 +995,7 @@ export function DashboardPage() {
                       </LinkButton>
                       {character.pdf_url && (
                         <LinkButton
-                          to={`/character/${character.id}`}
+                          to={`/character/${character.id}?view=pdf`}
                           className="border-border text-ink-muted hover:border-neon-cyan hover:text-neon-cyan"
                         >
                           PDF
