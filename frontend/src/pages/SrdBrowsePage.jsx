@@ -16,9 +16,53 @@ const CATEGORIES = [
   { id: "gear", label: "Gear", path: "/rules/gear", listKey: "gear" },
 ];
 
+function formatSpellLevel(level) {
+  if (level === 0) return "Cantrip";
+  if (level != null) return `Lv ${level}`;
+  return null;
+}
+
+function isSpellEntry(entry) {
+  return Boolean(entry?.school != null && (entry.casting_time != null || entry.components != null));
+}
+
+function SpellEntryMeta({ entry }) {
+  const header = [
+    formatSpellLevel(entry.level) || (entry.level != null ? `Level ${entry.level}` : null),
+    entry.school,
+    entry.classes ? `(${entry.classes})` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const rows = [
+    ["Casting Time", entry.casting_time],
+    ["Range", entry.range],
+    ["Components", entry.components],
+    ["Duration", entry.duration],
+  ].filter(([, value]) => value);
+
+  if (entry.ritual === "yes") rows.push(["Ritual", "Yes"]);
+  if (entry.concentration === "yes") rows.push(["Concentration", "Yes"]);
+
+  return (
+    <div className="space-y-2 border-b border-border/60 pb-3">
+      {header && <p className="text-xs font-black uppercase text-neon-cyan">{header}</p>}
+      <dl className="space-y-1 font-mono text-xs">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex gap-2">
+            <dt className="shrink-0 text-ink-faint">{label}:</dt>
+            <dd className="text-starlight">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function entrySummary(entry, category) {
   if (category === "spells") {
-    return [entry.level != null ? `Lv ${entry.level}` : null, entry.school, entry.casting_time]
+    return [formatSpellLevel(entry.level), entry.school, entry.casting_time]
       .filter(Boolean)
       .join(" · ");
   }
@@ -328,13 +372,8 @@ export function SrdBrowsePage() {
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
                   <div className="space-y-3">
-                    {selectedEntry.level != null && (
-                      <p className="text-xs text-neon-cyan">
-                        Level {selectedEntry.level}
-                        {selectedEntry.school ? ` · ${selectedEntry.school}` : ""}
-                      </p>
-                    )}
-                    {selectedEntry.cr != null && (
+                    {isSpellEntry(selectedEntry) && <SpellEntryMeta entry={selectedEntry} />}
+                    {!isSpellEntry(selectedEntry) && selectedEntry.cr != null && (
                       <p className="text-xs text-neon-cyan">CR {selectedEntry.cr}</p>
                     )}
                     <MarkdownRenderer content={entryBody(selectedEntry)} />
