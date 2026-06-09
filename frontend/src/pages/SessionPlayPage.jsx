@@ -8,6 +8,7 @@ import {
   parseSheetJson,
   sheetToJson,
 } from "../lib/characterSheet";
+import { useNestedPageLayout } from "../contexts/PageRefreshContext";
 import { useMediaQuery, SESSION_MOBILE_QUERY } from "../hooks/useMediaQuery";
 import { SheetPane } from "../components/sheet/SheetPane";
 import { StackedSessionLayout } from "../components/sheet/StackedSessionLayout";
@@ -117,6 +118,7 @@ export function SessionPlayPage() {
   const isDmSession =
     sessionStatus?.session_active && sessionStatus?.is_owner && !sessionStatus?.character_id;
   const isMobileSession = useMediaQuery(SESSION_MOBILE_QUERY);
+  useNestedPageLayout(isMobileSession);
 
   useEffect(() => {
     layoutRef.current = layout;

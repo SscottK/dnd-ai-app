@@ -5,7 +5,8 @@ import { useMediaQuery, APP_MOBILE_QUERY } from "../hooks/useMediaQuery";
 import { apiFetch } from "../lib/api";
 import { entrySummary, formatCategoryLabel } from "../lib/srdEntryFormat";
 import { SrdEntryDetail } from "../components/SrdEntryDetail";
-import { PAGE_SCROLL_CLASS, PullToRefresh } from "../components/PullToRefresh";
+import { PageScroll } from "../components/PageScroll";
+import { PullToRefresh } from "../components/PullToRefresh";
 
 const CATEGORIES = [
   { id: "spells", label: "Spells", path: "/rules/spells", listKey: "spells" },
@@ -75,7 +76,17 @@ function EntryList({
   );
 }
 
-function EntryDetailPanel({ title, onClose, children, onRefresh, fullScreen = false }) {
+function EntryDetailPanel({
+  title,
+  onClose,
+  children,
+  onRefresh,
+  fullScreen = false,
+  useShellRefresh = false,
+}) {
+  const contentClassName =
+    "min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 text-sm font-mono text-ink-muted sm:p-4";
+
   return (
     <div
       className={`flex min-h-0 w-full min-w-0 flex-1 flex-col bg-void-panel ${
@@ -96,12 +107,15 @@ function EntryDetailPanel({ title, onClose, children, onRefresh, fullScreen = fa
           <X className="h-4 w-4" />
         </button>
       </div>
-      <PullToRefresh
-        onRefresh={onRefresh}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 text-sm font-mono text-ink-muted sm:p-4"
-      >
-        {children}
-      </PullToRefresh>
+      {useShellRefresh ? (
+        <PageScroll nested onRefresh={onRefresh} className={contentClassName}>
+          {children}
+        </PageScroll>
+      ) : (
+        <PullToRefresh onRefresh={onRefresh} className={contentClassName}>
+          {children}
+        </PullToRefresh>
+      )}
     </div>
   );
 }
@@ -475,6 +489,7 @@ export function SrdBrowsePage() {
           onClose={closeEntry}
           onRefresh={refreshBrowse}
           fullScreen
+          useShellRefresh
         >
           {detailBody}
         </EntryDetailPanel>
@@ -484,8 +499,7 @@ export function SrdBrowsePage() {
 
   if (isMobile) {
     return (
-      <div className="session-ui flex h-full min-h-0 flex-col overflow-hidden bg-void">
-        <PullToRefresh onRefresh={refreshBrowse} className={PAGE_SCROLL_CLASS}>
+      <PageScroll onRefresh={refreshBrowse} className="session-ui bg-void">
           <div className="mx-auto w-full max-w-6xl space-y-3 px-4 py-4 sm:space-y-4">
             <BrowseChrome
               trimmedSearch={trimmedSearch}
@@ -518,8 +532,7 @@ export function SrdBrowsePage() {
               />
             </section>
           </div>
-        </PullToRefresh>
-      </div>
+      </PageScroll>
     );
   }
 

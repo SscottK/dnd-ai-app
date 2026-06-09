@@ -3,13 +3,17 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ExternalLink, FileText, RefreshCw, Upload } from "lucide-react";
 import { AuthenticatedPdfFrame, openAuthenticatedPdfInTab } from "../components/sheet/AuthenticatedPdfFrame";
 import { DigitalSheetEditor } from "../components/sheet/DigitalSheetEditor";
+import { useNestedPageLayout } from "../contexts/PageRefreshContext";
 import { useAuth } from "../hooks/useAuth";
+import { APP_MOBILE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 import { apiFetch, apiUpload } from "../lib/api";
 
 export function CharacterViewPage() {
   const { characterId } = useParams();
   const [searchParams] = useSearchParams();
   const { token } = useAuth();
+  const isMobile = useMediaQuery(APP_MOBILE_QUERY);
+  useNestedPageLayout(isMobile);
   const uploadInputRef = useRef(null);
   const [character, setCharacter] = useState(null);
   const [loading, setLoading] = useState(true);

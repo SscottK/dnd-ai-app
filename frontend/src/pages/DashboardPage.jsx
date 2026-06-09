@@ -28,7 +28,7 @@ import {
   writeStoredDmLayout,
 } from "../lib/sheetLayout";
 import { fetchCampaignNotes, serverNotesToClient } from "../lib/campaignNotes";
-import { PAGE_SCROLL_CLASS, PullToRefresh } from "../components/PullToRefresh";
+import { PageScroll } from "../components/PageScroll";
 
 const emptyCharacterForm = {
   name: "",
@@ -483,7 +483,7 @@ export function DashboardPage() {
     "w-full rounded-sm border border-border bg-black px-3 py-2.5 text-sm font-mono text-starlight placeholder:text-ink-faint focus:border-neon-cyan focus:outline-none";
 
   return (
-    <PullToRefresh onRefresh={loadDashboard} className={`session-ui ${PAGE_SCROLL_CLASS} bg-void`}>
+    <PageScroll onRefresh={loadDashboard} className="session-ui bg-void">
       <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-8">
         <header className="mb-8">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan sm:text-sm">
@@ -1162,6 +1162,6 @@ export function DashboardPage() {
           </div>
         </div>
       )}
-    </PullToRefresh>
+    </PageScroll>
   );
 }

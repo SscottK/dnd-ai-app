@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronDown, Plus, ScrollText, Trash2 } from "lucide-react";
 import { CampaignNotesEditor } from "../components/notes/CampaignNotesEditor";
-import { PAGE_SCROLL_CLASS, PullToRefresh } from "../components/PullToRefresh";
+import { PageScroll } from "../components/PageScroll";
 import { useAuth } from "../hooks/useAuth";
 import {
   createUserNote,
@@ -222,7 +222,7 @@ export function NotesPage() {
   };
 
   return (
-    <PullToRefresh onRefresh={loadNotes} className={`${PAGE_SCROLL_CLASS} p-3 sm:p-6`}>
+    <PageScroll onRefresh={loadNotes} className="p-3 sm:p-6">
       <div className="mx-auto max-w-4xl space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -402,6 +402,6 @@ export function NotesPage() {
           );
         })}
       </div>
-    </PullToRefresh>
+    </PageScroll>
   );
 }
