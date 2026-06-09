@@ -3,6 +3,7 @@ import { ExternalLink, FileText, RefreshCw, Upload, X } from "lucide-react";
 import { openAuthenticatedPdfInTab } from "./AuthenticatedPdfFrame";
 import { DigitalCharacterSheet } from "./DigitalCharacterSheet";
 import { resolveCombatStats } from "../../lib/characterSheet";
+import { confirmPdfReplace } from "../../lib/pdfReplace";
 
 export function FullSheetModal({
   open,
@@ -73,7 +74,15 @@ export function FullSheetModal({
                   className="hidden"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) void onUploadPdf(file);
+                    if (
+                      file &&
+                      confirmPdfReplace({
+                        characterName: character.name,
+                        hasExistingPdf: hasPdf,
+                      })
+                    ) {
+                      void onUploadPdf(file);
+                    }
                     event.target.value = "";
                   }}
                 />

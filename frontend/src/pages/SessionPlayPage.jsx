@@ -16,6 +16,7 @@ import { DetailSlideOver } from "../components/sheet/DetailSlideOver";
 import { FullSheetModal } from "../components/sheet/FullSheetModal";
 import { DiceRoller } from "../components/DiceRoller";
 import { formatRollEntry, postActionRoll } from "../lib/actionRoll";
+import { confirmPdfReplace } from "../lib/pdfReplace";
 import {
   DmGeneratorsWidget,
   DmNotesWidget,
@@ -1060,6 +1061,14 @@ export function SessionPlayPage() {
 
   const handleUploadPdf = async (file) => {
     if (!token || !characterId || !file) return;
+    if (
+      !confirmPdfReplace({
+        characterName: character?.name,
+        hasExistingPdf: Boolean(character?.pdf_url),
+      })
+    ) {
+      return;
+    }
 
     setUploadingPdf(true);
     setError("");

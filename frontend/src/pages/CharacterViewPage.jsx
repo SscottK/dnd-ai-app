@@ -7,6 +7,7 @@ import { useNestedPageLayout } from "../contexts/PageRefreshContext";
 import { useAuth } from "../hooks/useAuth";
 import { APP_MOBILE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 import { apiFetch, apiUpload } from "../lib/api";
+import { confirmPdfReplace } from "../lib/pdfReplace";
 
 export function CharacterViewPage() {
   const { characterId } = useParams();
@@ -98,6 +99,15 @@ export function CharacterViewPage() {
   const handleReplacePdf = async (event) => {
     const file = event.target.files?.[0];
     if (!file || !token || !characterId) return;
+    if (
+      !confirmPdfReplace({
+        characterName: character?.name,
+        hasExistingPdf: Boolean(character?.pdf_url),
+      })
+    ) {
+      event.target.value = "";
+      return;
+    }
 
     setUploading(true);
     setError("");

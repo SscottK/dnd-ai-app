@@ -29,6 +29,7 @@ import {
 } from "../lib/sheetLayout";
 import { fetchCampaignNotes, serverNotesToClient } from "../lib/campaignNotes";
 import { PageScroll } from "../components/PageScroll";
+import { confirmPdfReplace } from "../lib/pdfReplace";
 
 const emptyCharacterForm = {
   name: "",
@@ -229,6 +230,16 @@ export function DashboardPage() {
   const handleReplacePdfForEdit = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !token || !editingCharacterId) return;
+    const existing = characters.find((c) => c.id === editingCharacterId);
+    if (
+      !confirmPdfReplace({
+        characterName: existing?.name || characterForm.name,
+        hasExistingPdf: Boolean(existing?.pdf_url),
+      })
+    ) {
+      e.target.value = "";
+      return;
+    }
 
     setParsingPdf(true);
     setError("");
