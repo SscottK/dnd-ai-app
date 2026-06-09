@@ -1346,6 +1346,62 @@ function resourceSheetForCombatant(combatant, { isActive, characterId, sheet, dm
   return null;
 }
 
+function partySliceRequestBody(activeCombatant, isOwner) {
+  const body = {};
+  if (isOwner && activeCombatant?.id) {
+    body.combatant_id = activeCombatant.id;
+  }
+  return body;
+}
+
+function PartyPassControls({
+  passOptions,
+  passBusy,
+  onPass,
+  onFinishSlice,
+  finishLabel = "Done",
+}) {
+  if (!passOptions.length) {
+    return (
+      <div className="border-t border-border/40 pt-2">
+        <button
+          type="button"
+          disabled={passBusy}
+          onClick={onFinishSlice}
+          className="rounded-sm border border-starlight/60 px-2 py-0.5 text-[10px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
+        >
+          {finishLabel}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-2">
+      <span className="text-[10px] font-black uppercase text-ink-faint">Pass to</span>
+      {passOptions.map((member) => (
+        <button
+          key={member.id}
+          type="button"
+          disabled={passBusy}
+          onClick={() => onPass(member)}
+          className="rounded-sm border border-neon-cyan/50 px-2 py-0.5 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+        >
+          {member.name}
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={passBusy}
+        onClick={onFinishSlice}
+        className="rounded-sm border border-starlight/60 px-2 py-0.5 text-[10px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
+      >
+        {finishLabel}
+      </button>
+    </div>
+  );
+}
+
 export function InitiativeWidget({
   campaignId,
   characterId,
@@ -1494,7 +1550,10 @@ export function InitiativeWidget({
       const res = await apiFetch(`/campaigns/${campaignId}/encounter/pass-combat`, {
         token,
         method: "POST",
-        body: { target_combatant_id: targetCombatantId },
+        body: {
+          target_combatant_id: targetCombatantId,
+          ...partySliceRequestBody(activeCombatant, isOwner),
+        },
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1518,7 +1577,7 @@ export function InitiativeWidget({
       const res = await apiFetch(`/campaigns/${campaignId}/encounter/finish-party-slice`, {
         token,
         method: "POST",
-        body: {},
+        body: partySliceRequestBody(activeCombatant, isOwner),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1804,38 +1863,31 @@ export function InitiativeWidget({
     );
   };
 
+  const dmPartyPassSlot =
+    isOwner && partyPhase && activeCombatant?.character_id ? (
+      <PartyPassControls
+        passOptions={passOptions}
+        passBusy={passBusy}
+        onPass={setPassTarget}
+        onFinishSlice={finishPartySlice}
+        finishLabel="Done slice"
+      />
+    ) : null;
+
   if (!isOwner) {
     const combatActive = combatHasStarted(encounter) || hasTurnOrder(encounter);
     const needsInitRoll = playerNeedsInitiativeRoll(encounter, characterId);
     const turnHeaderSlot =
       isMyTurn && (partyPhase || !teamMode) ? (
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-2">
-          {partyPhase && passOptions.length > 0 && (
-            <>
-              <span className="text-[10px] font-black uppercase text-ink-faint">Pass to</span>
-              {passOptions.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  disabled={passBusy}
-                  onClick={() => setPassTarget(member)}
-                  className="rounded-sm border border-neon-cyan/50 px-2 py-0.5 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
-                >
-                  {member.name}
-                </button>
-              ))}
-            </>
-          )}
-          {partyPhase ? (
-            <button
-              type="button"
-              disabled={passBusy}
-              onClick={finishPartySlice}
-              className="rounded-sm border border-starlight/60 px-2 py-0.5 text-[10px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
-            >
-              Done
-            </button>
-          ) : (
+        partyPhase ? (
+          <PartyPassControls
+            passOptions={passOptions}
+            passBusy={passBusy}
+            onPass={setPassTarget}
+            onFinishSlice={finishPartySlice}
+          />
+        ) : (
+          <div className="border-t border-border/40 pt-2">
             <button
               type="button"
               disabled={submitting}
@@ -1844,8 +1896,8 @@ export function InitiativeWidget({
             >
               End turn
             </button>
-          )}
-        </div>
+          </div>
+        )
       ) : null;
 
     return (
@@ -2066,32 +2118,6 @@ export function InitiativeWidget({
               Party init: <span className="text-starlight">{partyInitDisplay}</span>
             </p>
           )}
-          {isMyTurn && passOptions.length > 0 && (
-            <div className="mt-2 space-y-1.5 border-t border-border/50 pt-2">
-              <p className="text-[10px] font-black uppercase text-ink-faint">Pass combat to</p>
-              <div className="flex flex-wrap gap-1">
-                {passOptions.map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    disabled={passBusy}
-                    onClick={() => setPassTarget(member)}
-                    className="rounded-sm border border-neon-cyan/50 px-2 py-0.5 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
-                  >
-                    {member.name}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                disabled={passBusy}
-                onClick={finishPartySlice}
-                className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan disabled:opacity-40"
-              >
-                Done — end my slice
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -2208,6 +2234,7 @@ export function InitiativeWidget({
           canTakeTurn
           canAdjustMovement
           isDmProxy
+          headerSlot={dmPartyPassSlot}
           actionCatalogMode={activeCombatant.character_id ? "pc" : "npc"}
           actionSheet={dmActionSheet}
           actionSheetLoading={dmSheetLoading}
