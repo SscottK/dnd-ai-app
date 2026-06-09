@@ -17,6 +17,7 @@ import {
 import { encounterPatchBody } from "../../lib/encounterPatch";
 import {
   buildTrackerCombatants,
+  combatHasStarted,
   hasTurnOrder,
   isPartyPhaseActive,
   isPartySlotEntry,
@@ -26,6 +27,7 @@ import {
   partyPcs,
   partyRoster,
   passTargets,
+  playerNeedsInitiativeRoll,
   resolveActiveCombatant,
   resolveMyCombatant,
   showPartyInitiative,
@@ -970,11 +972,12 @@ function InitiativeCombatantStats({
   resourceSheet,
 }) {
   if (isPartySlotEntry(combatant)) {
+    const memberCount = combatant.party_members?.length || 0;
     return (
       <div className="flex w-full flex-col gap-0.5">
         <InitiativeLabeledStat label="Init" value={combatant.initiative} />
-        {combatant.party_member_names ? (
-          <InitiativeLabeledStat label="PCs" value={combatant.party_member_names} />
+        {memberCount > 0 ? (
+          <InitiativeLabeledStat label="Group" value={`${memberCount} PC${memberCount === 1 ? "" : "s"}`} />
         ) : null}
       </div>
     );
@@ -1722,6 +1725,286 @@ export function InitiativeWidget({
     if (nextOrientation === orientation) return;
     onOrientationChange?.(nextOrientation, displaySorted.length);
   };
+
+  const renderTracker = () => {
+    if (displaySorted.length === 0) {
+      return (
+        <p className="text-xs font-mono text-ink-faint">
+          Roll initiative to join the tracker when combat starts.
+        </p>
+      );
+    }
+    if (isHorizontal) {
+      return (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {displaySorted.map((combatant, index) => {
+            const defeated = isDefeatedEnemy(combatant);
+            const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+            const isYou = isPartySlotEntry(combatant)
+              ? partyRoster(encounter).some((member) => member.character_id === characterId)
+              : combatant.character_id === characterId;
+            return (
+              <InitiativeCombatantCard
+                key={combatant.id}
+                combatant={combatant}
+                combatants={encounter.combatants}
+                index={index}
+                isActive={isActive}
+                isYou={isYou}
+                isDmView={false}
+                isDefeated={defeated}
+                onPortraitPreview={setPortraitPreview}
+                token={token}
+                turnEconomy={encounter.turn_economy}
+                resourceSheet={resourceSheetForCombatant(combatant, {
+                  isActive,
+                  characterId,
+                  sheet,
+                  dmActionSheet: null,
+                  isOwner: false,
+                })}
+              />
+            );
+          })}
+        </div>
+      );
+    }
+    return (
+      <ul className="space-y-1.5">
+        {displaySorted.map((combatant, index) => {
+          const defeated = isDefeatedEnemy(combatant);
+          const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+          const isYou = isPartySlotEntry(combatant)
+            ? partyRoster(encounter).some((member) => member.character_id === characterId)
+            : combatant.character_id === characterId;
+          return (
+            <InitiativeCombatantRow
+              key={combatant.id}
+              combatant={combatant}
+              combatants={encounter.combatants}
+              index={index}
+              isActive={isActive}
+              isYou={isYou}
+              isDmView={false}
+              isDefeated={defeated}
+              onPortraitPreview={setPortraitPreview}
+              token={token}
+              turnEconomy={encounter.turn_economy}
+              resourceSheet={resourceSheetForCombatant(combatant, {
+                isActive,
+                characterId,
+                sheet,
+                dmActionSheet: null,
+                isOwner: false,
+              })}
+            />
+          );
+        })}
+      </ul>
+    );
+  };
+
+  if (!isOwner) {
+    const combatActive = combatHasStarted(encounter) || hasTurnOrder(encounter);
+    const needsInitRoll = playerNeedsInitiativeRoll(encounter, characterId);
+    const turnHeaderSlot =
+      isMyTurn && (partyPhase || !teamMode) ? (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-2">
+          {partyPhase && passOptions.length > 0 && (
+            <>
+              <span className="text-[10px] font-black uppercase text-ink-faint">Pass to</span>
+              {passOptions.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  disabled={passBusy}
+                  onClick={() => setPassTarget(member)}
+                  className="rounded-sm border border-neon-cyan/50 px-2 py-0.5 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                >
+                  {member.name}
+                </button>
+              ))}
+            </>
+          )}
+          {partyPhase ? (
+            <button
+              type="button"
+              disabled={passBusy}
+              onClick={finishPartySlice}
+              className="rounded-sm border border-starlight/60 px-2 py-0.5 text-[10px] font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
+            >
+              Done
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleEndTurn}
+              className="rounded-sm border border-starlight bg-starlight/10 px-2 py-0.5 text-[10px] font-black uppercase text-starlight hover:bg-starlight/20 disabled:opacity-40"
+            >
+              End turn
+            </button>
+          )}
+        </div>
+      ) : null;
+
+    return (
+      <div className="session-ui flex h-full min-h-0 flex-col gap-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border pb-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-ink-faint">
+            Round <span className="text-lg text-neon-cyan">{encounter.round}</span>
+          </p>
+          <div className="flex items-center gap-1">
+            <div className="flex overflow-hidden rounded-sm border border-border">
+              <button
+                type="button"
+                onClick={() => handleOrientation(INITIATIVE_ORIENTATION_VERTICAL)}
+                className={`p-1.5 ${
+                  !isHorizontal
+                    ? "bg-neon-cyan/20 text-starlight"
+                    : "text-ink-faint hover:bg-border/40 hover:text-starlight"
+                }`}
+                title="Vertical list"
+              >
+                <Rows3 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOrientation(INITIATIVE_ORIENTATION_HORIZONTAL)}
+                className={`border-l border-border p-1.5 ${
+                  isHorizontal
+                    ? "bg-neon-cyan/20 text-starlight"
+                    : "text-ink-faint hover:bg-border/40 hover:text-starlight"
+                }`}
+                title="Horizontal row"
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={loadEncounter}
+              className="rounded p-1.5 text-ink-faint hover:bg-border/40 hover:text-starlight"
+              title="Refresh initiative"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[42%] shrink-0 overflow-auto rounded-sm border border-border/60 bg-void-deep/30 p-2">
+          {renderTracker()}
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+          {actionError && (
+            <p className="shrink-0 text-xs font-mono text-danger">{actionError}</p>
+          )}
+
+          {isMyTurn && myCombatant && combatActive ? (
+            <TurnActionsPanel
+              campaignId={campaignId}
+              token={token}
+              sheet={sheet}
+              actionCatalogMode="pc"
+              encounter={encounter}
+              actorCombatant={myCombatant}
+              canTakeTurn
+              canAdjustMovement
+              headerSlot={turnHeaderSlot}
+              onEncounterUpdate={setEncounter}
+              onSheetRefresh={handleSheetRefresh}
+              onCombatEnded={onCombatEnded}
+              onError={setActionError}
+            />
+          ) : needsInitRoll ? (
+            <div className="shrink-0 space-y-2 rounded-sm border border-border-bright bg-void-deep/50 p-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-ink-faint">
+                {teamMode ? "Roll for team initiative" : "Roll initiative"}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={handleAutoRoll}
+                  className="flex items-center gap-1 rounded-sm border border-neon-cyan px-2 py-1 text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                >
+                  <Dices className="h-3.5 w-3.5" />
+                  Roll d20{formatModifier(initiativeBonus)}
+                </button>
+                <form onSubmit={handleManualSubmit} className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={manualInit}
+                    onChange={(e) => setManualInit(e.target.value)}
+                    placeholder="Total"
+                    className="w-14 rounded-sm border border-border bg-black px-2 py-1 text-center text-xs font-mono text-starlight"
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting || manualInit === ""}
+                    className="rounded-sm border border-border px-2 py-1 text-xs font-black uppercase text-ink-muted hover:text-starlight disabled:opacity-40"
+                  >
+                    Set
+                  </button>
+                </form>
+              </div>
+              {teamMode && (
+                <p className="text-[10px] font-mono text-ink-faint">
+                  Your roll counts toward the party slot (floor of average).
+                </p>
+              )}
+              {lastRoll && lastRoll.d20 != null && (
+                <p className="text-xs font-mono text-neon-cyan">
+                  Rolled {lastRoll.d20} {formatModifier(lastRoll.bonus)} ={" "}
+                  <span className="font-black text-starlight">{lastRoll.total}</span>
+                </p>
+              )}
+            </div>
+          ) : combatActive ? (
+            <p className="shrink-0 rounded-sm border border-border/60 bg-void-deep/40 px-2 py-2 text-xs font-mono text-ink-muted">
+              {partyPhase && activeCombatant
+                ? `Party turn — ${activeCombatant.name} is acting`
+                : activeCombatant
+                  ? `Waiting — ${activeCombatant.name}'s turn`
+                  : "Waiting for the next turn…"}
+            </p>
+          ) : (
+            <p className="shrink-0 text-xs font-mono text-ink-faint">
+              Combat has not started yet.
+            </p>
+          )}
+
+          {combatActive && encounter.combat_log?.length > 0 && (
+            <details className="shrink-0 rounded-sm border border-border/50 bg-void-deep/25 px-2 py-1.5">
+              <summary className="cursor-pointer text-[10px] font-black uppercase tracking-widest text-ink-faint">
+                Combat log
+              </summary>
+              <div className="mt-2">
+                <EncounterCombatLog log={encounter.combat_log} limit={5} bare />
+              </div>
+            </details>
+          )}
+        </div>
+
+        <PortraitPreviewModal
+          open={!!portraitPreview}
+          portraitUrl={portraitPreview?.portraitUrl}
+          name={portraitPreview?.name}
+          token={token}
+          onClose={() => setPortraitPreview(null)}
+        />
+
+        <PassCombatDialog
+          open={Boolean(passTarget)}
+          targetName={passTarget?.name}
+          busy={passBusy}
+          onConfirm={() => passCombatTo(passTarget.id)}
+          onCancel={() => setPassTarget(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="session-ui flex h-full min-h-0 flex-col gap-2 sm:gap-3">

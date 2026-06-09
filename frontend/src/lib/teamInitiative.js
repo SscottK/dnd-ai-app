@@ -198,3 +198,15 @@ export function partyControllerOptions(encounter) {
       name: combatant.name,
     }));
 }
+
+/** True when the player still needs to submit an initiative roll before combat. */
+export function playerNeedsInitiativeRoll(encounter, characterId) {
+  if (!characterId || combatHasStarted(encounter)) return false;
+  const myCombatant = resolveMyCombatant(encounter, characterId);
+  if (!myCombatant) return true;
+  if (isTeamMode(encounter)) {
+    const roll = encounter?.team?.initiative_rolls?.[myCombatant.id];
+    return roll == null || roll <= 0;
+  }
+  return myCombatant.initiative == null || myCombatant.initiative <= 0;
+}

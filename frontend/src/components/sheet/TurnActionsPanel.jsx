@@ -100,6 +100,7 @@ export function TurnActionsPanel({
   onSheetRefresh,
   onCombatEnded,
   onError,
+  headerSlot = null,
 }) {
   const [step, setStep] = useState("pick_type");
   const [pickedType, setPickedType] = useState(null);
@@ -413,6 +414,8 @@ export function TurnActionsPanel({
         )}
       </p>
 
+      {headerSlot}
+
       {lastOutcome && step === "pick_type" && (
         <p className="rounded-sm border border-neon-cyan/30 bg-neon-cyan/10 px-2 py-1 text-xs sm:text-sm font-mono text-neon-cyan">
           {lastOutcome}
@@ -716,30 +719,36 @@ function formatLogEntry(entry) {
   return entry.message;
 }
 
-export function EncounterCombatLog({ log, limit = 8 }) {
+export function EncounterCombatLog({ log, limit = 8, bare = false }) {
   const entries = (log || []).slice(-limit).reverse();
   if (!entries.length) return null;
+
+  const list = (
+    <ul className={`space-y-0.5 overflow-y-auto ${bare ? "max-h-28" : "max-h-24"}`}>
+      {entries.map((entry, index) => (
+        <li key={`${entry.at}-${index}`} className="text-xs font-mono text-ink-muted">
+          <span
+            className={
+              entry.kind === "roll"
+                ? "text-neon-magenta"
+                : entry.kind === "action" || entry.kind === "hp"
+                  ? "text-neon-cyan"
+                  : "text-ink-faint"
+            }
+          >
+            {formatLogEntry(entry)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (bare) return list;
 
   return (
     <div className="shrink-0 space-y-1 rounded-sm border border-border/60 bg-void-deep/40 p-2">
       <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">Combat log</p>
-      <ul className="max-h-24 space-y-0.5 overflow-y-auto">
-        {entries.map((entry, index) => (
-          <li key={`${entry.at}-${index}`} className="text-xs sm:text-sm font-mono text-ink-muted">
-            <span
-              className={
-                entry.kind === "roll"
-                  ? "text-neon-magenta"
-                  : entry.kind === "action" || entry.kind === "hp"
-                    ? "text-neon-cyan"
-                    : "text-ink-faint"
-              }
-            >
-              {formatLogEntry(entry)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {list}
     </div>
   );
 }
