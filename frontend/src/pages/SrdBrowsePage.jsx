@@ -50,9 +50,15 @@ function BrowseListPanel({
   );
 }
 
-function EntryDetailPanel({ title, onClose, children, onRefresh }) {
+function EntryDetailPanel({ title, onClose, children, onRefresh, fullScreen = false }) {
   return (
-    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col rounded-md border border-border-bright bg-void-panel lg:w-[min(100%,26rem)]">
+    <div
+      className={`flex min-h-0 w-full min-w-0 flex-1 flex-col bg-void-panel ${
+        fullScreen
+          ? "h-full rounded-none border-0"
+          : "rounded-md border border-border-bright lg:w-[min(100%,26rem)]"
+      }`}
+    >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
         <p className="min-w-0 truncate text-xs font-black uppercase text-starlight">{title}</p>
         <button
@@ -287,6 +293,7 @@ export function SrdBrowsePage() {
 
   const showDetail = Boolean(selectedName);
   const mobileDetailOpen = isMobile && showDetail;
+  const mobileChromeHidden = mobileDetailOpen;
   const listEmptyMessage = loadingList
     ? null
     : showGlobalSearch && searchResults.length === 0 && !searching
@@ -295,67 +302,75 @@ export function SrdBrowsePage() {
 
   return (
     <div className="session-ui flex h-full min-h-0 flex-col overflow-hidden bg-void">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-3 overflow-hidden px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
-        <header className="shrink-0">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan">SRD 5.2.1</p>
-          <h1 className="mt-1 flex items-center gap-2 text-xl font-black uppercase text-starlight sm:text-2xl">
-            <BookOpen className="h-5 w-5 text-neon-magenta sm:h-6 sm:w-6" />
-            Rules browser
-          </h1>
-          <p className="mt-1 text-xs text-ink-muted sm:mt-2 sm:text-sm">
-            Browse spells, monsters, magic items, and more from the official System Reference Document.
-          </p>
-        </header>
+      <div
+        className={`mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden ${
+          mobileChromeHidden ? "gap-0" : "gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5"
+        }`}
+      >
+        {!mobileChromeHidden && (
+          <>
+            <header className="shrink-0">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan">SRD 5.2.1</p>
+              <h1 className="mt-1 flex items-center gap-2 text-xl font-black uppercase text-starlight sm:text-2xl">
+                <BookOpen className="h-5 w-5 text-neon-magenta sm:h-6 sm:w-6" />
+                Rules browser
+              </h1>
+              <p className="mt-1 text-xs text-ink-muted sm:mt-2 sm:text-sm">
+                Browse spells, monsters, magic items, and more from the official System Reference Document.
+              </p>
+            </header>
 
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void runSearch(trimmedSearch);
-          }}
-          className="flex shrink-0 gap-2"
-        >
-          <div className="relative min-w-0 flex-1">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search all SRD categories…"
-              className="w-full rounded-sm border border-border bg-black py-2 pl-3 pr-9 text-sm font-mono text-starlight placeholder:text-ink-faint focus:border-neon-cyan focus:outline-none"
-            />
-            {searchQuery && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void runSearch(trimmedSearch);
+              }}
+              className="flex shrink-0 gap-2"
+            >
+              <div className="relative min-w-0 flex-1">
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search all SRD categories…"
+                  className="w-full rounded-sm border border-border bg-black py-2 pl-3 pr-9 text-sm font-mono text-starlight placeholder:text-ink-faint focus:border-neon-cyan focus:outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ink-faint hover:text-starlight"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
               <button
-                type="button"
-                onClick={clearSearch}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ink-faint hover:text-starlight"
-                aria-label="Clear search"
+                type="submit"
+                className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-neon-cyan px-3 py-2 text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
               >
-                <X className="h-4 w-4" />
+                <Search className="h-4 w-4" />
+                <span>Search</span>
               </button>
+            </form>
+
+            {error && (
+              <p className="shrink-0 rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm font-mono text-danger">
+                {error}
+              </p>
             )}
-          </div>
-          <button
-            type="submit"
-            className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-neon-cyan px-3 py-2 text-xs font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
-          >
-            <Search className="h-4 w-4" />
-            <span className="hidden sm:inline">Search</span>
-          </button>
-        </form>
 
-        {error && (
-          <p className="shrink-0 rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm font-mono text-danger">
-            {error}
-          </p>
-        )}
-
-        {showGlobalSearch && !mobileDetailOpen && (
-          <SearchResultsPanel
-            results={searchResults}
-            searching={searching}
-            query={trimmedSearch}
-            onSelect={(name, category) => void openEntry(name, category)}
-            onClear={clearSearch}
-          />
+            {showGlobalSearch && (
+              <SearchResultsPanel
+                results={searchResults}
+                searching={searching}
+                query={trimmedSearch}
+                onSelect={(name, category) => void openEntry(name, category)}
+                onClear={clearSearch}
+              />
+            )}
+          </>
         )}
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:gap-4">
@@ -384,9 +399,13 @@ export function SrdBrowsePage() {
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:items-stretch">
             {(!isMobile || !showDetail) && (
-              <div className="min-h-0 w-full shrink-0 lg:w-[22rem] xl:w-[24rem]">
+              <div
+                className={`min-h-0 w-full shrink-0 ${
+                  isMobile ? "flex flex-1 flex-col" : "lg:w-[22rem] xl:w-[24rem]"
+                }`}
+              >
                 <BrowseListPanel
-                  fillHeight={!isMobile}
+                  fillHeight
                   onRefresh={refreshBrowse}
                   title={
                     <>
@@ -435,6 +454,7 @@ export function SrdBrowsePage() {
                 title={selectedName}
                 onClose={closeEntry}
                 onRefresh={refreshBrowse}
+                fullScreen={mobileDetailOpen}
               >
                 {loadingEntry && <p className="text-ink-faint">Loading…</p>}
                 {!loadingEntry && selectedEntry && (
@@ -442,6 +462,11 @@ export function SrdBrowsePage() {
                 )}
                 {!loadingEntry && !selectedEntry && (
                   <p className="text-ink-faint">Could not load this entry.</p>
+                )}
+                {mobileDetailOpen && error && (
+                  <p className="mt-3 rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-xs font-mono text-danger">
+                    {error}
+                  </p>
                 )}
               </EntryDetailPanel>
             )}

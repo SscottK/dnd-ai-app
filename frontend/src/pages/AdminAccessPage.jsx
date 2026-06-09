@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Check, MessageSquarePlus, ShieldAlert, UserPlus, X } from "lucide-react";
+import { PullToRefresh } from "../components/PullToRefresh";
 import { useAuth } from "../hooks/useAuth";
 import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
 import { apiFetch } from "../lib/api";
@@ -96,6 +97,15 @@ export function AdminAccessPage() {
     }
   }, [activeSection, loadAccessRequests, loadFeedback]);
 
+  const refreshPage = useCallback(async () => {
+    await refreshPendingCount();
+    if (activeSection === "access") {
+      await loadAccessRequests();
+    } else {
+      await loadFeedback();
+    }
+  }, [activeSection, loadAccessRequests, loadFeedback, refreshPendingCount]);
+
   if (!isValidating && !user?.is_admin) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -155,7 +165,7 @@ export function AdminAccessPage() {
         : "No reviewed feedback yet.";
 
   return (
-    <div className="h-full overflow-y-auto overscroll-y-contain p-3 sm:p-6">
+    <PullToRefresh onRefresh={refreshPage} className="h-full overflow-y-auto overscroll-y-contain p-3 sm:p-6">
       <div className="mx-auto max-w-3xl space-y-4 sm:space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-black uppercase italic tracking-tight text-starlight sm:text-2xl">
@@ -359,6 +369,6 @@ export function AdminAccessPage() {
           </ul>
         )}
       </div>
-    </div>
+    </PullToRefresh>
   );
 }

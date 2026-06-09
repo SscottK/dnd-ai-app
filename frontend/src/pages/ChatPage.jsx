@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useChatStream } from "../hooks/useChatStream";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { SrdCitations } from "../components/SrdCitations";
+import { PullToRefresh } from "../components/PullToRefresh";
 import { apiFetch } from "../lib/api";
 import {
   Plus,
@@ -42,14 +43,33 @@ export function ChatPage() {
     localStorage.setItem("pinned_conversations", JSON.stringify(pinnedConvIds));
   }, [pinnedConvIds]);
 
-  useEffect(() => {
-    if (token) {
-      apiFetch("/conversations", { token })
-        .then((res) => res.json())
-        .then((data) => setConversations(data.conversations || []))
-        .catch((e) => console.error("Error loading threads:", e));
+  const loadConversations = useCallback(async () => {
+    if (!token) return;
+    const res = await apiFetch("/conversations", { token });
+    if (res.ok) {
+      const data = await res.json();
+      setConversations(data.conversations || []);
     }
   }, [token]);
+
+  useEffect(() => {
+    void loadConversations();
+  }, [loadConversations]);
+
+  const refreshThreads = useCallback(async () => {
+    await loadConversations();
+  }, [loadConversations]);
+
+  const refreshActiveChat = useCallback(async () => {
+    await loadConversations();
+    if (!activeConvId || !token) return;
+    const res = await apiFetch(`/conversations/${activeConvId}`, { token });
+    if (res.ok) {
+      const data = await res.json();
+      setMessages(data.messages || []);
+      setStreamedReply("");
+    }
+  }, [loadConversations, activeConvId, token]);
 
   useEffect(() => {
     if (activeConvId && token) {
@@ -257,7 +277,10 @@ export function ChatPage() {
             <Plus className="w-4 h-4" /> New Thread
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-1 py-2 space-y-3">
+        <PullToRefresh
+          onRefresh={refreshThreads}
+          className="flex-1 overflow-y-auto overscroll-y-contain px-1 py-2 space-y-3"
+        >
           {pinnedThreads.length > 0 && (
             <div className="space-y-0.5">
               <div className="px-3 text-[10px] font-black text-starlight uppercase tracking-widest">Pinned</div>
@@ -274,7 +297,7 @@ export function ChatPage() {
               )
             )}
           </div>
-        </div>
+        </PullToRefresh>
       </aside>
       )}
 
@@ -294,7 +317,10 @@ export function ChatPage() {
                 </button>
               </div>
             )}
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:space-y-6 sm:p-6">
+            <PullToRefresh
+              onRefresh={refreshActiveChat}
+              className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 sm:space-y-6 sm:p-6"
+            >
               {messages.map((m, idx) => (
                 <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div
@@ -327,7 +353,7 @@ export function ChatPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </PullToRefresh>
             <div className="shrink-0 border-t-2 border-neon-magenta bg-black/95 p-3 sm:p-4">
               <form onSubmit={handleSendMessage} className="mx-auto flex max-w-3xl gap-2 font-mono">
                 <input

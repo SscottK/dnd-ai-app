@@ -13,12 +13,11 @@ const navLinkClass = ({ isActive }) =>
       : "border-transparent text-ink-muted hover:text-ink"
   }`;
 
-function NavItem({ to, end, icon: Icon, label, shortLabel, children }) {
+function NavItem({ to, end, icon: Icon, label, children }) {
   return (
     <NavLink to={to} end={end} className={navLinkClass} title={label}>
       <Icon className="h-3.5 w-3.5 shrink-0" />
-      <span className="sm:hidden">{shortLabel || label}</span>
-      <span className="hidden sm:inline">{label}</span>
+      <span className="whitespace-nowrap">{label}</span>
       {children}
     </NavLink>
   );
@@ -58,27 +57,21 @@ export function AppLayout() {
               className="flex items-center gap-1 rounded-sm px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-500 transition hover:text-danger"
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
+              <span className="whitespace-nowrap">Sign Out</span>
             </button>
           </div>
         </div>
 
         <nav className="flex items-center gap-0.5 overflow-x-auto overscroll-x-contain border-t border-border/50 px-2 pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-1 sm:border-t-0 sm:px-4 sm:pb-2 [&::-webkit-scrollbar]:hidden">
-          <NavItem to="/dashboard" end icon={LayoutDashboard} label="Dashboard" shortLabel="Home" />
-          <NavItem
-            to="/chat"
-            icon={MessageSquare}
-            label={RULE_WIZARD_LABEL}
-            shortLabel="Rules"
-          />
-          <NavItem to="/srd" icon={BookOpen} label="SRD" shortLabel="SRD" />
-          <NavItem to="/notes" icon={ScrollText} label="Notes" shortLabel="Notes" />
+          <NavItem to="/dashboard" end icon={LayoutDashboard} label="Dashboard" />
+          <NavItem to="/chat" icon={MessageSquare} label={RULE_WIZARD_LABEL} />
+          <NavItem to="/srd" icon={BookOpen} label="SRD" />
+          <NavItem to="/notes" icon={ScrollText} label="Notes" />
           {user?.is_admin && (
             <NavLink to="/admin/access" className={navLinkClass} title="Requests">
-              <span className="relative flex shrink-0 items-center gap-1">
+              <span className="relative flex shrink-0 items-center gap-1 whitespace-nowrap">
                 <UserPlus className="h-3.5 w-3.5" />
-                <span className="sm:hidden">Requests</span>
-                <span className="hidden sm:inline">Requests</span>
+                <span>Requests</span>
                 {pendingCount > 0 && (
                   <span
                     className="min-w-[1.1rem] rounded-full bg-neon-magenta px-1 text-center text-[9px] font-black leading-4 text-black"
