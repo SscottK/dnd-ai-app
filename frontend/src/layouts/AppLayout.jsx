@@ -1,7 +1,17 @@
 import { useCallback, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { BookOpen, LayoutDashboard, LogOut, MessageSquare, Scroll, ScrollText, UserPlus } from "lucide-react";
+import {
+  BookOpen,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Radio,
+  Scroll,
+  ScrollText,
+  UserPlus,
+} from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useLiveCampaigns } from "../hooks/useLiveCampaigns";
 import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { APP_NAME, APP_TAGLINE, APP_VERSION, RULE_WIZARD_LABEL } from "../constants/branding";
@@ -26,7 +36,19 @@ function NavItem({ to, end, icon: Icon, label, children }) {
   );
 }
 
-function AppHeader({ user, pendingCount, onLogout }) {
+function liveSessionNavLabel(campaigns) {
+  if (campaigns.length === 1) {
+    return campaigns[0].is_owner ? "Live session" : "Join session";
+  }
+  return `Live (${campaigns.length})`;
+}
+
+function AppHeader({ user, pendingCount, liveCampaigns, onLogout }) {
+  const liveSessionTitle =
+    liveCampaigns.length > 0
+      ? liveCampaigns.map((campaign) => campaign.name).join(" · ")
+      : undefined;
+
   return (
       <header className="shrink-0 border-b-4 border-neon-magenta bg-void-deep">
         <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-4">
@@ -59,6 +81,22 @@ function AppHeader({ user, pendingCount, onLogout }) {
 
         <nav className="flex items-center gap-0.5 overflow-x-auto overscroll-x-contain border-t border-border/50 px-2 pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-1 sm:border-t-0 sm:px-4 sm:pb-2 [&::-webkit-scrollbar]:hidden">
           <NavItem to="/dashboard" end icon={LayoutDashboard} label="Dashboard" />
+          {liveCampaigns.length > 0 && (
+            <NavLink
+              to={`/session/${liveCampaigns[0].id}`}
+              className={({ isActive }) =>
+                `flex shrink-0 items-center gap-1 rounded-sm px-2.5 py-2 text-[10px] font-black uppercase tracking-wide border-b-2 transition sm:gap-1.5 sm:px-3 sm:text-xs ${
+                  isActive
+                    ? "border-neon-magenta bg-neon-magenta/15 text-starlight"
+                    : "border-transparent bg-neon-magenta/10 text-neon-magenta hover:border-neon-magenta/60 hover:text-starlight"
+                }`
+              }
+              title={liveSessionTitle}
+            >
+              <Radio className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+              <span className="whitespace-nowrap">{liveSessionNavLabel(liveCampaigns)}</span>
+            </NavLink>
+          )}
           <NavItem to="/chat" icon={MessageSquare} label={RULE_WIZARD_LABEL} />
           <NavItem to="/srd" icon={BookOpen} label="SRD" />
           <NavItem to="/notes" icon={ScrollText} label="Notes" />
@@ -109,6 +147,7 @@ function AppLayoutBody() {
     token,
     Boolean(user?.is_admin)
   );
+  const { liveCampaigns } = useLiveCampaigns(token);
   const { layoutNested, getScrollElement } = usePageRefreshContext();
   const isMobile = useMediaQuery(APP_MOBILE_QUERY);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -138,7 +177,12 @@ function AppLayoutBody() {
           className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
         >
           <div ref={shiftRef}>
-            <AppHeader user={user} pendingCount={pendingCount} onLogout={logout} />
+            <AppHeader
+              user={user}
+              pendingCount={pendingCount}
+              liveCampaigns={liveCampaigns}
+              onLogout={logout}
+            />
             <main className="min-w-0">
               <Outlet />
             </main>
@@ -147,7 +191,12 @@ function AppLayoutBody() {
         </div>
       ) : (
         <div ref={shiftRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <AppHeader user={user} pendingCount={pendingCount} onLogout={logout} />
+          <AppHeader
+            user={user}
+            pendingCount={pendingCount}
+            liveCampaigns={liveCampaigns}
+            onLogout={logout}
+          />
           <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="flex h-full min-h-0 flex-1 flex-col">
               <Outlet />
