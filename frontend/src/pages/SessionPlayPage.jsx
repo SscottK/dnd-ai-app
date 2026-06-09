@@ -57,6 +57,7 @@ import {
   computeHorizontalInitiativeWidth,
   createWidget,
   defaultViewport,
+  pullWidgetsIntoView,
   hydrateLayout,
   INITIATIVE_ORIENTATION_HORIZONTAL,
   PANE_ORIENTATION_HORIZONTAL,
@@ -245,10 +246,23 @@ export function SessionPlayPage() {
       }
       const prevW = base.viewport?.canvasW || size.width;
       const prevH = base.viewport?.canvasH || size.height;
+      const viewportScale = base.viewport?.scale ?? DEFAULT_ZOOM;
       const widgets =
         prevW !== size.width || prevH !== size.height
-          ? reflowWidgetsOnResize(base.widgets, prevW, prevH, size.width, size.height)
-          : clampWidgets(base.widgets, size.width, size.height);
+          ? reflowWidgetsOnResize(
+              base.widgets,
+              prevW,
+              prevH,
+              size.width,
+              size.height,
+              viewportScale
+            )
+          : pullWidgetsIntoView(
+              clampWidgets(base.widgets, size.width, size.height, viewportScale),
+              size.width,
+              size.height,
+              viewportScale
+            );
       const next = {
         ...base,
         widgets,
@@ -688,8 +702,16 @@ export function SessionPlayPage() {
       canvasBoundsRef.current = { width: nextW, height: nextH };
 
       setLayout((prevLayout) => {
+        const viewportScale = prevLayout.viewport?.scale ?? DEFAULT_ZOOM;
         const next = {
-          widgets: reflowWidgetsOnResize(prevLayout.widgets, prevW, prevH, nextW, nextH),
+          widgets: reflowWidgetsOnResize(
+            prevLayout.widgets,
+            prevW,
+            prevH,
+            nextW,
+            nextH,
+            viewportScale
+          ),
           viewport: withCanvasViewport(prevLayout.viewport, nextW, nextH),
         };
         layoutRef.current = next;
@@ -751,7 +773,8 @@ export function SessionPlayPage() {
 
   const updateWidget = (widget) => {
     const { width, height } = canvasBoundsRef.current;
-    const bounded = clampWidget(widget, width, height);
+    const viewportScale = layoutRef.current.viewport?.scale ?? DEFAULT_ZOOM;
+    const bounded = clampWidget(widget, width, height, viewportScale);
     setLayout((prev) => ({
       ...prev,
       widgets: prev.widgets.map((w) => (w.id === widget.id ? bounded : w)),
@@ -874,7 +897,8 @@ export function SessionPlayPage() {
           next.w = Math.min(Math.max(idealW, w.w), maxW);
           next.h = Math.min(Math.max(160, w.h), Math.max(120, canvasH - w.y));
         }
-        return clampWidget(next, canvasW, canvasH);
+        const viewportScale = prev.viewport?.scale ?? DEFAULT_ZOOM;
+        return clampWidget(next, canvasW, canvasH, viewportScale);
       });
       const nextLayout = { ...prev, widgets: nextWidgets };
       setLayout(nextLayout);
@@ -896,7 +920,8 @@ export function SessionPlayPage() {
           next.w = idealW;
           next.h = Math.min(Math.max(180, w.h), Math.max(140, canvasH - w.y));
         }
-        return clampWidget(next, canvasW, canvasH);
+        const viewportScale = prev.viewport?.scale ?? DEFAULT_ZOOM;
+        return clampWidget(next, canvasW, canvasH, viewportScale);
       });
       const nextLayout = { ...prev, widgets: nextWidgets };
       setLayout(nextLayout);
@@ -925,7 +950,8 @@ export function SessionPlayPage() {
           ? { ...w, minimized: false, h: w.expandedH || w.h || 200, expandedH: w.expandedH || w.h || 200 }
           : { ...w, minimized: true, expandedH: w.h, h: MIN_PANE_HEIGHT };
         const { width, height } = canvasBoundsRef.current;
-        return clampWidget(next, width, height);
+        const viewportScale = layoutRef.current.viewport?.scale ?? DEFAULT_ZOOM;
+        return clampWidget(next, width, height, viewportScale);
       }),
     };
     setLayout(nextLayout);
@@ -976,11 +1002,21 @@ export function SessionPlayPage() {
   };
 
   const setViewport = (viewport, { save = true } = {}) => {
-    const nextLayout = { ...layout, viewport };
-    setLayout(nextLayout);
-    if (save) {
-      saveLayoutSnapshot(nextLayout);
-    }
+    const { width, height } = canvasBoundsRef.current;
+    setLayout((prev) => {
+      const nextViewport = { ...prev.viewport, ...viewport, canvasW: width, canvasH: height };
+      const scale = nextViewport.scale ?? DEFAULT_ZOOM;
+      const nextLayout = {
+        ...prev,
+        viewport: nextViewport,
+        widgets: pullWidgetsIntoView(prev.widgets, width, height, scale),
+      };
+      layoutRef.current = nextLayout;
+      if (save) {
+        saveLayoutSnapshot(nextLayout);
+      }
+      return nextLayout;
+    });
   };
 
   const resetZoom = () => {

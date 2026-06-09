@@ -331,14 +331,46 @@ export function paneOptionsForSession(isDmSession) {
   return isDmSession ? DM_WIDGET_TYPES : PLAYER_WIDGET_TYPES;
 }
 
-/** Keep pane fully inside the viewport — can touch edges, never extend past them. */
-export function clampWidget(widget, canvasW, canvasH) {
+/** Layout coordinate space shrinks when the canvas is zoomed in via CSS scale. */
+export function effectiveLayoutSize(canvasW, canvasH, viewportScale = 1) {
+  const scale = Math.max(Number(viewportScale) || 1, 0.01);
+  if (!canvasW || !canvasH) {
+    return { width: canvasW || 0, height: canvasH || 0, scale };
+  }
+  return {
+    width: canvasW / scale,
+    height: canvasH / scale,
+    scale,
+  };
+}
+
+function widgetDisplayHeight(widget, maxH) {
+  const height = widget.minimized ? MIN_PANE_HEIGHT : Math.max(120, widget.h);
+  return maxH ? Math.min(height, maxH) : height;
+}
+
+function widgetVisibleRatio(widget, effW, effH) {
+  const h = widgetDisplayHeight(widget, effH);
+  const left = Math.max(widget.x, 0);
+  const top = Math.max(widget.y, 0);
+  const right = Math.min(widget.x + widget.w, effW);
+  const bottom = Math.min(widget.y + h, effH);
+  if (right <= left || bottom <= top) return 0;
+  const visible = (right - left) * (bottom - top);
+  return visible / Math.max(1, widget.w * h);
+}
+
+/** Keep pane fully inside the effective viewport (accounts for zoom). */
+export function clampWidget(widget, canvasW, canvasH, viewportScale = 1) {
   if (!canvasW || !canvasH) return widget;
 
-  const height = widget.minimized ? MIN_PANE_HEIGHT : Math.min(Math.max(120, widget.h), canvasH);
-  const width = Math.min(Math.max(MIN_PANE_WIDTH, widget.w), canvasW);
-  const maxX = Math.max(0, canvasW - width);
-  const maxY = Math.max(0, canvasH - height);
+  const { width: effW, height: effH } = effectiveLayoutSize(canvasW, canvasH, viewportScale);
+  const height = widget.minimized
+    ? MIN_PANE_HEIGHT
+    : Math.min(widgetDisplayHeight(widget, effH), effH);
+  const width = Math.min(Math.max(MIN_PANE_WIDTH, widget.w), effW);
+  const maxX = Math.max(0, effW - width);
+  const maxY = Math.max(0, effH - height);
 
   return {
     ...widget,
@@ -349,22 +381,85 @@ export function clampWidget(widget, canvasW, canvasH) {
   };
 }
 
-export function clampWidgets(widgets, canvasW, canvasH) {
-  return widgets.map((widget) => clampWidget(widget, canvasW, canvasH));
+export function clampWidgets(widgets, canvasW, canvasH, viewportScale = 1) {
+  return widgets.map((widget) => clampWidget(widget, canvasW, canvasH, viewportScale));
+}
+
+/** Move a pane back into view, pulling toward the center when it is mostly off-screen. */
+export function nudgeWidgetIntoView(widget, canvasW, canvasH, viewportScale = 1) {
+  if (!canvasW || !canvasH) return widget;
+
+  const { width: effW, height: effH } = effectiveLayoutSize(canvasW, canvasH, viewportScale);
+  const width = Math.min(Math.max(MIN_PANE_WIDTH, widget.w), effW);
+  const height = widgetDisplayHeight(widget, effH);
+  let x = widget.x;
+  let y = widget.y;
+
+  const ratio = widgetVisibleRatio({ ...widget, w: width, h: height }, effW, effH);
+  const fullyInside =
+    ratio >= 0.9 && x >= 0 && y >= 0 && x + width <= effW && y + height <= effH;
+  if (fullyInside) {
+    return clampWidget({ ...widget, w: width, h: height }, canvasW, canvasH, viewportScale);
+  }
+
+  if (ratio === 0) {
+    x = Math.round((effW - width) / 2);
+    y = Math.round((effH - height) / 2);
+  } else {
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x + width > effW) x = Math.max(0, effW - width);
+    if (y + height > effH) y = Math.max(0, effH - height);
+    const afterClamp = widgetVisibleRatio({ ...widget, x, y, w: width, h: height }, effW, effH);
+    if (afterClamp < 0.6) {
+      const centerX = (effW - width) / 2;
+      const centerY = (effH - height) / 2;
+      x = Math.round(x * 0.3 + centerX * 0.7);
+      y = Math.round(y * 0.3 + centerY * 0.7);
+    }
+  }
+
+  return clampWidget({ ...widget, x, y, w: width, h: height }, canvasW, canvasH, viewportScale);
+}
+
+/** Recover panes after resize/zoom so none stay hidden outside the visible canvas. */
+export function pullWidgetsIntoView(widgets, canvasW, canvasH, viewportScale = 1) {
+  const { width: effW, height: effH } = effectiveLayoutSize(canvasW, canvasH, viewportScale);
+  const stagger = 16;
+
+  return widgets.map((widget, index) => {
+    const before = widgetVisibleRatio(widget, effW, effH);
+    let next = nudgeWidgetIntoView(widget, canvasW, canvasH, viewportScale);
+    if (before >= 0.9) return next;
+
+    const col = index % 4;
+    const row = Math.floor(index / 4);
+    const h = widgetDisplayHeight(next, effH);
+    return clampWidget(
+      {
+        ...next,
+        x: Math.min(Math.max(0, next.x + col * stagger), Math.max(0, effW - next.w)),
+        y: Math.min(Math.max(0, next.y + row * stagger), Math.max(0, effH - h)),
+      },
+      canvasW,
+      canvasH,
+      viewportScale
+    );
+  });
 }
 
 /** Scale pane positions and sizes proportionally when the viewport changes, then clamp. */
-export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH) {
+export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH, viewportScale = 1) {
   if (!prevW || !prevH || (prevW === nextW && prevH === nextH)) {
-    return clampWidgets(widgets, nextW, nextH);
+    return pullWidgetsIntoView(clampWidgets(widgets, nextW, nextH, viewportScale), nextW, nextH, viewportScale);
   }
 
   const scaleX = nextW / prevW;
   const scaleY = nextH / prevH;
 
-  return widgets.map((widget) => {
+  const scaled = widgets.map((widget) => {
     const expandedH = widget.expandedH ?? widget.h;
-    const scaled = {
+    const next = {
       ...widget,
       x: Math.round(widget.x * scaleX),
       y: Math.round(widget.y * scaleY),
@@ -372,12 +467,14 @@ export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH) {
       expandedH: Math.round(expandedH * scaleY),
     };
     if (widget.minimized) {
-      scaled.h = MIN_PANE_HEIGHT;
+      next.h = MIN_PANE_HEIGHT;
     } else {
-      scaled.h = Math.round(expandedH * scaleY);
+      next.h = Math.round(expandedH * scaleY);
     }
-    return clampWidget(scaled, nextW, nextH);
+    return clampWidget(next, nextW, nextH, viewportScale);
   });
+
+  return pullWidgetsIntoView(scaled, nextW, nextH, viewportScale);
 }
 
 export function vttZoneDefault(canvasW, canvasH) {
@@ -862,16 +959,23 @@ export function hydrateLayout(layout, canvasW = 1280, canvasH = 800) {
   if (!layout?.widgets?.length) return null;
   const layoutW = layout.viewport?.canvasW ?? canvasW;
   const layoutH = layout.viewport?.canvasH ?? canvasH;
+  const scale = layout.viewport?.scale ?? DEFAULT_ZOOM;
   return {
     widgets: ensureWidgetZIndices(
-      clampWidgets(
-        layout.widgets.filter((widget) => widget.type !== "dm_combatants").map(normalizeWidget),
+      pullWidgetsIntoView(
+        clampWidgets(
+          layout.widgets.filter((widget) => widget.type !== "dm_combatants").map(normalizeWidget),
+          layoutW,
+          layoutH,
+          scale
+        ),
         layoutW,
-        layoutH
+        layoutH,
+        scale
       )
     ),
     viewport: {
-      scale: layout.viewport?.scale ?? DEFAULT_ZOOM,
+      scale,
       canvasW: layoutW,
       canvasH: layoutH,
     },
@@ -889,24 +993,31 @@ export function parseLayout(layoutJson, canvasW = 1280, canvasH = 800) {
     }
     const layoutW = parsed.viewport?.canvasW ?? canvasW;
     const layoutH = parsed.viewport?.canvasH ?? canvasH;
-    const widgets = clampWidgets(
-      ensureCharacterPortraitWidget(
-        ensurePlayerNotesWidget(
-          ensureVttWidget(recenterWidgets(parsed.widgets, layoutW, layoutH), layoutW, layoutH),
+    const scale = parsed.viewport?.scale ?? DEFAULT_ZOOM;
+    const widgets = pullWidgetsIntoView(
+      clampWidgets(
+        ensureCharacterPortraitWidget(
+          ensurePlayerNotesWidget(
+            ensureVttWidget(recenterWidgets(parsed.widgets, layoutW, layoutH), layoutW, layoutH),
+            layoutW,
+            layoutH
+          ),
           layoutW,
           layoutH
-        ),
+        ).map(normalizeWidget),
         layoutW,
-        layoutH
-      ).map(normalizeWidget),
+        layoutH,
+        scale
+      ),
       layoutW,
-      layoutH
+      layoutH,
+      scale
     );
 
     return {
       widgets: ensureWidgetZIndices(widgets),
       viewport: {
-        scale: parsed.viewport?.scale ?? DEFAULT_ZOOM,
+        scale,
         canvasW: layoutW,
         canvasH: layoutH,
       },

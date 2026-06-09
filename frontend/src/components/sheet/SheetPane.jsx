@@ -41,7 +41,8 @@ export function SheetPane({
               y: Math.round(dragRef.current.originY + dy),
             },
             width,
-            height
+            height,
+            scale
           )
         );
       } else if (resizeRef.current) {
@@ -57,7 +58,8 @@ export function SheetPane({
               expandedH: nextH,
             },
             width,
-            height
+            height,
+            scale
           )
         );
       }
@@ -69,7 +71,7 @@ export function SheetPane({
       resizeRef.current = null;
       if (wasDragging) {
         const { width, height } = getCanvasBounds();
-        onCommit?.(clampWidget(widgetRef.current, width, height));
+        onCommit?.(clampWidget(widgetRef.current, width, height, scale));
         onInteractionEnd?.();
       }
     };
