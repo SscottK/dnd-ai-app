@@ -798,6 +798,30 @@ export function SessionPlayPage() {
     [saveLayoutSnapshot, scheduleNotesServerSave]
   );
 
+  const handleDeletedArchivedTab = useCallback(
+    (tab) => {
+      const prev = layoutRef.current;
+      const widgetType = isDmSession ? "dm_notes" : "player_notes";
+      const tabsKey = isDmSession ? "dmNotesTabs" : "playerNotesTabs";
+      const notesWidget = prev.widgets.find((widget) => widget.type === widgetType);
+      if (!notesWidget) return;
+
+      const nextTabs = (notesWidget[tabsKey] || []).filter((item) => item.id !== tab.id);
+      const nextClosed = (notesWidget.closedNotesTabs || []).filter((item) => item.id !== tab.id);
+      const nextActive =
+        notesWidget.activeNotesTabId === tab.id
+          ? nextTabs[0]?.id ?? null
+          : notesWidget.activeNotesTabId;
+
+      updateWidgetMeta(notesWidget.id, {
+        [tabsKey]: nextTabs,
+        closedNotesTabs: nextClosed,
+        activeNotesTabId: nextActive,
+      });
+    },
+    [isDmSession, updateWidgetMeta]
+  );
+
   const handleImportArchivedTab = useCallback(
     (tab) => {
       const prev = layoutRef.current;
@@ -1212,14 +1236,17 @@ export function SessionPlayPage() {
         );
       case "dice_roller":
         return (
-          <DiceRoller
-            campaignId={campaignId}
-            token={token}
-            rollerLabel={user?.username}
-            combatActive={combatActive}
-            sheet={sheet}
-            characterId={character?.id}
-          />
+          <div className="flex h-full min-h-0 flex-1 flex-col">
+            <DiceRoller
+              campaignId={campaignId}
+              token={token}
+              rollerLabel={user?.username}
+              combatActive={combatActive}
+              sheet={sheet}
+              characterId={character?.id}
+              fillPane
+            />
+          </div>
         );
       case "vtt_zone":
         return <VttZoneWidget campaignId={campaignId} />;
@@ -1547,6 +1574,7 @@ export function SessionPlayPage() {
         }
         onClose={() => setNotesArchiveOpen(false)}
         onImportTab={handleImportArchivedTab}
+        onTabDeleted={handleDeletedArchivedTab}
       />
     </div>
   );

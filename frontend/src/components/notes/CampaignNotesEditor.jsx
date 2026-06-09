@@ -99,6 +99,23 @@ export function CampaignNotesEditor({ campaignId, token, campaignName }) {
     scheduleSave(nextState);
   };
 
+  const handleDeletedTab = (tab) => {
+    const current = stateRef.current;
+    const nextTabs = current.tabs.filter((item) => item.id !== tab.id);
+    const nextClosed = current.closedTabs.filter((item) => item.id !== tab.id);
+    const nextActive =
+      current.activeTabId === tab.id ? nextTabs[0]?.id ?? null : current.activeTabId;
+    const nextState = {
+      tabs: nextTabs,
+      closedTabs: nextClosed,
+      activeTabId: nextActive,
+    };
+    setTabs(nextState.tabs);
+    setClosedTabs(nextState.closedTabs);
+    setActiveTabId(nextState.activeTabId);
+    stateRef.current = nextState;
+  };
+
   const handleImportTab = (tab) => {
     const current = stateRef.current;
     const nextClosed = current.closedTabs.filter((item) => item.id !== tab.id);
@@ -156,6 +173,7 @@ export function CampaignNotesEditor({ campaignId, token, campaignName }) {
         openTabs={tabs}
         onClose={() => setArchiveOpen(false)}
         onImportTab={handleImportTab}
+        onTabDeleted={handleDeletedTab}
       />
       {campaignName && (
         <p className="text-[9px] font-mono text-ink-faint">

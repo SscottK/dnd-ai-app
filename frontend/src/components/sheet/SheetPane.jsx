@@ -184,7 +184,7 @@ export function SheetPane({
         </div>
       </div>
       {!widget.minimized && (
-        <div className="relative z-0 min-h-0 min-w-0 flex-1 overflow-auto p-3 text-sm font-mono text-ink-muted sm:p-4">
+        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-3 text-sm font-mono text-ink-muted sm:p-4">
           {children}
         </div>
       )}

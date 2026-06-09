@@ -569,6 +569,7 @@ export function DmToolboxWidget({ campaignId, token, rollerLabel, combatActive =
         token={token}
         rollerLabel={rollerLabel}
         combatActive={combatActive}
+        fillPane
       />
     </div>
   );

@@ -1,11 +1,24 @@
 import { useEffect, useState } from "react";
-import { ArchiveRestore, X } from "lucide-react";
-import { fetchCampaignNotes, serverNotesToClient } from "../../lib/campaignNotes";
+import { ArchiveRestore, Trash2, X } from "lucide-react";
+import {
+  deleteCampaignNoteTab,
+  fetchCampaignNotes,
+  serverNotesToClient,
+} from "../../lib/campaignNotes";
 
-export function NotesArchiveModal({ open, campaignId, token, openTabs, onClose, onImportTab }) {
+export function NotesArchiveModal({
+  open,
+  campaignId,
+  token,
+  openTabs,
+  onClose,
+  onImportTab,
+  onTabDeleted,
+}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [archivedTabs, setArchivedTabs] = useState([]);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     if (!open || !campaignId || !token) return undefined;
@@ -35,6 +48,26 @@ export function NotesArchiveModal({ open, campaignId, token, openTabs, onClose, 
       cancelled = true;
     };
   }, [open, campaignId, token, openTabs]);
+
+  const handleDeleteTab = async (tab) => {
+    if (!campaignId || !token) return;
+    const confirmed = window.confirm(
+      `Permanently delete "${tab.title}"?\n\nThis removes the tab from your archive and cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(tab.id);
+    setError("");
+    try {
+      await deleteCampaignNoteTab(campaignId, token, tab.id);
+      setArchivedTabs((prev) => prev.filter((item) => item.id !== tab.id));
+      onTabDeleted?.(tab);
+    } catch (err) {
+      setError(err.message || "Could not delete note.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (!open) return null;
 
@@ -77,14 +110,29 @@ export function NotesArchiveModal({ open, campaignId, token, openTabs, onClose, 
                   className="rounded-sm border border-border/70 bg-void-deep/40 p-3"
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
-                    <p className="text-[11px] font-black uppercase text-starlight">{tab.title}</p>
-                    <button
-                      type="button"
-                      onClick={() => onImportTab(tab)}
-                      className="shrink-0 rounded-sm border border-neon-cyan/50 px-2 py-0.5 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
-                    >
-                      Reopen
-                    </button>
+                    <p className="min-w-0 flex-1 text-[11px] font-black uppercase text-starlight">
+                      {tab.title}
+                    </p>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        disabled={deletingId === tab.id}
+                        onClick={() => onImportTab(tab)}
+                        className="rounded-sm border border-neon-cyan/50 px-2 py-0.5 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                      >
+                        Reopen
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deletingId === tab.id}
+                        onClick={() => handleDeleteTab(tab)}
+                        className="inline-flex items-center gap-1 rounded-sm border border-danger/50 px-2 py-0.5 text-[9px] font-black uppercase text-danger hover:bg-danger/10 disabled:opacity-40"
+                        title="Delete permanently"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </button>
+                    </div>
                   </div>
                   <p className="line-clamp-4 whitespace-pre-wrap text-[10px] font-mono text-ink-muted">
                     {tab.content || "(empty)"}
@@ -97,8 +145,8 @@ export function NotesArchiveModal({ open, campaignId, token, openTabs, onClose, 
 
         <div className="border-t border-border px-4 py-2">
           <p className="text-[9px] font-mono text-ink-faint">
-            Reopening adds the tab back to your open tabs. Edit anytime on the Notes page — live
-            session not required.
+            Reopen adds a tab back to your open notes. Delete permanently removes it from your
+            archive and server storage.
           </p>
         </div>
       </div>

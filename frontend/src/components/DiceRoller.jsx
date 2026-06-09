@@ -51,6 +51,7 @@ export function DiceRoller({
   combatActive = false,
   sheet = null,
   characterId = null,
+  fillPane = false,
 }) {
   const [mode, setMode] = useState("quick");
   const [expression, setExpression] = useState("1d20");
@@ -214,8 +215,12 @@ export function DiceRoller({
 
   const selectedSkill = skills.find((skill) => skill.name === skillName) || skills[0];
 
+  const rootClass = fillPane
+    ? "flex h-full min-h-0 flex-1 flex-col gap-2"
+    : "flex h-full min-h-0 flex-col gap-2";
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
+    <div className={rootClass}>
       <div className="flex shrink-0 items-center gap-2">
         <Dices className="h-4 w-4 shrink-0 text-neon-magenta" />
         <span className="text-[10px] font-black uppercase tracking-widest text-starlight">Dice</span>
@@ -262,21 +267,31 @@ export function DiceRoller({
       )}
 
       {mode === "quick" && (
-        <>
-          <div className="flex flex-wrap gap-1">
+        <div className={fillPane ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}>
+          <div
+            className={
+              fillPane
+                ? "grid min-h-0 flex-1 grid-cols-3 gap-1 sm:grid-cols-3"
+                : "flex flex-wrap gap-1"
+            }
+          >
             {QUICK_DICE.map((die) => (
               <button
                 key={die}
                 type="button"
                 disabled={busy}
                 onClick={() => handleQuickRoll(die)}
-                className="border border-zinc-700 px-2 py-1 text-[10px] font-black uppercase hover:border-neon-cyan hover:text-starlight disabled:opacity-40"
+                className={
+                  fillPane
+                    ? "flex min-h-[2.5rem] items-center justify-center border border-zinc-700 text-[10px] font-black uppercase hover:border-neon-cyan hover:text-starlight disabled:opacity-40 sm:min-h-[3rem] sm:text-xs"
+                    : "border border-zinc-700 px-2 py-1 text-[10px] font-black uppercase hover:border-neon-cyan hover:text-starlight disabled:opacity-40"
+                }
               >
                 {hasModifier ? appendModifier(die, parsedModifier) : die}
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className={fillPane ? "flex shrink-0 flex-wrap gap-1" : "flex flex-wrap gap-1"}>
             {COMMON_FORMULAS.filter((item) => !QUICK_DICE.includes(item)).map((formula) => (
               <button
                 key={formula}
@@ -289,11 +304,14 @@ export function DiceRoller({
               </button>
             ))}
           </div>
-        </>
+        </div>
       )}
 
       {mode === "expr" && (
-        <form onSubmit={handleExpressionRoll} className="space-y-2">
+        <form
+          onSubmit={handleExpressionRoll}
+          className={fillPane ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}
+        >
           <input
             value={expression}
             onChange={(event) => setExpression(event.target.value)}
@@ -314,7 +332,7 @@ export function DiceRoller({
       )}
 
       {mode === "check" && (
-        <div className="space-y-2">
+        <div className={fillPane ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}>
           {!sheet ? (
             <p className="text-[9px] font-mono text-ink-faint">Join with a character to roll checks.</p>
           ) : (
