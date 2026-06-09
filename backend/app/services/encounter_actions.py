@@ -192,8 +192,15 @@ def combat_has_started(state: EncounterState) -> bool:
 
 def sync_initiative_order_after_setup_change(state: EncounterState) -> bool:
     """Keep active turn at the top of order while assembling initiative; preserve mid-combat."""
+    from app.services.team_initiative import activate_current_team_slot, is_team_mode, refresh_turn_slots
+
     if combat_has_started(state):
         return ensure_active_combatant(state)
+    if is_team_mode(state):
+        refresh_turn_slots(state)
+        if activate_current_team_slot(state):
+            return True
+        return reset_active_to_top_of_initiative(state)
     return reset_active_to_top_of_initiative(state)
 
 

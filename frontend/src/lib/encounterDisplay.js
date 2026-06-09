@@ -121,6 +121,12 @@ export function turnStatusLabels(economy, combatants = []) {
     const target = combatants.find((c) => c.id === economy.helping_target_id);
     labels.push(target ? `Helping ${target.name}` : "Helping");
   }
-  if (economy.readied_action) labels.push(`Readied: ${economy.readied_action}`);
+  if (economy.readied_action) {
+    labels.push(
+      economy.readied_trigger
+        ? `Ready: ${economy.readied_action} (${economy.readied_trigger})`
+        : `Ready: ${economy.readied_action}`
+    );
+  }
   return labels;
 }

@@ -24,8 +24,24 @@ import {
   turnStatusLabels,
 } from "../lib/encounterDisplay";
 import { encounterPatchBody } from "../lib/encounterPatch";
+import {
+  combatHasStarted,
+  isPartyPhaseActive,
+  isTeamMode,
+  partyPcs,
+  partyRoster,
+  passTargets,
+  showPartyInitiative,
+} from "../lib/teamInitiative";
 import { PageScroll } from "../components/PageScroll";
 import { DiceRoller } from "../components/DiceRoller";
+import { TeamRosterRollModal } from "../components/initiative/TeamRosterRollModal";
+import { PassCombatDialog } from "../components/initiative/PassCombatDialog";
+import {
+  AllyControllerSelect,
+  partyControllerOptions,
+} from "../components/initiative/AllyControllerSelect";
+import { ReadiedActionsPanel } from "../components/initiative/ReadiedActionsPanel";
 import {
   EncounterCombatLog,
   TurnActionsPanel,
@@ -77,6 +93,7 @@ export function InitiativePage() {
   const [monsterName, setMonsterName] = useState("");
   const [monsterInit, setMonsterInit] = useState("10");
   const [monsterAlly, setMonsterAlly] = useState(false);
+  const [monsterControllerId, setMonsterControllerId] = useState(null);
   const [monsterSuggestions, setMonsterSuggestions] = useState([]);
   const [sessionActive, setSessionActive] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
@@ -90,6 +107,9 @@ export function InitiativePage() {
   const [dmActionSheet, setDmActionSheet] = useState(null);
   const [dmSheetLoading, setDmSheetLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [rosterRollModalOpen, setRosterRollModalOpen] = useState(false);
+  const [passTarget, setPassTarget] = useState(null);
+  const [passBusy, setPassBusy] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(`initiative-dice-width-${campaignId}`, String(dicePanelWidth));
@@ -233,7 +253,14 @@ export function InitiativePage() {
     return () => clearInterval(timer);
   }, [token, campaignId, saving]);
 
-  const displaySorted = sortCombatantsForDisplay(encounter.combatants);
+  const teamMode = isTeamMode(encounter);
+  const partyPhase = isPartyPhaseActive(encounter);
+  const trackerCombatants = teamMode
+    ? (encounter.combatants || []).filter(
+        (c) => !c.is_pc && !(c.is_ally && c.controller_character_id)
+      )
+    : encounter.combatants;
+  const displaySorted = sortCombatantsForDisplay(trackerCombatants);
   const turnSorted = sortCombatantsForTurns(encounter.combatants);
   const activeCombatant = encounter.active_combatant_id
     ? turnSorted.find((c) => c.id === encounter.active_combatant_id) ||
@@ -241,7 +268,11 @@ export function InitiativePage() {
       null
     : turnSorted[encounter.active_index] || null;
   const activeEconomy = activeCombatant ? encounter.turn_economy?.[activeCombatant.id] : null;
-  const waitingForInitiative = isWaitingForPcInitiative(encounter.combatants);
+  const waitingForInitiative =
+    !teamMode && isWaitingForPcInitiative(encounter.combatants);
+  const partyInitDisplay = encounter.team?.party_initiative ?? 0;
+  const passOptions = passTargets(encounter);
+  const controllerOptions = partyControllerOptions(encounter);
 
   useEffect(() => {
     if (!isOwner || !token || !campaignId || !activeCombatant?.character_id) {
@@ -355,6 +386,8 @@ export function InitiativePage() {
           initiative: parseInt(monsterInit, 10) || 0,
           is_pc: false,
           is_ally: monsterAlly,
+          controller_character_id:
+            monsterAlly && teamMode ? monsterControllerId : null,
           character_id: null,
           hp: null,
           max_hp: null,
@@ -366,6 +399,7 @@ export function InitiativePage() {
     pushEncounter(next);
     setMonsterName("");
     setMonsterAlly(false);
+    setMonsterControllerId(null);
   };
 
   const updateCombatant = (id, patch) => {
@@ -475,6 +509,10 @@ export function InitiativePage() {
 
   const addAllFromRoster = async () => {
     if (!token || !campaignId) return;
+    if (teamMode) {
+      setRosterRollModalOpen(true);
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -488,6 +526,130 @@ export function InitiativePage() {
     } catch (err) {
       console.error(err);
       setError("Could not add roster to tracker.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmTeamRosterRoll = async (rollCharacterIds) => {
+    if (!token || !campaignId) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/add-roster-team`, {
+        token,
+        method: "POST",
+        body: { roll_character_ids: rollCharacterIds },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Add roster failed");
+      }
+      setEncounter(await res.json());
+      setRosterRollModalOpen(false);
+      setStatusMessage(
+        "Party added. Team initiative (floor of average) set from selected rolls."
+      );
+    } catch (err) {
+      setError(err.message || "Could not add roster to tracker.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateInitiativeMode = async (mode) => {
+    if (!token || !campaignId || !isOwner || combatHasStarted(encounter)) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter`, {
+        token,
+        method: "PATCH",
+        body: { initiative_mode: mode },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not update initiative mode");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+    } catch (err) {
+      setError(err.message || "Could not update initiative mode.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const passCombatTo = async (targetCombatantId) => {
+    if (!token || !campaignId) return;
+    setPassBusy(true);
+    setError("");
+    try {
+      const body = { target_combatant_id: targetCombatantId };
+      if (isOwner && activeCombatant?.id) {
+        body.combatant_id = activeCombatant.id;
+      }
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/pass-combat`, {
+        token,
+        method: "POST",
+        body,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not pass combat");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+      setPassTarget(null);
+    } catch (err) {
+      setError(err.message || "Could not pass combat.");
+    } finally {
+      setPassBusy(false);
+    }
+  };
+
+  const finishPartySlice = async () => {
+    if (!token || !campaignId) return;
+    setPassBusy(true);
+    setError("");
+    try {
+      const body = {};
+      if (isOwner && activeCombatant?.id) body.combatant_id = activeCombatant.id;
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/finish-party-slice`, {
+        token,
+        method: "POST",
+        body,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not end turn");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+    } catch (err) {
+      setError(err.message || "Could not end turn.");
+    } finally {
+      setPassBusy(false);
+    }
+  };
+
+  const endPartyTurnEarly = async () => {
+    if (!token || !campaignId || !isOwner) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/end-party-turn`, {
+        token,
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not end party turn");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+    } catch (err) {
+      setError(err.message || "Could not end party turn.");
     } finally {
       setSaving(false);
     }
@@ -536,25 +698,61 @@ export function InitiativePage() {
               {saving && " · saving..."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-black text-neon-cyan">Round {encounter.round}</span>
+            {isOwner && !combatHasStarted(encounter) && (
+              <div className="flex rounded-sm border border-border text-[10px] font-black uppercase">
+                <button
+                  type="button"
+                  onClick={() => updateInitiativeMode("individual")}
+                  disabled={saving || !teamMode}
+                  className={`px-2 py-1 ${!teamMode ? "bg-neon-cyan/20 text-neon-cyan" : "text-ink-faint"}`}
+                >
+                  Individual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateInitiativeMode("team")}
+                  disabled={saving || teamMode}
+                  className={`px-2 py-1 ${teamMode ? "bg-neon-cyan/20 text-neon-cyan" : "text-ink-faint"}`}
+                >
+                  Team
+                </button>
+              </div>
+            )}
             {isOwner && (
               <>
                 <button
                   type="button"
                   onClick={nextTurn}
-                  disabled={waitingForInitiative || !activeCombatant}
+                  disabled={
+                    partyPhase
+                      ? true
+                      : waitingForInitiative || (!teamMode && !activeCombatant)
+                  }
                   className="px-3 py-2 text-[10px] font-black uppercase bg-neon-magenta text-black border-2 border-black disabled:opacity-40"
                   title={
-                    waitingForInitiative
-                      ? "Waiting for party initiative rolls"
-                      : !activeCombatant
-                        ? "No active combatant"
-                        : "Advance turn"
+                    partyPhase
+                      ? "Use pass combat during a party turn"
+                      : waitingForInitiative
+                        ? "Waiting for party initiative rolls"
+                        : !teamMode && !activeCombatant
+                          ? "No active combatant"
+                          : "Advance turn"
                   }
                 >
                   Next Turn
                 </button>
+                {partyPhase && (
+                  <button
+                    type="button"
+                    onClick={endPartyTurnEarly}
+                    disabled={saving}
+                    className="px-3 py-2 text-[10px] font-black uppercase border-2 border-zinc-600 text-zinc-400 hover:border-starlight disabled:opacity-40"
+                  >
+                    End party turn
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={loadData}
@@ -598,12 +796,114 @@ export function InitiativePage() {
 
         {waitingForInitiative && (
           <p className="mb-4 rounded-sm border border-neon-cyan/40 bg-neon-cyan/10 px-3 py-2 text-xs font-mono text-neon-cyan">
-            Waiting for party initiative rolls before combat starts. Enemies won&apos;t take the
-            first turn until every PC has rolled.
+            Waiting for individual PC initiative rolls before combat starts (individual mode).
           </p>
         )}
 
-        {activeCombatant && (
+        {isOwner && (
+          <ReadiedActionsPanel
+            campaignId={campaignId}
+            token={token}
+            encounter={encounter}
+            onEncounterUpdate={setEncounter}
+            onError={setError}
+          />
+        )}
+
+        {teamMode && partyPcs(encounter).length > 0 && (
+          <div
+            className={`mb-4 border-2 p-3 ${
+              partyPhase ? "border-starlight bg-starlight/5" : "border-neon-cyan/40 bg-black"
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] font-black uppercase text-neon-cyan">Party</p>
+                {showPartyInitiative(encounter, { isDmView: isOwner }) && (
+                  <p className="text-xs font-mono text-ink-muted">
+                    Team initiative (floor of avg):{" "}
+                    <span className="font-black text-starlight">{partyInitDisplay}</span>
+                  </p>
+                )}
+                {partyPhase && activeCombatant && (
+                  <p className="text-sm font-black uppercase text-starlight">
+                    Active: {activeCombatant.name}
+                  </p>
+                )}
+              </div>
+              {isOwner && !combatHasStarted(encounter) && (
+                <p className="text-[9px] font-mono text-ink-faint">
+                  {partyRoster(encounter).length} PCs in group
+                </p>
+              )}
+            </div>
+            {isOwner && !combatHasStarted(encounter) && (
+              <ul className="mt-2 flex flex-wrap gap-1">
+                {partyPcs(encounter).map((pc) => (
+                  <li
+                    key={pc.id}
+                    className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-mono text-ink-muted"
+                  >
+                    {pc.name}
+                    {encounter.team?.initiative_rolls?.[pc.id] != null && (
+                      <span className="ml-1 text-neon-cyan">
+                        ({encounter.team.initiative_rolls[pc.id]})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {partyPhase && isOwner && (
+              <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
+                <p className="text-[9px] font-black uppercase text-ink-faint">Pass combat to</p>
+                <div className="flex flex-wrap gap-2">
+                  {passOptions.map((member) => (
+                    <button
+                      key={member.id}
+                      type="button"
+                      disabled={passBusy}
+                      onClick={() => setPassTarget(member)}
+                      className="rounded-sm border border-neon-cyan/50 px-2 py-1 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                    >
+                      {member.name}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={passBusy}
+                  onClick={finishPartySlice}
+                  className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan disabled:opacity-40"
+                >
+                  Done — end my slice
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeCombatant && partyPhase && isOwner && (
+          <div className="mb-4 space-y-2 border-2 border-starlight bg-black p-4">
+            {actionError && <p className="text-[9px] font-mono text-danger">{actionError}</p>}
+            <TurnActionsPanel
+              campaignId={campaignId}
+              token={token}
+              actionSheet={dmActionSheet}
+              actionSheetLoading={dmSheetLoading}
+              encounter={encounter}
+              actorCombatant={activeCombatant}
+              canTakeTurn
+              canAdjustMovement
+              isDmProxy
+              onEncounterUpdate={setEncounter}
+              onSheetRefresh={reloadDmActionSheet}
+              onError={setActionError}
+            />
+          </div>
+        )}
+
+        {activeCombatant && !partyPhase && (
           <div className="mb-4 space-y-2 border-2 border-starlight bg-black p-4">
             <div>
               <p className="text-[10px] uppercase text-zinc-500">Active turn</p>
@@ -717,7 +1017,16 @@ export function InitiativePage() {
                           <span className="ml-2 text-[9px] text-neon-cyan">PC</span>
                         )}
                         {combatant.is_ally && !combatant.is_pc && (
-                          <span className="ml-2 text-[9px] text-neon-cyan">ALLY</span>
+                          <span className="ml-2 text-[9px] text-neon-cyan">
+                            ALLY
+                            {combatant.controller_character_id &&
+                              (() => {
+                                const owner = controllerOptions.find(
+                                  (pc) => pc.character_id === combatant.controller_character_id
+                                );
+                                return owner ? ` · ${owner.name}` : "";
+                              })()}
+                          </span>
                         )}
                       </p>
                       {(combatant.hp != null ||
@@ -737,17 +1046,37 @@ export function InitiativePage() {
                     {isOwner && (
                       <>
                         {!combatant.is_pc && (
-                          <label className="flex items-center gap-1 text-[9px] font-mono uppercase text-zinc-500">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(combatant.is_ally)}
-                              onChange={(e) =>
-                                updateCombatant(combatant.id, { is_ally: e.target.checked })
-                              }
-                              className="accent-neon-cyan"
-                            />
-                            Ally
-                          </label>
+                          <>
+                            <label className="flex items-center gap-1 text-[9px] font-mono uppercase text-zinc-500">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(combatant.is_ally)}
+                                onChange={(e) =>
+                                  updateCombatant(combatant.id, {
+                                    is_ally: e.target.checked,
+                                    controller_character_id: e.target.checked
+                                      ? combatant.controller_character_id
+                                      : null,
+                                  })
+                                }
+                                className="accent-neon-cyan"
+                              />
+                              Ally
+                            </label>
+                            {combatant.is_ally && teamMode && (
+                              <AllyControllerSelect
+                                compact
+                                value={combatant.controller_character_id}
+                                options={controllerOptions}
+                                disabled={saving}
+                                onChange={(characterId) =>
+                                  updateCombatant(combatant.id, {
+                                    controller_character_id: characterId,
+                                  })
+                                }
+                              />
+                            )}
+                          </>
                         )}
                         {!combatant.is_pc && (
                           <>
@@ -822,7 +1151,7 @@ export function InitiativePage() {
                         disabled={saving}
                         className="px-2 py-1 text-[10px] font-black uppercase border border-starlight text-starlight hover:bg-starlight/10 disabled:opacity-40"
                       >
-                        Add all & roll init
+                        {teamMode ? "Add all (team roll)" : "Add all & roll init"}
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -885,11 +1214,22 @@ export function InitiativePage() {
                     <input
                       type="checkbox"
                       checked={monsterAlly}
-                      onChange={(e) => setMonsterAlly(e.target.checked)}
+                      onChange={(e) => {
+                        setMonsterAlly(e.target.checked);
+                        if (!e.target.checked) setMonsterControllerId(null);
+                      }}
                       className="accent-neon-cyan"
                     />
                     Ally
                   </label>
+                  {monsterAlly && teamMode && controllerOptions.length > 0 && (
+                    <AllyControllerSelect
+                      compact
+                      value={monsterControllerId}
+                      options={controllerOptions}
+                      onChange={setMonsterControllerId}
+                    />
+                  )}
                   <button
                     type="submit"
                     className="px-4 py-2 text-[10px] font-black uppercase bg-neon-cyan text-black"
@@ -897,7 +1237,8 @@ export function InitiativePage() {
                     Add NPC
                   </button>
                   <p className="w-full text-[9px] font-mono text-zinc-500">
-                    Matching SRD 5.2.1 names auto-fill HP, AC, and real attacks (Scimitar, breath weapons, etc.).
+                    SRD 5.2.1 monster names auto-fill stats and attacks (combat uses D&amp;D 5.5e
+                    action economy).
                   </p>
                   <button
                     type="button"
@@ -937,6 +1278,20 @@ export function InitiativePage() {
           </aside>
         </div>
       </div>
+      <TeamRosterRollModal
+        open={rosterRollModalOpen}
+        roster={roster}
+        busy={saving}
+        onClose={() => setRosterRollModalOpen(false)}
+        onConfirm={confirmTeamRosterRoll}
+      />
+      <PassCombatDialog
+        open={Boolean(passTarget)}
+        targetName={passTarget?.name}
+        busy={passBusy}
+        onConfirm={() => passCombatTo(passTarget.id)}
+        onCancel={() => setPassTarget(null)}
+      />
     </PageScroll>
   );
 }

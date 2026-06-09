@@ -16,6 +16,20 @@ import {
   sortCombatantsForTurns,
 } from "../../lib/encounterDisplay";
 import { encounterPatchBody } from "../../lib/encounterPatch";
+import {
+  displayCombatants,
+  isPartyPhaseActive,
+  isTeamMode,
+  passTargets,
+  resolveMyCombatant,
+  showPartyInitiative,
+} from "../../lib/teamInitiative";
+import { PassCombatDialog } from "../initiative/PassCombatDialog";
+import {
+  AllyControllerSelect,
+  partyControllerOptions,
+} from "../initiative/AllyControllerSelect";
+import { ReadiedActionsPanel } from "../initiative/ReadiedActionsPanel";
 import { ConditionsEditor } from "./ConditionsEditor";
 import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
 import { AbilityScoresGrid } from "./AbilityScoresGrid";
@@ -1253,6 +1267,8 @@ function DmCombatantEditor({
   movementRemaining = null,
   onAdjustMovement,
   movementBusy = false,
+  controllerOptions = [],
+  teamMode = false,
 }) {
   const defeated = combatant.hp != null && combatant.hp <= 0;
   const isEnemy = !combatant.is_pc && !combatant.is_ally;
@@ -1384,16 +1400,35 @@ function DmCombatantEditor({
           onChange={(next) => onPatch({ conditions: next })}
         />
         {isEnemy && (
-          <label className="flex items-center gap-1.5 text-xs sm:text-sm font-mono uppercase text-ink-faint">
-            <input
-              type="checkbox"
-              checked={Boolean(combatant.is_ally)}
-              disabled={saving}
-              onChange={(e) => onPatch({ is_ally: e.target.checked })}
-              className="accent-neon-cyan"
-            />
-            Ally
-          </label>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs sm:text-sm font-mono uppercase text-ink-faint">
+              <input
+                type="checkbox"
+                checked={Boolean(combatant.is_ally)}
+                disabled={saving}
+                onChange={(e) =>
+                  onPatch({
+                    is_ally: e.target.checked,
+                    controller_character_id: e.target.checked
+                      ? combatant.controller_character_id
+                      : null,
+                  })
+                }
+                className="accent-neon-cyan"
+              />
+              Ally / summon
+            </label>
+            {combatant.is_ally && teamMode && (
+              <AllyControllerSelect
+                value={combatant.controller_character_id}
+                options={controllerOptions}
+                disabled={saving}
+                onChange={(characterId) =>
+                  onPatch({ controller_character_id: characterId })
+                }
+              />
+            )}
+          </div>
         )}
         <button
           type="button"
@@ -1549,6 +1584,8 @@ export function InitiativeWidget({
   const [dmSheetLoading, setDmSheetLoading] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
   const [portraitPreview, setPortraitPreview] = useState(null);
+  const [passTarget, setPassTarget] = useState(null);
+  const [passBusy, setPassBusy] = useState(false);
   const savingRef = useRef(false);
 
   const loadEncounter = useCallback(async () => {
@@ -1571,17 +1608,27 @@ export function InitiativeWidget({
     return () => clearInterval(timer);
   }, [loadEncounter]);
 
-  const displaySorted = sortCombatantsForDisplay(encounter.combatants);
+  const teamMode = isTeamMode(encounter);
+  const partyPhase = isPartyPhaseActive(encounter);
+  const trackerCombatants = displayCombatants(encounter, { isDmView: isOwner });
+  const displaySorted = sortCombatantsForDisplay(trackerCombatants);
   const turnSorted = sortCombatantsForTurns(encounter.combatants);
   const activeCombatant = encounter.active_combatant_id
     ? turnSorted.find((c) => c.id === encounter.active_combatant_id) ||
+      encounter.team?.party_roster?.find((r) => r.id === encounter.active_combatant_id) ||
       turnSorted[encounter.active_index] ||
       null
     : turnSorted[encounter.active_index] || null;
-  const myCombatant = encounter.combatants.find((c) => c.character_id === characterId);
-  const isMyTurn = Boolean(myCombatant && activeCombatant?.id === myCombatant.id);
-  const activeCombatantId = activeCombatant?.id ?? null;
-  const waitingForInitiative = isWaitingForPcInitiative(encounter.combatants);
+  const myCombatant = resolveMyCombatant(encounter, characterId);
+  const isMyTurn = Boolean(
+    myCombatant && encounter.active_combatant_id === myCombatant.id
+  );
+  const activeCombatantId = encounter.active_combatant_id ?? activeCombatant?.id ?? null;
+  const waitingForInitiative =
+    !teamMode && isWaitingForPcInitiative(encounter.combatants);
+  const passOptions = passTargets(encounter);
+  const partyInitDisplay = encounter.team?.party_initiative ?? 0;
+  const controllerOptions = partyControllerOptions(encounter);
 
   const reloadDmActionSheet = useCallback(async () => {
     if (!isOwner || !token || !campaignId || !activeCombatantId) {
@@ -1649,6 +1696,79 @@ export function InitiativeWidget({
     const value = parseInt(manualInit, 10);
     if (Number.isNaN(value)) return;
     submitInitiative({ initiative: value });
+  };
+
+  const passCombatTo = async (targetCombatantId) => {
+    if (!token || !campaignId) return;
+    setPassBusy(true);
+    setActionError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/pass-combat`, {
+        token,
+        method: "POST",
+        body: { target_combatant_id: targetCombatantId },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not pass combat");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+      setPassTarget(null);
+    } catch (err) {
+      setActionError(err.message || "Could not pass combat.");
+    } finally {
+      setPassBusy(false);
+    }
+  };
+
+  const finishPartySlice = async () => {
+    if (!token || !campaignId) return;
+    setPassBusy(true);
+    setActionError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/finish-party-slice`, {
+        token,
+        method: "POST",
+        body: {},
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not end turn");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+      if (parsed.combatEnded) {
+        setSelectedId(null);
+        onCombatEnded?.(parsed.combatLogText, parsed.reason);
+      }
+    } catch (err) {
+      setActionError(err.message || "Could not end turn.");
+    } finally {
+      setPassBusy(false);
+    }
+  };
+
+  const endPartyTurnEarly = async () => {
+    if (!token || !campaignId || !isOwner) return;
+    setSubmitting(true);
+    setActionError("");
+    try {
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/end-party-turn`, {
+        token,
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not end party turn");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+    } catch (err) {
+      setActionError(err.message || "Could not end party turn.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEndTurn = async () => {
@@ -1863,16 +1983,62 @@ export function InitiativeWidget({
         </div>
       </div>
 
-      {!isHorizontal && activeCombatant ? (
+      {teamMode && partyPhase && (
+        <div className="shrink-0 rounded-sm border border-starlight/60 bg-starlight/5 px-2 py-2">
+          <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-neon-cyan">
+            Party turn
+          </p>
+          {activeCombatant && (
+            <p className="truncate text-xs font-black uppercase text-starlight">
+              Active: {activeCombatant.name}
+            </p>
+          )}
+          {showPartyInitiative(encounter, { isDmView: isOwner }) && (
+            <p className="text-[10px] font-mono text-ink-muted">
+              Party init: <span className="text-starlight">{partyInitDisplay}</span>
+            </p>
+          )}
+          {isMyTurn && passOptions.length > 0 && (
+            <div className="mt-2 space-y-1.5 border-t border-border/50 pt-2">
+              <p className="text-[10px] font-black uppercase text-ink-faint">Pass combat to</p>
+              <div className="flex flex-wrap gap-1">
+                {passOptions.map((member) => (
+                  <button
+                    key={member.id}
+                    type="button"
+                    disabled={passBusy}
+                    onClick={() => setPassTarget(member)}
+                    className="rounded-sm border border-neon-cyan/50 px-2 py-0.5 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                  >
+                    {member.name}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={passBusy}
+                onClick={finishPartySlice}
+                className="text-[10px] font-black uppercase text-starlight hover:text-neon-cyan disabled:opacity-40"
+              >
+                Done — end my slice
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isHorizontal && activeCombatant && !partyPhase ? (
         <div className="shrink-0 rounded-sm border border-starlight/60 bg-starlight/5 px-2 py-1.5">
           <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">Active turn</p>
           <p className="truncate text-xs font-black uppercase text-starlight">{activeCombatant.name}</p>
         </div>
-      ) : !isHorizontal ? (
+      ) : !isHorizontal && !partyPhase ? (
         <p className="shrink-0 text-xs sm:text-sm font-mono text-ink-faint">
           {waitingForInitiative
             ? "Waiting for party initiative rolls…"
-            : "No active turn yet."}
+            : teamMode
+              ? "Party turn will start when initiative reaches the party slot."
+              : "No active turn yet."}
         </p>
       ) : null}
 
@@ -1905,7 +2071,7 @@ export function InitiativeWidget({
                 Set
               </button>
             </form>
-            {isMyTurn && !waitingForInitiative && (
+            {isMyTurn && !waitingForInitiative && !partyPhase && (
               <button
                 type="button"
                 disabled={submitting}
@@ -1914,6 +2080,11 @@ export function InitiativeWidget({
               >
                 End Turn
               </button>
+            )}
+            {teamMode && showPartyInitiative(encounter, { isDmView: isOwner }) && (
+              <p className="w-full text-[10px] font-mono text-ink-faint">
+                Team initiative (5.5e): your roll counts toward the party slot (floor of average).
+              </p>
             )}
           </div>
           {myCombatant && (
@@ -1931,7 +2102,7 @@ export function InitiativeWidget({
         </div>
       )}
 
-      {!isOwner && characterId && myCombatant && turnSorted.length > 0 && (
+      {!isOwner && characterId && myCombatant && turnSorted.length > 0 && (!partyPhase || isMyTurn) && (
         <TurnActionsPanel
           campaignId={campaignId}
           token={token}
@@ -1949,12 +2120,25 @@ export function InitiativeWidget({
         />
       )}
 
+      {isOwner && (
+        <ReadiedActionsPanel
+          campaignId={campaignId}
+          token={token}
+          encounter={encounter}
+          onEncounterUpdate={setEncounter}
+          onError={setActionError}
+          compact
+        />
+      )}
+
       {isOwner && activeCombatant && turnSorted.length > 0 && (
         <TurnActionsPanel
           campaignId={campaignId}
           token={token}
           encounter={encounter}
-          actorCombatant={activeCombatant}
+          actorCombatant={
+            turnSorted.find((c) => c.id === activeCombatant.id) || activeCombatant
+          }
           canTakeTurn
           canAdjustMovement
           isDmProxy
@@ -2063,6 +2247,8 @@ export function InitiativeWidget({
               encounter.turn_economy?.[selectedCombatant.id]?.movement_remaining ?? null
             }
             movementBusy={movementBusy}
+            teamMode={teamMode}
+            controllerOptions={controllerOptions}
             onAdjustMovement={
               activeCombatant?.id === selectedCombatant.id
                 ? (delta) => adjustMovement(selectedCombatant.id, delta)
@@ -2077,13 +2263,24 @@ export function InitiativeWidget({
           <div className="flex gap-1">
             <button
               type="button"
-              disabled={dmBusy}
+              disabled={dmBusy || partyPhase}
               onClick={handleEndTurn}
+              title={partyPhase ? "Use pass combat during a party turn" : "Advance turn"}
               className="flex flex-1 items-center justify-center gap-1 rounded-sm border border-starlight px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
             >
               <ChevronRight className="h-3 w-3" />
               Next turn
             </button>
+            {partyPhase && (
+              <button
+                type="button"
+                disabled={dmBusy}
+                onClick={endPartyTurnEarly}
+                className="flex-1 rounded-sm border border-zinc-600 px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-zinc-400 hover:border-starlight disabled:opacity-40"
+              >
+                End party turn
+              </button>
+            )}
             <button
               type="button"
               disabled={dmBusy}
@@ -2102,10 +2299,20 @@ export function InitiativeWidget({
         )}
         {!isOwner && (
           <p className="text-xs sm:text-sm font-mono text-ink-faint">
-            Roll to add yourself · End turn when it is yours
+            {teamMode
+              ? "Roll for team initiative · Pass combat during party turns (5.5e)"
+              : "Roll to join combat · End turn on your initiative (5.5e)"}
           </p>
         )}
       </div>
+
+      <PassCombatDialog
+        open={Boolean(passTarget)}
+        targetName={passTarget?.name}
+        busy={passBusy}
+        onConfirm={() => passCombatTo(passTarget.id)}
+        onCancel={() => setPassTarget(null)}
+      />
     </div>
   );
 }

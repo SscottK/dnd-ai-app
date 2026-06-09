@@ -76,13 +76,69 @@ def enrich_encounter_movement(session: Session, state: EncounterState) -> Encoun
 
 
 def encounter_for_viewer(state: EncounterState, *, is_owner: bool) -> EncounterState:
-    """Hide enemy AC from players; allies and PCs remain visible."""
+    """Hide enemy AC from players; team mode hides PC rows and roll data during combat."""
+    from app.services.encounter_actions import combat_has_started
+    from app.services.team_initiative import is_team_mode, party_pc_combatants
+
     if is_owner:
+        if is_team_mode(state) and state.team is not None:
+
+            enriched = state.model_copy(deep=True)
+            enriched.team = enriched.team.model_copy(
+                update={
+                    "party_roster": [
+                        {
+                            "id": combatant.id,
+                            "name": combatant.name,
+                            "character_id": combatant.character_id,
+                        }
+                        for combatant in party_pc_combatants(state)
+                    ],
+                }
+            )
+            return enriched
         return state
+
     redacted = state.model_copy(deep=True)
     for combatant in redacted.combatants:
         if not combatant.is_pc and not combatant.is_ally:
             combatant.ac = None
+
+    if is_team_mode(state):
+        from app.services.team_initiative import party_pc_combatants
+
+        if redacted.team is not None:
+            redacted.team = redacted.team.model_copy(
+                update={
+                    "party_roster": [
+                        {
+                            "id": combatant.id,
+                            "name": combatant.name,
+                            "character_id": combatant.character_id,
+                        }
+                        for combatant in party_pc_combatants(state)
+                    ],
+                }
+            )
+
+    if is_team_mode(redacted) and combat_has_started(redacted):
+        redacted.combatants = [
+            combatant
+            for combatant in redacted.combatants
+            if not combatant.is_pc
+            and not (combatant.is_ally and combatant.controller_character_id)
+        ]
+        for combatant in redacted.combatants:
+            combatant.initiative = 0
+        if redacted.team is not None:
+            redacted.team = redacted.team.model_copy(
+                update={
+                    "party_initiative": 0,
+                    "initiative_rolls": {},
+                    "eligible_character_ids": [],
+                    "turn_slots": [],
+                }
+            )
     return redacted
 
 

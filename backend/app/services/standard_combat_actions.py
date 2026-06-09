@@ -197,11 +197,19 @@ def resolve_standard_combat_effect(
 
     if effect == "ready":
         ready_for = (data.detail or "an action").strip()[:120]
+        trigger = (data.trigger or "").strip()[:120] or None
         economy.readied_action = ready_for
-        message = (
-            f"{actor.name} readies {ready_for} — will act on the chosen trigger "
-            "before their next turn."
-        )
+        economy.readied_trigger = trigger
+        if trigger:
+            message = (
+                f"{actor.name} readies {ready_for} — reacts when {trigger} "
+                "(before their next turn)."
+            )
+        else:
+            message = (
+                f"{actor.name} readies {ready_for} — DM will resolve the trigger "
+                "before their next turn."
+            )
         messages.append(message)
         append_log(state, message, kind="action", actor=actor.name)
         return messages

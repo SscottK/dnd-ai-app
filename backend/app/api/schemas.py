@@ -353,6 +353,23 @@ class CombatActionEntry(BaseModel):
     damage_dice: str | None = Field(default=None, max_length=32)
 
 
+class PartyRosterEntry(BaseModel):
+    id: str
+    name: str
+    character_id: int | None = None
+
+
+class TeamInitiativeState(BaseModel):
+    party_initiative: int = 0
+    party_phase_active: bool = False
+    completed_this_phase: list[str] = Field(default_factory=list)
+    initiative_rolls: dict[str, int] = Field(default_factory=dict)
+    eligible_character_ids: list[int] = Field(default_factory=list)
+    turn_slot_index: int = 0
+    turn_slots: list[str] = Field(default_factory=list)
+    party_roster: list[PartyRosterEntry] = Field(default_factory=list)
+
+
 class EncounterCombatant(BaseModel):
     id: str
     name: str
@@ -360,6 +377,7 @@ class EncounterCombatant(BaseModel):
     is_pc: bool = False
     is_ally: bool = False
     character_id: int | None = None
+    controller_character_id: int | None = None
     portrait_url: str | None = None
     hp: int | None = None
     max_hp: int | None = None
@@ -392,12 +410,15 @@ class TurnEconomySnapshot(BaseModel):
     hiding: bool = False
     helping_target_id: str | None = None
     readied_action: str | None = None
+    readied_trigger: str | None = None
 
 
 class EncounterState(BaseModel):
     round: int = 1
     active_index: int = 0
     active_combatant_id: str | None = None
+    initiative_mode: str = "individual"
+    team: TeamInitiativeState | None = None
     combatants: list[EncounterCombatant] = Field(default_factory=list)
     combat_log: list[CombatLogEntry] = Field(default_factory=list)
     turn_economy: dict[str, TurnEconomySnapshot] = Field(default_factory=dict)
@@ -411,6 +432,16 @@ class UseActionRequest(BaseModel):
     targeting: str = Field(min_length=1, max_length=32)
     target_ids: list[str] = Field(default_factory=list)
     detail: str | None = Field(default=None, max_length=500)
+    trigger: str | None = Field(default=None, max_length=200)
+
+
+class TriggerReadiedRequest(BaseModel):
+    combatant_id: str = Field(min_length=1, max_length=64)
+    note: str | None = Field(default=None, max_length=200)
+
+
+class CancelReadiedRequest(BaseModel):
+    combatant_id: str = Field(min_length=1, max_length=64)
 
 
 class UseActionResponse(BaseModel):
@@ -449,8 +480,22 @@ class EncounterUpdate(BaseModel):
     round: int | None = Field(default=None, ge=1)
     active_index: int | None = Field(default=None, ge=0)
     active_combatant_id: str | None = None
+    initiative_mode: str | None = Field(default=None, max_length=16)
     combatants: list[EncounterCombatant] | None = None
     turn_economy: dict[str, TurnEconomySnapshot] | None = None
+
+
+class PassCombatRequest(BaseModel):
+    target_combatant_id: str = Field(min_length=1, max_length=64)
+    combatant_id: str | None = Field(default=None, max_length=64)
+
+
+class FinishPartySliceRequest(BaseModel):
+    combatant_id: str | None = Field(default=None, max_length=64)
+
+
+class AddRosterTeamRequest(BaseModel):
+    roll_character_ids: list[int] = Field(default_factory=list)
 
 
 class EncounterPatchResponse(BaseModel):

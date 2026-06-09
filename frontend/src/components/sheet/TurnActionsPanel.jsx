@@ -106,6 +106,7 @@ export function TurnActionsPanel({
   const [pickedAction, setPickedAction] = useState(null);
   const [targetId, setTargetId] = useState("");
   const [readyDetail, setReadyDetail] = useState("");
+  const [readyTrigger, setReadyTrigger] = useState("");
   const [busy, setBusy] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
   const [lastOutcome, setLastOutcome] = useState("");
@@ -138,6 +139,7 @@ export function TurnActionsPanel({
     setPickedAction(null);
     setTargetId("");
     setReadyDetail("");
+    setReadyTrigger("");
   }, [actorCombatant?.id, canTakeTurn]);
 
   const resetFlow = () => {
@@ -146,6 +148,7 @@ export function TurnActionsPanel({
     setPickedAction(null);
     setTargetId("");
     setReadyDetail("");
+    setReadyTrigger("");
   };
 
   const freeActionFeatures = (available[ACTION_TYPES.action] || []).some(
@@ -200,6 +203,7 @@ export function TurnActionsPanel({
     setLastOutcome("");
     try {
       const rawDetail = action.readyDetail ?? action.detail ?? null;
+      const rawTrigger = action.readyTrigger ?? null;
       const body = {
         action_id: action.id,
         action_name: cleanActionName(action.name),
@@ -208,6 +212,8 @@ export function TurnActionsPanel({
         target_ids: targets,
         detail:
           rawDetail && rawDetail.length > 200 ? rawDetail.slice(0, 200) : rawDetail,
+        trigger:
+          rawTrigger && rawTrigger.length > 200 ? rawTrigger.slice(0, 200) : rawTrigger,
       };
       if (isDmProxy) {
         body.combatant_id = actorCombatant.id;
@@ -255,6 +261,7 @@ export function TurnActionsPanel({
     setPickedAction(action);
     if (actionNeedsReadyDetail(action)) {
       setReadyDetail("");
+      setReadyTrigger("");
       setStep("pick_detail");
       return;
     }
@@ -380,7 +387,8 @@ export function TurnActionsPanel({
   const handleConfirmReadyDetail = () => {
     if (!pickedAction) return;
     const detail = readyDetail.trim() || "an action";
-    void submitAction({ ...pickedAction, readyDetail: detail }, []);
+    const trigger = readyTrigger.trim() || null;
+    void submitAction({ ...pickedAction, readyDetail: detail, readyTrigger: trigger }, []);
   };
 
   return (
@@ -599,14 +607,22 @@ export function TurnActionsPanel({
       {step === "pick_detail" && pickedAction && (
         <div className="space-y-1">
           <p className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">
-            What are you readying?
+            Ready action (D&amp;D 5.5e) — prepare a Reaction for later this round
           </p>
           <input
             type="text"
             value={readyDetail}
             disabled={busy}
             onChange={(e) => setReadyDetail(e.target.value)}
-            placeholder="e.g. Fire Bolt when the goblin moves"
+            placeholder="Action to ready (e.g. Fire Bolt, Attack with longbow)"
+            className="w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-starlight"
+          />
+          <input
+            type="text"
+            value={readyTrigger}
+            disabled={busy}
+            onChange={(e) => setReadyTrigger(e.target.value)}
+            placeholder="Perceivable trigger (e.g. the goblin moves within 30 ft)"
             className="w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-mono text-starlight"
           />
           <div className="flex gap-1">
@@ -616,7 +632,7 @@ export function TurnActionsPanel({
               onClick={handleConfirmReadyDetail}
               className="flex-1 rounded-sm border border-neon-cyan px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
             >
-              Ready
+              Take Ready
             </button>
             <button
               type="button"

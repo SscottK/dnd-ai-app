@@ -7,6 +7,10 @@ from app.api.deps import CurrentUser, SessionDep
 from app.api.schemas import (
     AddEncounterEnemiesRequest,
     AddRosterRequest,
+    AddRosterTeamRequest,
+    FinishPartySliceRequest,
+    PassCombatRequest,
+    TriggerReadiedRequest,
     CampaignCreate,
     CampaignJoin,
     CampaignUpdate,
@@ -22,6 +26,7 @@ from app.api.schemas import (
     EncounterState,
     EncounterUpdate,
     AdjustMovementRequest,
+    CancelReadiedRequest,
     CombatantActionSheetResponse,
     MonsterSearchEntry,
     MonsterSearchResponse,
@@ -65,6 +70,16 @@ from app.services.play_session_notes import (
     new_play_session_tab,
     parse_play_session,
     play_session_payload,
+)
+from app.services.team_initiative import (
+    TeamInitiativeError,
+    add_roster_with_team_rolls,
+    advance_team_turn,
+    end_party_phase,
+    finish_party_slice,
+    is_team_mode,
+    pass_combat_to,
+    set_initiative_mode,
 )
 from app.services.encounter_actions import (
     add_enemies_to_encounter,
@@ -112,6 +127,7 @@ from app.services.standard_combat_actions import (
     resolve_standard_combat_effect,
     skips_action_economy,
 )
+from app.services.readied_actions import ReadiedActionError, cancel_readied_action, trigger_readied_action
 from app.services.turn_actions import ensure_turn_economy, get_active_combatant, use_combat_action
 from app.services.invite_codes import generate_invite_code
 
@@ -671,6 +687,14 @@ def update_encounter(
         state.combatants = [
             apply_monster_catalog_to_combatant(combatant) for combatant in data.combatants
         ]
+    if data.initiative_mode is not None:
+        try:
+            set_initiative_mode(state, data.initiative_mode)
+        except TeamInitiativeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
 
     log_hp_changes(before, state)
     sync_encounter_combatants_to_characters(session, before, state)
@@ -725,7 +749,24 @@ def submit_initiative(
         )
 
     upsert_pc_combatant(state, character, total)
-    if data.auto_roll and d20_roll is not None:
+    if is_team_mode(state):
+        from app.services.team_initiative import record_pc_initiative_roll
+
+        combatant = next(
+            (entry for entry in state.combatants if entry.character_id == character.id),
+            None,
+        )
+        if combatant is not None:
+            record_pc_initiative_roll(
+                state,
+                combatant.id,
+                total=total,
+                d20_roll=d20_roll if data.auto_roll else None,
+                bonus=bonus if data.auto_roll else None,
+                roller_name=character.name,
+            )
+    team_logged_roll = is_team_mode(state) and data.auto_roll and d20_roll is not None
+    if data.auto_roll and d20_roll is not None and not team_logged_roll:
         append_log(
             state,
             f"{character.name} rolled initiative",
@@ -737,7 +778,7 @@ def submit_initiative(
             bonus=bonus,
             total=total,
         )
-    else:
+    elif not data.auto_roll:
         append_log(
             state,
             f"{character.name} set initiative to {total}",
@@ -781,25 +822,39 @@ def next_encounter_turn(campaign_id: int, current_user: CurrentUser, session: Se
                 detail="It is not your turn",
             )
 
-    ordered = sorted_combatants(state)
-    current = ordered[resolve_active_index(state)] if ordered else None
-    advance_turn(state)
-    ordered_after = sorted_combatants(state)
-    active_after = ordered_after[resolve_active_index(state)] if ordered_after else None
-    if active_after:
-        append_log(
-            state,
-            f"Round {state.round} — {active_after.name}'s turn",
-            kind="turn",
-            actor=active_after.name,
-        )
-    elif current:
-        append_log(
-            state,
-            f"Turn ended ({current.name})",
-            kind="turn",
-            actor=current.name,
-        )
+    if is_team_mode(state):
+        if state.team and state.team.party_phase_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Use pass combat during a party turn.",
+            )
+        try:
+            advance_team_turn(state)
+        except TeamInitiativeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+    else:
+        ordered = sorted_combatants(state)
+        current = ordered[resolve_active_index(state)] if ordered else None
+        advance_turn(state)
+        ordered_after = sorted_combatants(state)
+        active_after = ordered_after[resolve_active_index(state)] if ordered_after else None
+        if active_after:
+            append_log(
+                state,
+                f"Round {state.round} — {active_after.name}'s turn",
+                kind="turn",
+                actor=active_after.name,
+            )
+        elif current:
+            append_log(
+                state,
+                f"Turn ended ({current.name})",
+                kind="turn",
+                actor=current.name,
+            )
 
     end_response = _combat_end_response_if_needed(
         session, campaign, state, is_owner=is_owner
@@ -1070,6 +1125,76 @@ def adjust_encounter_movement(
     return build_encounter_response(session, campaign, is_owner=is_owner)
 
 
+@router.post("/{campaign_id}/encounter/trigger-readied", response_model=EncounterPatchResponse)
+def trigger_readied(
+    campaign_id: int,
+    data: TriggerReadiedRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can trigger readied actions",
+        )
+
+    state = parse_encounter(campaign)
+    try:
+        trigger_readied_action(
+            state,
+            combatant_id=data.combatant_id,
+            note=data.note,
+        )
+    except ReadiedActionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    end_response = _combat_end_response_if_needed(
+        session, campaign, state, is_owner=True
+    )
+    if end_response:
+        return end_response
+
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=True),
+    )
+
+
+@router.post("/{campaign_id}/encounter/cancel-readied", response_model=EncounterPatchResponse)
+def cancel_readied(
+    campaign_id: int,
+    data: CancelReadiedRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can cancel readied actions",
+        )
+
+    state = parse_encounter(campaign)
+    try:
+        cancel_readied_action(state, combatant_id=data.combatant_id)
+    except ReadiedActionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=True),
+    )
+
+
 @router.post("/{campaign_id}/encounter/roll", response_model=EncounterState)
 def log_dice_roll(
     campaign_id: int,
@@ -1126,6 +1251,194 @@ def end_combat_tracker(campaign_id: int, current_user: CurrentUser, session: Ses
         party_updated=party_updated,
         reason="dm",
     )
+
+
+@router.post("/{campaign_id}/encounter/pass-combat", response_model=EncounterPatchResponse)
+def pass_combat(
+    campaign_id: int,
+    data: PassCombatRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    state = parse_encounter(campaign)
+
+    if not is_team_mode(state):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pass combat is only available in team initiative mode.",
+        )
+
+    passer_id: str | None = None
+    if is_owner:
+        passer_id = data.combatant_id or state.active_combatant_id
+    else:
+        try:
+            _, character = get_member_character(session, campaign_id, current_user.id)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Join this campaign with a character to pass combat",
+            ) from exc
+        actor = next(
+            (combatant for combatant in state.combatants if combatant.character_id == character.id),
+            None,
+        )
+        if actor is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not in this encounter",
+            )
+        if state.active_combatant_id != actor.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="It is not your turn",
+            )
+        passer_id = actor.id
+
+    try:
+        pass_combat_to(
+            state,
+            target_combatant_id=data.target_combatant_id,
+            passer_combatant_id=passer_id,
+        )
+    except TeamInitiativeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    end_response = _combat_end_response_if_needed(
+        session, campaign, state, is_owner=is_owner
+    )
+    if end_response:
+        return end_response
+
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=is_owner),
+    )
+
+
+@router.post("/{campaign_id}/encounter/finish-party-slice", response_model=EncounterPatchResponse)
+def finish_party_turn_slice(
+    campaign_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+    data: FinishPartySliceRequest = FinishPartySliceRequest(),
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    state = parse_encounter(campaign)
+
+    combatant_id: str | None = None
+    if is_owner:
+        combatant_id = data.combatant_id or state.active_combatant_id
+    else:
+        try:
+            _, character = get_member_character(session, campaign_id, current_user.id)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Join this campaign with a character to end your turn",
+            ) from exc
+        actor = next(
+            (combatant for combatant in state.combatants if combatant.character_id == character.id),
+            None,
+        )
+        if actor is None or state.active_combatant_id != actor.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="It is not your turn",
+            )
+        combatant_id = actor.id
+
+    try:
+        finish_party_slice(state, combatant_id=combatant_id)
+    except TeamInitiativeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    end_response = _combat_end_response_if_needed(
+        session, campaign, state, is_owner=is_owner
+    )
+    if end_response:
+        return end_response
+
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=is_owner),
+    )
+
+
+@router.post("/{campaign_id}/encounter/end-party-turn", response_model=EncounterPatchResponse)
+def end_party_turn(
+    campaign_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can end a party turn early",
+        )
+
+    state = parse_encounter(campaign)
+    if not is_team_mode(state) or state.team is None or not state.team.party_phase_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active party turn to end.",
+        )
+
+    if state.active_combatant_id and state.active_combatant_id not in state.team.completed_this_phase:
+        state.team.completed_this_phase.append(state.active_combatant_id)
+
+    end_party_phase(state, reason="dm_early")
+    append_log(state, "DM ended the party turn early.", kind="event", actor="DM")
+
+    end_response = _combat_end_response_if_needed(
+        session, campaign, state, is_owner=True
+    )
+    if end_response:
+        return end_response
+
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=True),
+    )
+
+
+@router.post("/{campaign_id}/encounter/add-roster-team", response_model=EncounterState)
+def add_roster_team_to_tracker(
+    campaign_id: int,
+    data: AddRosterTeamRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can add roster to the tracker",
+        )
+    try:
+        add_roster_with_team_rolls(
+            session,
+            campaign,
+            roll_character_ids=data.roll_character_ids,
+        )
+    except TeamInitiativeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    session.refresh(campaign)
+    return build_encounter_response(session, campaign, is_owner=True)
 
 
 @router.post("/{campaign_id}/encounter/add-roster", response_model=EncounterState)
