@@ -55,7 +55,16 @@ def can_take_turn(combatant: EncounterCombatant) -> bool:
 def sorted_combatants(state: EncounterState) -> list[EncounterCombatant]:
     """Combatants eligible for turns, highest initiative first."""
     living = [combatant for combatant in state.combatants if can_take_turn(combatant)]
-    return sorted(living, key=lambda combatant: combatant.initiative, reverse=True)
+    return sorted(living, key=lambda combatant: (-combatant.initiative, combatant.id))
+
+
+def pcs_awaiting_initiative(state: EncounterState) -> list[EncounterCombatant]:
+    """Roster PCs still at initiative 0 during pre-combat setup."""
+    return [
+        combatant
+        for combatant in state.combatants
+        if combatant.is_pc and can_take_turn(combatant) and combatant.initiative == 0
+    ]
 
 
 def sorted_combatants_for_display(state: EncounterState) -> list[EncounterCombatant]:
@@ -147,6 +156,13 @@ def advance_turn(state: EncounterState) -> None:
 def reset_active_to_top_of_initiative(state: EncounterState) -> bool:
     """Set the active turn to the highest-initiative living combatant."""
     from app.services.turn_actions import begin_turn, ensure_turn_economy
+
+    if pcs_awaiting_initiative(state):
+        if state.active_combatant_id is not None:
+            state.active_combatant_id = None
+            state.active_index = 0
+            return True
+        return False
 
     ordered = sorted_combatants(state)
     if not ordered:

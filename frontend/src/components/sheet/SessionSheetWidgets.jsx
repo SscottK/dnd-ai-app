@@ -10,10 +10,12 @@ import {
   formatCombatResources,
   turnStatusLabels,
   isDefeatedEnemy,
+  isWaitingForPcInitiative,
   parseEncounterPatchResponse,
   sortCombatantsForDisplay,
   sortCombatantsForTurns,
 } from "../../lib/encounterDisplay";
+import { encounterPatchBody } from "../../lib/encounterPatch";
 import { ConditionsEditor } from "./ConditionsEditor";
 import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
 import { AbilityScoresGrid } from "./AbilityScoresGrid";
@@ -1579,6 +1581,7 @@ export function InitiativeWidget({
   const myCombatant = encounter.combatants.find((c) => c.character_id === characterId);
   const isMyTurn = Boolean(myCombatant && activeCombatant?.id === myCombatant.id);
   const activeCombatantId = activeCombatant?.id ?? null;
+  const waitingForInitiative = isWaitingForPcInitiative(encounter.combatants);
 
   const reloadDmActionSheet = useCallback(async () => {
     if (!isOwner || !token || !campaignId || !activeCombatantId) {
@@ -1661,7 +1664,17 @@ export function InitiativeWidget({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || "Could not end turn");
       }
-      setEncounter(await res.json());
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+      if (parsed.combatEnded) {
+        setSelectedId(null);
+        onCombatEnded?.(parsed.combatLogText, parsed.reason);
+        setActionError(
+          parsed.reason === "defeat"
+            ? "Party defeated. Combat log added to everyone's Session notes."
+            : "Victory! All enemies defeated. Combat log added to everyone's Session notes."
+        );
+      }
     } catch (err) {
       setActionError(err.message || "Could not end turn.");
     } finally {
@@ -1704,7 +1717,7 @@ export function InitiativeWidget({
         const res = await apiFetch(`/campaigns/${campaignId}/encounter`, {
           token,
           method: "PATCH",
-          body: next,
+          body: encounterPatchBody(next),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -1856,7 +1869,11 @@ export function InitiativeWidget({
           <p className="truncate text-xs font-black uppercase text-starlight">{activeCombatant.name}</p>
         </div>
       ) : !isHorizontal ? (
-        <p className="shrink-0 text-xs sm:text-sm font-mono text-ink-faint">No active turn yet.</p>
+        <p className="shrink-0 text-xs sm:text-sm font-mono text-ink-faint">
+          {waitingForInitiative
+            ? "Waiting for party initiative rolls…"
+            : "No active turn yet."}
+        </p>
       ) : null}
 
       {characterId && (
@@ -1888,7 +1905,7 @@ export function InitiativeWidget({
                 Set
               </button>
             </form>
-            {isMyTurn && (
+            {isMyTurn && !waitingForInitiative && (
               <button
                 type="button"
                 disabled={submitting}

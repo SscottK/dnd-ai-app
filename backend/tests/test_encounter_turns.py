@@ -8,6 +8,7 @@ from app.api.schemas import EncounterCombatant, EncounterState
 from app.services.encounter_actions import (
     advance_turn,
     ensure_active_combatant,
+    reset_active_to_top_of_initiative,
     sorted_combatants,
 )
 
@@ -91,6 +92,37 @@ class EncounterTurnTests(unittest.TestCase):
         ordered = sorted_combatants(state)
 
         self.assertEqual([combatant.id for combatant in ordered], ["a"])
+
+    def test_setup_waits_for_pc_initiative_before_activating_enemy(self) -> None:
+        state = EncounterState(
+            round=1,
+            active_combatant_id="goblin",
+            active_index=0,
+            combatants=[
+                _combatant("goblin", "Goblin", 14),
+                _combatant("pc", "Hero", 0, is_pc=True),
+            ],
+        )
+
+        changed = reset_active_to_top_of_initiative(state)
+
+        self.assertTrue(changed)
+        self.assertIsNone(state.active_combatant_id)
+        self.assertEqual(state.active_index, 0)
+
+    def test_setup_activates_top_initiative_after_all_pcs_roll(self) -> None:
+        state = EncounterState(
+            round=1,
+            combatants=[
+                _combatant("goblin", "Goblin", 14),
+                _combatant("pc", "Hero", 18, is_pc=True),
+            ],
+        )
+
+        reset_active_to_top_of_initiative(state)
+
+        self.assertEqual(state.active_combatant_id, "pc")
+        self.assertEqual(state.active_index, 0)
 
 
 if __name__ == "__main__":

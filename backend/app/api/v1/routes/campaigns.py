@@ -671,8 +671,6 @@ def update_encounter(
         state.combatants = [
             apply_monster_catalog_to_combatant(combatant) for combatant in data.combatants
         ]
-    if data.turn_economy is not None:
-        state.turn_economy = data.turn_economy
 
     log_hp_changes(before, state)
     sync_encounter_combatants_to_characters(session, before, state)
@@ -757,7 +755,7 @@ def submit_initiative(
     )
 
 
-@router.post("/{campaign_id}/encounter/next-turn", response_model=EncounterState)
+@router.post("/{campaign_id}/encounter/next-turn", response_model=EncounterPatchResponse)
 def next_encounter_turn(campaign_id: int, current_user: CurrentUser, session: SessionDep):
     campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
     state = parse_encounter(campaign)
@@ -802,9 +800,18 @@ def next_encounter_turn(campaign_id: int, current_user: CurrentUser, session: Se
             kind="turn",
             actor=current.name,
         )
+
+    end_response = _combat_end_response_if_needed(
+        session, campaign, state, is_owner=is_owner
+    )
+    if end_response:
+        return end_response
+
     persist_encounter(session, campaign, state)
     session.refresh(campaign)
-    return build_encounter_response(session, campaign, is_owner=is_owner)
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=is_owner),
+    )
 
 
 @router.post("/{campaign_id}/encounter/use-action", response_model=UseActionResponse)

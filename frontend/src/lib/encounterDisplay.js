@@ -20,7 +20,15 @@ export function sortCombatantsForDisplay(combatants) {
 }
 
 export function sortCombatantsForTurns(combatants) {
-  return [...(combatants || [])].filter(canTakeTurn).sort((a, b) => b.initiative - a.initiative);
+  return [...(combatants || [])]
+    .filter(canTakeTurn)
+    .sort((a, b) => b.initiative - a.initiative || String(a.id).localeCompare(String(b.id)));
+}
+
+/** True when roster PCs are still at initiative 0 during pre-combat setup. */
+export function isWaitingForPcInitiative(combatants) {
+  const pcs = (combatants || []).filter((c) => c.is_pc && canTakeTurn(c));
+  return pcs.length > 0 && pcs.some((c) => c.initiative === 0);
 }
 
 /** Whether a player (non-DM) may see this combatant's AC on the initiative tracker. */

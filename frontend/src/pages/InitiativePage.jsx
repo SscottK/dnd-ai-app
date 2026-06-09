@@ -17,11 +17,13 @@ import {
   formatCombatantSpeed,
   formatCombatResources,
   isDefeatedEnemy,
+  isWaitingForPcInitiative,
   parseEncounterPatchResponse,
   sortCombatantsForDisplay,
   sortCombatantsForTurns,
   turnStatusLabels,
 } from "../lib/encounterDisplay";
+import { encounterPatchBody } from "../lib/encounterPatch";
 import { PageScroll } from "../components/PageScroll";
 import { DiceRoller } from "../components/DiceRoller";
 import {
@@ -146,7 +148,7 @@ export function InitiativePage() {
         const res = await apiFetch(`/campaigns/${campaignId}/encounter`, {
           token,
           method: "PATCH",
-          body: next,
+          body: encounterPatchBody(next),
         });
         if (!res.ok) throw new Error("Save failed");
         const parsed = parseEncounterPatchResponse(await res.json());
@@ -239,6 +241,7 @@ export function InitiativePage() {
       null
     : turnSorted[encounter.active_index] || null;
   const activeEconomy = activeCombatant ? encounter.turn_economy?.[activeCombatant.id] : null;
+  const waitingForInitiative = isWaitingForPcInitiative(encounter.combatants);
 
   useEffect(() => {
     if (!isOwner || !token || !campaignId || !activeCombatant?.character_id) {
@@ -398,7 +401,15 @@ export function InitiativePage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || "Could not advance turn");
       }
-      setEncounter(await res.json());
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+      if (parsed.combatEnded) {
+        setStatusMessage(
+          parsed.reason === "defeat"
+            ? "Party defeated. Combat log added to everyone's Session notes."
+            : "Victory! All enemies defeated. Combat log added to everyone's Session notes."
+        );
+      }
     } catch (err) {
       setError(err.message || "Could not advance turn.");
     } finally {
@@ -532,7 +543,15 @@ export function InitiativePage() {
                 <button
                   type="button"
                   onClick={nextTurn}
-                  className="px-3 py-2 text-[10px] font-black uppercase bg-neon-magenta text-black border-2 border-black"
+                  disabled={waitingForInitiative || !activeCombatant}
+                  className="px-3 py-2 text-[10px] font-black uppercase bg-neon-magenta text-black border-2 border-black disabled:opacity-40"
+                  title={
+                    waitingForInitiative
+                      ? "Waiting for party initiative rolls"
+                      : !activeCombatant
+                        ? "No active combatant"
+                        : "Advance turn"
+                  }
                 >
                   Next Turn
                 </button>
@@ -574,6 +593,13 @@ export function InitiativePage() {
         {!isOwner && (
           <p className="mb-4 text-[10px] font-mono text-zinc-500 border border-zinc-800 p-3">
             Use the Initiative pane in your session play view to roll initiative and end your turn.
+          </p>
+        )}
+
+        {waitingForInitiative && (
+          <p className="mb-4 rounded-sm border border-neon-cyan/40 bg-neon-cyan/10 px-3 py-2 text-xs font-mono text-neon-cyan">
+            Waiting for party initiative rolls before combat starts. Enemies won&apos;t take the
+            first turn until every PC has rolled.
           </p>
         )}
 

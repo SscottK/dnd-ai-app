@@ -148,15 +148,67 @@ export function DiceRoller({
     await rollFormula(expression.trim());
   };
 
+  const rollCheckToCombatLog = async ({ label, bonus }) => {
+    if (!campaignId || !token) return;
+    setBusy(true);
+    setError("");
+    try {
+      const rollResult = rollExpression("d20", { advantage, disadvantage });
+      const total = rollResult.total + bonus;
+      const message = formatRollMessage({
+        label,
+        kept: rollResult.kept,
+        dropped: rollResult.dropped,
+        bonus,
+        total,
+      });
+      recordRoll(message);
+      await postCombatRoll(campaignId, token, {
+        dice: "d20",
+        result: total,
+        message,
+      });
+    } catch (err) {
+      setError(err.message || "Roll failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSkillRoll = async () => {
     if (!skillName) {
       setError("Choose a skill.");
+      return;
+    }
+    if (combatActive) {
+      if (!sheet) {
+        setError("Open your character sheet to roll skill checks in combat.");
+        return;
+      }
+      const bonus = resolveSkillBonus(sheet, skillName);
+      await rollCheckToCombatLog({
+        label: `${skillName} check`,
+        bonus,
+      });
       return;
     }
     await runActionRoll({ roll_kind: "skill", label: skillName });
   };
 
   const handleSaveRoll = async () => {
+    if (combatActive) {
+      if (!sheet) {
+        setError("Open your character sheet to roll saving throws in combat.");
+        return;
+      }
+      const bonus = resolveSaveBonus(sheet, saveAbility);
+      const abilityLabel = ABILITY_LABELS[saveAbility] || saveAbility.toUpperCase();
+      await rollCheckToCombatLog({
+        label: `${abilityLabel} save`,
+        bonus,
+      });
+      return;
+    }
     await runActionRoll({ roll_kind: "save", label: saveAbility });
   };
 
@@ -177,7 +229,7 @@ export function DiceRoller({
           <button
             key={tab}
             type="button"
-            disabled={busy || (combatActive && tab === "check")}
+            disabled={busy}
             onClick={() => setMode(tab)}
             className={`px-2 py-0.5 text-[9px] font-black uppercase border ${
               mode === tab
