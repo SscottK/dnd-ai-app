@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Dices } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Dices, X } from "lucide-react";
 import {
   ABILITY_LABELS,
   DEFAULT_SKILLS,
@@ -9,6 +9,12 @@ import {
 } from "../lib/characterSheet";
 import { formatRollEntry, postActionRoll, postCombatRoll } from "../lib/actionRoll";
 import { appendModifier, formatRollMessage, rollExpression } from "../lib/diceRoll";
+import {
+  loadSavedDiceFormulas,
+  removeSavedDiceFormula,
+  saveDiceFormula,
+} from "../lib/savedDiceFormulas";
+import { useAuth } from "../hooks/useAuth";
 
 const QUICK_DICE = ["d4", "d6", "d8", "d10", "d12", "d20"];
 const COMMON_FORMULAS = ["d20", "2d6", "3d6", "4d6", "2d20kh1", "4d6dl1"];
@@ -75,6 +81,12 @@ export function DiceRoller({
   const [lastRoll, setLastRoll] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [savedFormulas, setSavedFormulas] = useState([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    setSavedFormulas(loadSavedDiceFormulas(user?.id));
+  }, [user?.id]);
 
   const skills = useMemo(() => {
     if (sheet?.skills?.length) return sheet.skills;
@@ -159,6 +171,21 @@ export function DiceRoller({
     event.preventDefault();
     if (!expression.trim()) return;
     await rollFormula(expression.trim());
+  };
+
+  const handleSaveFormula = () => {
+    setError("");
+    try {
+      const next = saveDiceFormula(user?.id, expression, savedFormulas);
+      setSavedFormulas(next);
+    } catch (err) {
+      setError(err.message || "Could not save formula.");
+    }
+  };
+
+  const handleRemoveSavedFormula = (formula) => {
+    const next = removeSavedDiceFormula(user?.id, formula, savedFormulas);
+    setSavedFormulas(next);
   };
 
   const rollCheckToCombatLog = async ({ label, bonus }) => {
@@ -321,27 +348,75 @@ export function DiceRoller({
         )}
 
         {mode === "expr" && (
-          <form onSubmit={handleExpressionRoll} className="space-y-2">
-            <label className="block text-[9px] font-black uppercase tracking-wider text-ink-faint">
-              Custom formula
-            </label>
-            <input
-              value={expression}
-              onChange={(event) => setExpression(event.target.value)}
-              placeholder="2d6+3, 4d6dl1, 2d20kh1"
-              className="w-full border border-border bg-black px-2 py-1.5 text-xs font-mono text-starlight"
-            />
-            <p className="text-[8px] font-mono text-ink-faint">
-              Mod field adds to the formula. Use dl/kh/kl for drop/keep.
-            </p>
-            <button
-              type="submit"
-              disabled={busy || !expression.trim()}
-              className="w-full border border-neon-cyan py-2 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
-            >
-              Roll formula
-            </button>
-          </form>
+          <div className="space-y-3">
+            <form onSubmit={handleExpressionRoll} className="space-y-2">
+              <label className="block text-[9px] font-black uppercase tracking-wider text-ink-faint">
+                Custom formula
+              </label>
+              <input
+                value={expression}
+                onChange={(event) => setExpression(event.target.value)}
+                placeholder="2d6+3, 4d6dl1, 2d20kh1"
+                className="w-full border border-border bg-black px-2 py-1.5 text-xs font-mono text-starlight"
+              />
+              <p className="text-[8px] font-mono text-ink-faint">
+                Mod field adds to the formula. Use dl/kh/kl for drop/keep.
+              </p>
+              <div className="flex gap-1.5">
+                <button
+                  type="submit"
+                  disabled={busy || !expression.trim()}
+                  className="flex-1 border border-neon-cyan py-2 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                >
+                  Roll formula
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !expression.trim()}
+                  onClick={handleSaveFormula}
+                  className="border border-border px-3 py-2 text-[10px] font-black uppercase text-starlight hover:border-neon-cyan hover:text-neon-cyan disabled:opacity-40"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+
+            {savedFormulas.length > 0 && (
+              <section className="space-y-1.5">
+                <p className="text-[9px] font-black uppercase tracking-wider text-ink-faint">
+                  Saved shortcuts
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {savedFormulas.map((formula) => (
+                    <div
+                      key={formula}
+                      className="inline-flex max-w-full items-stretch overflow-hidden rounded-sm border border-zinc-700 bg-void-deep/40"
+                    >
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleQuickRoll(formula)}
+                        className="truncate px-2 py-1 text-[9px] font-mono uppercase text-starlight hover:bg-neon-cyan/10 disabled:opacity-40"
+                        title={`Roll ${formula}`}
+                      >
+                        {hasModifier ? appendModifier(formula, parsedModifier) : formula}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleRemoveSavedFormula(formula)}
+                        className="border-l border-zinc-700 px-1.5 py-1 text-ink-faint hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                        title="Remove saved formula"
+                        aria-label={`Remove ${formula}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
         )}
 
         {mode === "check" && (

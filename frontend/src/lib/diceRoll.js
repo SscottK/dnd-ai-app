@@ -9,6 +9,18 @@ export function normalizeRollExpression(expression) {
     .replace(/\s+/g, "");
 }
 
+export function isValidDiceExpression(expression) {
+  const normalized = normalizeRollExpression(expression);
+  if (!normalized) return false;
+
+  const match = normalized.match(DICE_EXPR);
+  if (!match) return false;
+
+  const count = parseInt(match[1] || "1", 10);
+  const sides = parseInt(match[2], 10);
+  return count >= 1 && count <= 40 && sides >= 2 && sides <= 100;
+}
+
 function rollDie(sides) {
   return Math.floor(Math.random() * sides) + 1;
 }
