@@ -1390,9 +1390,8 @@ export function InitiativeWidget({
   const displaySorted = sortCombatantsForDisplay(trackerCombatants);
   const turnSorted = sortCombatantsForTurns(encounter.combatants);
   const activeCombatant = encounter.active_combatant_id
-    ? turnSorted.find((c) => c.id === encounter.active_combatant_id) ||
+    ? (encounter.combatants || []).find((c) => c.id === encounter.active_combatant_id) ||
       encounter.team?.party_roster?.find((r) => r.id === encounter.active_combatant_id) ||
-      turnSorted[encounter.active_index] ||
       null
     : turnSorted[encounter.active_index] || null;
   const myCombatant = resolveMyCombatant(encounter, characterId);

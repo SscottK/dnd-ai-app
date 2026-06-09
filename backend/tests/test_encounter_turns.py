@@ -8,6 +8,7 @@ from app.api.schemas import EncounterCombatant, EncounterState
 from app.services.encounter_actions import (
     advance_turn,
     ensure_active_combatant,
+    reconcile_active_combatant,
     reset_active_to_top_of_initiative,
     sorted_combatants,
 )
@@ -123,6 +124,39 @@ class EncounterTurnTests(unittest.TestCase):
 
         self.assertEqual(state.active_combatant_id, "pc")
         self.assertEqual(state.active_index, 0)
+
+    def test_reconcile_read_only_does_not_advance_past_defeated_active(self) -> None:
+        state = EncounterState(
+            round=2,
+            active_combatant_id="b",
+            active_index=1,
+            combatants=[
+                _combatant("a", "Alpha", 20, is_pc=True),
+                _combatant("b", "Brute", 15, hp=0),
+                _combatant("c", "Charlie", 10, is_pc=True),
+            ],
+        )
+
+        changed = reconcile_active_combatant(state, advance_past_defeated=False)
+
+        self.assertFalse(changed)
+        self.assertEqual(state.active_combatant_id, "b")
+
+    def test_reconcile_read_only_does_not_reset_missing_active_mid_combat(self) -> None:
+        state = EncounterState(
+            round=2,
+            active_combatant_id=None,
+            active_index=0,
+            combatants=[
+                _combatant("a", "Alpha", 20, is_pc=True),
+                _combatant("b", "Brute", 15),
+            ],
+        )
+
+        changed = reconcile_active_combatant(state, advance_past_defeated=False)
+
+        self.assertFalse(changed)
+        self.assertIsNone(state.active_combatant_id)
 
 
 if __name__ == "__main__":

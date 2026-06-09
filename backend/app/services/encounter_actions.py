@@ -195,7 +195,7 @@ def sync_initiative_order_after_setup_change(state: EncounterState) -> bool:
     from app.services.team_initiative import activate_current_team_slot, is_team_mode, refresh_turn_slots
 
     if combat_has_started(state):
-        return ensure_active_combatant(state)
+        return reconcile_active_combatant(state, advance_past_defeated=False)
     if is_team_mode(state):
         refresh_turn_slots(state)
         if activate_current_team_slot(state):
@@ -204,8 +204,73 @@ def sync_initiative_order_after_setup_change(state: EncounterState) -> bool:
     return reset_active_to_top_of_initiative(state)
 
 
-def ensure_active_combatant(state: EncounterState) -> bool:
-    """Point active turn at a living combatant when missing or stale. Returns True if state changed."""
+def _reconcile_active_team(state: EncounterState, *, advance_past_defeated: bool) -> bool:
+    """Align team-mode active combatant with the current turn slot without rogue turn jumps."""
+    from app.services.team_initiative import (
+        PARTY_SLOT,
+        advance_team_turn,
+        ensure_team_state,
+        refresh_turn_slots,
+        start_party_phase,
+    )
+    from app.services.turn_actions import begin_turn, ensure_turn_economy
+
+    team = ensure_team_state(state)
+    refresh_turn_slots(state)
+
+    if team.party_phase_active:
+        if state.active_combatant_id:
+            active = next(
+                (combatant for combatant in state.combatants if combatant.id == state.active_combatant_id),
+                None,
+            )
+            if active and can_take_turn(active):
+                ensure_turn_economy(state)
+                return False
+        if not state.active_combatant_id:
+            return start_party_phase(state)
+        return False
+
+    if not team.turn_slots:
+        if state.active_combatant_id is not None:
+            state.active_combatant_id = None
+            return True
+        return False
+
+    expected_slot = team.turn_slots[team.turn_slot_index]
+    if expected_slot == PARTY_SLOT:
+        return start_party_phase(state)
+
+    active = (
+        next(
+            (combatant for combatant in state.combatants if combatant.id == state.active_combatant_id),
+            None,
+        )
+        if state.active_combatant_id
+        else None
+    )
+
+    if state.active_combatant_id == expected_slot:
+        if active and can_take_turn(active):
+            ensure_turn_economy(state)
+            return False
+        if advance_past_defeated and active and not can_take_turn(active):
+            advance_team_turn(state)
+            return True
+        return False
+
+    if not advance_past_defeated:
+        return False
+
+    target = next((combatant for combatant in state.combatants if combatant.id == expected_slot), None)
+    if target and can_take_turn(target):
+        state.active_combatant_id = expected_slot
+        begin_turn(state, expected_slot)
+        return True
+    return False
+
+
+def _reconcile_active_individual(state: EncounterState, *, advance_past_defeated: bool) -> bool:
     from app.services.turn_actions import begin_turn, ensure_turn_economy
 
     ordered = sorted_combatants(state)
@@ -230,19 +295,26 @@ def ensure_active_combatant(state: EncounterState) -> bool:
                     ensure_turn_economy(state)
                     return False
 
-        next_candidates = _initiative_search_order(
-            state, after_combatant_id=state.active_combatant_id
-        )
-        for candidate in next_candidates:
-            for index, combatant in enumerate(ordered):
-                if combatant.id == candidate.id:
-                    if state.active_combatant_id == candidate.id and state.active_index == index:
-                        ensure_turn_economy(state)
-                        return False
-                    state.active_combatant_id = candidate.id
-                    state.active_index = index
-                    begin_turn(state, candidate.id)
-                    return True
+        if advance_past_defeated:
+            next_candidates = _initiative_search_order(
+                state, after_combatant_id=state.active_combatant_id
+            )
+            for candidate in next_candidates:
+                for index, combatant in enumerate(ordered):
+                    if combatant.id == candidate.id:
+                        if state.active_combatant_id == candidate.id and state.active_index == index:
+                            ensure_turn_economy(state)
+                            return False
+                        state.active_combatant_id = candidate.id
+                        state.active_index = index
+                        begin_turn(state, candidate.id)
+                        return True
+
+        ensure_turn_economy(state)
+        return False
+
+    if combat_has_started(state):
+        return False
 
     if state.active_combatant_id == ordered[0].id and state.active_index == 0:
         ensure_turn_economy(state)
@@ -252,6 +324,20 @@ def ensure_active_combatant(state: EncounterState) -> bool:
     state.active_index = 0
     begin_turn(state, ordered[0].id)
     return True
+
+
+def reconcile_active_combatant(state: EncounterState, *, advance_past_defeated: bool = False) -> bool:
+    """Repair active turn pointers. Only advances past defeated actives when explicitly allowed."""
+    from app.services.team_initiative import is_team_mode
+
+    if is_team_mode(state) and combat_has_started(state):
+        return _reconcile_active_team(state, advance_past_defeated=advance_past_defeated)
+    return _reconcile_active_individual(state, advance_past_defeated=advance_past_defeated)
+
+
+def ensure_active_combatant(state: EncounterState) -> bool:
+    """Mutating saves: advance past a defeated active combatant when the tracker is edited."""
+    return reconcile_active_combatant(state, advance_past_defeated=True)
 
 
 def upsert_pc_combatant(state: EncounterState, character: Character, initiative: int) -> None:

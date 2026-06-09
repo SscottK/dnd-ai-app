@@ -460,15 +460,8 @@ def build_encounter_response(
             session, enrich_encounter_portraits(session, parse_encounter(campaign))
         ),
     )
-    if fix_active and sync_initiative_order_after_setup_change(state):
-        persist_encounter(session, campaign, state)
-        session.refresh(campaign)
-        state = enrich_encounter_pc_stats(
-            session,
-            enrich_encounter_movement(
-                session, enrich_encounter_portraits(session, parse_encounter(campaign))
-            ),
-        )
+    if fix_active:
+        sync_initiative_order_after_setup_change(state)
     ensure_turn_economy(state)
     return encounter_for_viewer(state, is_owner=is_owner)
 

@@ -263,8 +263,8 @@ export function InitiativePage() {
   const displaySorted = sortCombatantsForDisplay(trackerCombatants);
   const turnSorted = sortCombatantsForTurns(encounter.combatants);
   const activeCombatant = encounter.active_combatant_id
-    ? turnSorted.find((c) => c.id === encounter.active_combatant_id) ||
-      turnSorted[encounter.active_index] ||
+    ? (encounter.combatants || []).find((c) => c.id === encounter.active_combatant_id) ||
+      encounter.team?.party_roster?.find((r) => r.id === encounter.active_combatant_id) ||
       null
     : turnSorted[encounter.active_index] || null;
   const activeEconomy = activeCombatant ? encounter.turn_economy?.[activeCombatant.id] : null;
