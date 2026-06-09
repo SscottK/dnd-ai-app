@@ -15,6 +15,18 @@ const COMMON_FORMULAS = ["d20", "2d6", "3d6", "4d6", "2d20kh1", "4d6dl1"];
 
 const SAVE_ROWS = ["str", "dex", "con", "int", "wis", "cha"];
 
+const PRESET_FORMULAS = COMMON_FORMULAS.filter((item) => !QUICK_DICE.includes(item));
+
+function rollButtonClass({ active = false, compact = false } = {}) {
+  const size = compact
+    ? "min-h-[2rem] px-2 py-1 text-[9px]"
+    : "min-h-[2.75rem] px-2 py-2 text-[10px] sm:min-h-[3rem] sm:text-xs";
+  const tone = active
+    ? "border-neon-cyan text-neon-cyan bg-neon-cyan/10"
+    : "border-zinc-700 text-starlight hover:border-neon-cyan hover:text-starlight";
+  return `flex items-center justify-center border font-black uppercase disabled:opacity-40 ${size} ${tone}`;
+}
+
 function AdvantageToggles({ advantage, disadvantage, disabled, onChange }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono text-ink-faint">
@@ -215,47 +227,55 @@ export function DiceRoller({
 
   const selectedSkill = skills.find((skill) => skill.name === skillName) || skills[0];
 
-  const rootClass = fillPane
-    ? "flex h-full min-h-0 flex-1 flex-col gap-2"
-    : "flex h-full min-h-0 flex-col gap-2";
+  const diceGridClass = fillPane
+    ? "grid flex-1 grid-cols-3 grid-rows-2 gap-1.5 min-h-[7rem]"
+    : "grid grid-cols-3 gap-1.5 sm:grid-cols-6";
+
+  const presetGridClass = fillPane
+    ? "grid grid-cols-3 gap-1.5 sm:grid-cols-5"
+    : "grid grid-cols-3 gap-1.5 sm:grid-cols-5";
 
   return (
-    <div className={rootClass}>
-      <div className="flex shrink-0 items-center gap-2">
-        <Dices className="h-4 w-4 shrink-0 text-neon-magenta" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-starlight">Dice</span>
-        {rollerLabel && (
-          <span className="truncate text-[8px] font-mono text-ink-faint">as {rollerLabel}</span>
-        )}
-      </div>
-
-      <div className="flex shrink-0 flex-wrap gap-1">
-        {["quick", "expr", "check"].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            disabled={busy}
-            onClick={() => setMode(tab)}
-            className={`px-2 py-0.5 text-[9px] font-black uppercase border ${
-              mode === tab
-                ? "border-neon-cyan text-neon-cyan"
-                : "border-zinc-700 text-ink-faint hover:border-neon-cyan/50"
-            } disabled:opacity-40`}
-          >
-            {tab === "quick" ? "Quick" : tab === "expr" ? "Formula" : "Checks"}
-          </button>
-        ))}
+    <div
+      className={
+        fillPane
+          ? "flex h-full min-h-0 flex-1 flex-col gap-2"
+          : "flex h-full min-h-0 flex-col gap-2"
+      }
+    >
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Dices className="h-4 w-4 shrink-0 text-neon-magenta" />
+          {rollerLabel ? (
+            <span className="truncate text-[9px] font-mono text-ink-faint">Rolling as {rollerLabel}</span>
+          ) : (
+            <span className="text-[10px] font-black uppercase tracking-widest text-starlight">Dice</span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {["quick", "expr", "check"].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              disabled={busy}
+              onClick={() => setMode(tab)}
+              className={rollButtonClass({ active: mode === tab, compact: true })}
+            >
+              {tab === "quick" ? "Quick" : tab === "expr" ? "Formula" : "Checks"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {(mode === "quick" || mode === "expr") && (
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-sm border border-border/60 bg-void-deep/30 px-2 py-1.5">
           <label className="text-[9px] font-black uppercase text-ink-faint">Mod</label>
           <input
             type="number"
             value={modifier}
             onChange={(event) => setModifier(event.target.value)}
             placeholder="0"
-            className="w-14 border border-border bg-void-deep px-2 py-0.5 text-xs font-mono text-starlight"
+            className="w-14 border border-border bg-black px-2 py-0.5 text-xs font-mono text-starlight"
           />
           <AdvantageToggles
             advantage={advantage}
@@ -266,148 +286,148 @@ export function DiceRoller({
         </div>
       )}
 
-      {mode === "quick" && (
-        <div className={fillPane ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}>
-          <div
-            className={
-              fillPane
-                ? "grid min-h-0 flex-1 grid-cols-3 gap-1 sm:grid-cols-3"
-                : "flex flex-wrap gap-1"
-            }
-          >
-            {QUICK_DICE.map((die) => (
-              <button
-                key={die}
-                type="button"
-                disabled={busy}
-                onClick={() => handleQuickRoll(die)}
-                className={
-                  fillPane
-                    ? "flex min-h-[2.5rem] items-center justify-center border border-zinc-700 text-[10px] font-black uppercase hover:border-neon-cyan hover:text-starlight disabled:opacity-40 sm:min-h-[3rem] sm:text-xs"
-                    : "border border-zinc-700 px-2 py-1 text-[10px] font-black uppercase hover:border-neon-cyan hover:text-starlight disabled:opacity-40"
-                }
-              >
-                {hasModifier ? appendModifier(die, parsedModifier) : die}
-              </button>
-            ))}
-          </div>
-          <div className={fillPane ? "flex shrink-0 flex-wrap gap-1" : "flex flex-wrap gap-1"}>
-            {COMMON_FORMULAS.filter((item) => !QUICK_DICE.includes(item)).map((formula) => (
-              <button
-                key={formula}
-                type="button"
-                disabled={busy}
-                onClick={() => handleQuickRoll(formula)}
-                className="border border-zinc-800 px-2 py-0.5 text-[9px] font-mono uppercase text-ink-faint hover:border-neon-cyan hover:text-starlight disabled:opacity-40"
-              >
-                {hasModifier ? appendModifier(formula, parsedModifier) : formula}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {mode === "expr" && (
-        <form
-          onSubmit={handleExpressionRoll}
-          className={fillPane ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}
-        >
-          <input
-            value={expression}
-            onChange={(event) => setExpression(event.target.value)}
-            placeholder="2d6+3, 4d6dl1, 2d20kh1"
-            className="w-full border border-border bg-void-deep px-2 py-1 text-xs font-mono text-starlight"
-          />
-          <p className="text-[8px] font-mono text-ink-faint">
-            Mod field adds to the formula. Use dl/kh/kl for drop/keep.
-          </p>
-          <button
-            type="submit"
-            disabled={busy || !expression.trim()}
-            className="w-full border border-neon-cyan py-1 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
-          >
-            Roll formula
-          </button>
-        </form>
-      )}
-
-      {mode === "check" && (
-        <div className={fillPane ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"}>
-          {!sheet ? (
-            <p className="text-[9px] font-mono text-ink-faint">Join with a character to roll checks.</p>
-          ) : (
-            <>
-              <AdvantageToggles
-                advantage={advantage}
-                disadvantage={disadvantage}
-                disabled={busy}
-                onChange={setRollOptions}
-              />
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase text-neon-cyan">Skill</label>
-                <select
-                  value={skillName || skills[0]?.name || ""}
-                  onChange={(event) => setSkillName(event.target.value)}
-                  className="w-full border border-border bg-void-deep px-2 py-1 text-xs font-mono text-starlight"
-                >
-                  {skills.map((skill) => (
-                    <option key={skill.name} value={skill.name}>
-                      {skill.name} ({formatModifier(resolveSkillBonus(skill, sheet))})
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleSkillRoll}
-                  className="w-full border border-neon-cyan py-1 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
-                >
-                  Roll {selectedSkill?.name || "skill"}
-                </button>
+      <div className={fillPane ? "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" : "space-y-3"}>
+        {mode === "quick" && (
+          <>
+            <section className={fillPane ? "flex min-h-0 flex-1 flex-col gap-1.5" : "space-y-1.5"}>
+              <p className="shrink-0 text-[9px] font-black uppercase tracking-wider text-ink-faint">
+                Standard dice
+              </p>
+              <div className={diceGridClass}>
+                {QUICK_DICE.map((die) => (
+                  <button
+                    key={die}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleQuickRoll(die)}
+                    className={rollButtonClass()}
+                  >
+                    {hasModifier ? appendModifier(die, parsedModifier) : die}
+                  </button>
+                ))}
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase text-neon-magenta">Save</label>
-                <select
-                  value={saveAbility}
-                  onChange={(event) => setSaveAbility(event.target.value)}
-                  className="w-full border border-border bg-void-deep px-2 py-1 text-xs font-mono text-starlight"
-                >
-                  {SAVE_ROWS.map((ability) => {
-                    const save = sheet.saving_throws?.find((row) => row.ability === ability) || {
-                      ability,
-                      proficient: false,
-                    };
-                    return (
-                      <option key={ability} value={ability}>
-                        {ABILITY_LABELS[ability]} ({formatModifier(resolveSaveBonus(save, sheet))})
+            </section>
+
+            <section className="shrink-0 space-y-1.5">
+              <p className="text-[9px] font-black uppercase tracking-wider text-ink-faint">Presets</p>
+              <div className={presetGridClass}>
+                {PRESET_FORMULAS.map((formula) => (
+                  <button
+                    key={formula}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleQuickRoll(formula)}
+                    className={rollButtonClass({ compact: true })}
+                  >
+                    {hasModifier ? appendModifier(formula, parsedModifier) : formula}
+                  </button>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+
+        {mode === "expr" && (
+          <form onSubmit={handleExpressionRoll} className="space-y-2">
+            <label className="block text-[9px] font-black uppercase tracking-wider text-ink-faint">
+              Custom formula
+            </label>
+            <input
+              value={expression}
+              onChange={(event) => setExpression(event.target.value)}
+              placeholder="2d6+3, 4d6dl1, 2d20kh1"
+              className="w-full border border-border bg-black px-2 py-1.5 text-xs font-mono text-starlight"
+            />
+            <p className="text-[8px] font-mono text-ink-faint">
+              Mod field adds to the formula. Use dl/kh/kl for drop/keep.
+            </p>
+            <button
+              type="submit"
+              disabled={busy || !expression.trim()}
+              className="w-full border border-neon-cyan py-2 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+            >
+              Roll formula
+            </button>
+          </form>
+        )}
+
+        {mode === "check" && (
+          <div className="space-y-3">
+            {!sheet ? (
+              <p className="text-[9px] font-mono text-ink-faint">Join with a character to roll checks.</p>
+            ) : (
+              <>
+                <div className="rounded-sm border border-border/60 bg-void-deep/30 px-2 py-1.5">
+                  <AdvantageToggles
+                    advantage={advantage}
+                    disadvantage={disadvantage}
+                    disabled={busy}
+                    onChange={setRollOptions}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-neon-cyan">Skill</label>
+                  <select
+                    value={skillName || skills[0]?.name || ""}
+                    onChange={(event) => setSkillName(event.target.value)}
+                    className="w-full border border-border bg-black px-2 py-1.5 text-xs font-mono text-starlight"
+                  >
+                    {skills.map((skill) => (
+                      <option key={skill.name} value={skill.name}>
+                        {skill.name} ({formatModifier(resolveSkillBonus(skill, sheet))})
                       </option>
-                    );
-                  })}
-                </select>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={handleSaveRoll}
-                  className="w-full border border-neon-magenta py-1 text-[10px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
-                >
-                  Roll save
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleSkillRoll}
+                    className="w-full border border-neon-cyan py-2 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
+                  >
+                    Roll {selectedSkill?.name || "skill"}
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-neon-magenta">Save</label>
+                  <select
+                    value={saveAbility}
+                    onChange={(event) => setSaveAbility(event.target.value)}
+                    className="w-full border border-border bg-black px-2 py-1.5 text-xs font-mono text-starlight"
+                  >
+                    {SAVE_ROWS.map((ability) => {
+                      const save = sheet.saving_throws?.find((row) => row.ability === ability) || {
+                        ability,
+                        proficient: false,
+                      };
+                      return (
+                        <option key={ability} value={ability}>
+                          {ABILITY_LABELS[ability]} ({formatModifier(resolveSaveBonus(save, sheet))})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleSaveRoll}
+                    className="w-full border border-neon-magenta py-2 text-[10px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+                  >
+                    Roll save
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mt-auto shrink-0 space-y-1.5 border-t border-border/60 pt-2">
         {lastRoll && (
           <p className="text-xs font-mono text-neon-cyan">
             <span className="text-starlight">{lastRoll.message}</span>
             <span className="ml-2 text-zinc-600">{lastRoll.at}</span>
           </p>
         )}
-      </div>
-
-      <div className="shrink-0 space-y-1 border-t border-border/60 pt-2">
         <p className="text-[8px] font-mono text-ink-faint">
           {combatActive
             ? "Combat active — dice rolls go to the combat log."
