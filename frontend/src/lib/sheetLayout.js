@@ -360,6 +360,27 @@ function widgetVisibleRatio(widget, effW, effH) {
   return visible / Math.max(1, widget.w * h);
 }
 
+function widgetOverflowsBounds(widget, effW, effH, tolerance = 1) {
+  const h = widgetDisplayHeight(widget, effH);
+  return (
+    widget.x < -tolerance ||
+    widget.y < -tolerance ||
+    widget.x + widget.w > effW + tolerance ||
+    widget.y + h > effH + tolerance
+  );
+}
+
+function widgetsOverlap(left, right, gap = 8) {
+  const leftH = widgetDisplayHeight(left);
+  const rightH = widgetDisplayHeight(right);
+  return !(
+    left.x + left.w + gap <= right.x ||
+    right.x + right.w + gap <= left.x ||
+    left.y + leftH + gap <= right.y ||
+    right.y + rightH + gap <= left.y
+  );
+}
+
 /** Keep pane fully inside the effective viewport (accounts for zoom). */
 export function clampWidget(widget, canvasW, canvasH, viewportScale = 1) {
   if (!canvasW || !canvasH) return widget;
@@ -422,30 +443,72 @@ export function nudgeWidgetIntoView(widget, canvasW, canvasH, viewportScale = 1)
   return clampWidget({ ...widget, x, y, w: width, h: height }, canvasW, canvasH, viewportScale);
 }
 
+function widgetNeedsRecovery(widget, effW, effH) {
+  return widgetOverflowsBounds(widget, effW, effH) || widgetVisibleRatio(widget, effW, effH) < 0.95;
+}
+
+function findOpenSlot(widget, placed, effW, effH, startX, startY, gap = 12) {
+  const margin = 12;
+  const width = Math.min(Math.max(MIN_PANE_WIDTH, widget.w), effW - margin * 2);
+  const height = widgetDisplayHeight({ ...widget, w: width }, effH);
+  const maxX = Math.max(margin, effW - margin - width);
+  const maxY = Math.max(margin, effH - margin - height);
+
+  let y = Math.max(margin, startY);
+  while (y <= maxY) {
+    let x = Math.max(margin, startX);
+    while (x <= maxX) {
+      const candidate = { ...widget, x, y, w: width, h: height };
+      const inBounds =
+        x >= margin &&
+        y >= margin &&
+        x + width <= effW - margin &&
+        y + height <= effH - margin;
+      if (inBounds && !placed.some((other) => widgetsOverlap(candidate, other))) {
+        return { x, y, w: width, h: height };
+      }
+      x += gap + Math.min(120, width / 2);
+    }
+    y += gap + Math.min(80, height / 2);
+  }
+
+  const index = placed.length;
+  return {
+    x: Math.round((effW - width) / 2) + (index % 3) * 28,
+    y: Math.round((effH - height) / 2) + Math.floor(index / 3) * 28,
+    w: width,
+    h: height,
+  };
+}
+
 /** Recover panes after resize/zoom so none stay hidden outside the visible canvas. */
 export function pullWidgetsIntoView(widgets, canvasW, canvasH, viewportScale = 1) {
   const { width: effW, height: effH } = effectiveLayoutSize(canvasW, canvasH, viewportScale);
-  const stagger = 16;
+  if (!effW || !effH) return widgets;
 
-  return widgets.map((widget, index) => {
-    const before = widgetVisibleRatio(widget, effW, effH);
-    let next = nudgeWidgetIntoView(widget, canvasW, canvasH, viewportScale);
-    if (before >= 0.9) return next;
+  const clamped = clampWidgets(widgets, canvasW, canvasH, viewportScale);
+  const needsRecovery = clamped.filter((widget) => widgetNeedsRecovery(widget, effW, effH));
+  if (!needsRecovery.length) return clamped;
 
-    const col = index % 4;
-    const row = Math.floor(index / 4);
-    const h = widgetDisplayHeight(next, effH);
-    return clampWidget(
-      {
-        ...next,
-        x: Math.min(Math.max(0, next.x + col * stagger), Math.max(0, effW - next.w)),
-        y: Math.min(Math.max(0, next.y + row * stagger), Math.max(0, effH - h)),
-      },
+  const placed = clamped.filter((widget) => !widgetNeedsRecovery(widget, effW, effH));
+  const startX = Math.round(effW * 0.18);
+  const startY = Math.round(effH * 0.14);
+  const gap = 12;
+  const recoveredById = new Map();
+
+  for (const widget of [...needsRecovery].sort((left, right) => (left.z ?? 0) - (right.z ?? 0))) {
+    const slot = findOpenSlot(widget, placed, effW, effH, startX, startY, gap);
+    const next = clampWidget(
+      { ...widget, x: slot.x, y: slot.y, w: slot.w, h: slot.h },
       canvasW,
       canvasH,
       viewportScale
     );
-  });
+    recoveredById.set(widget.id, next);
+    placed.push(next);
+  }
+
+  return clamped.map((widget) => recoveredById.get(widget.id) || widget);
 }
 
 /** Scale pane positions and sizes proportionally when the viewport changes, then clamp. */
@@ -454,24 +517,23 @@ export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH, viewp
     return pullWidgetsIntoView(clampWidgets(widgets, nextW, nextH, viewportScale), nextW, nextH, viewportScale);
   }
 
+  const shrinking = nextW < prevW || nextH < prevH;
   const scaleX = nextW / prevW;
   const scaleY = nextH / prevH;
 
   const scaled = widgets.map((widget) => {
     const expandedH = widget.expandedH ?? widget.h;
-    const next = {
-      ...widget,
-      x: Math.round(widget.x * scaleX),
-      y: Math.round(widget.y * scaleY),
-      w: Math.round(widget.w * scaleX),
-      expandedH: Math.round(expandedH * scaleY),
-    };
-    if (widget.minimized) {
-      next.h = MIN_PANE_HEIGHT;
-    } else {
-      next.h = Math.round(expandedH * scaleY);
-    }
-    return clampWidget(next, nextW, nextH, viewportScale);
+    const next = shrinking
+      ? clampWidget(widget, nextW, nextH, viewportScale)
+      : {
+          ...widget,
+          x: Math.round(widget.x * scaleX),
+          y: Math.round(widget.y * scaleY),
+          w: Math.round(widget.w * scaleX),
+          expandedH: Math.round(expandedH * scaleY),
+          h: widget.minimized ? MIN_PANE_HEIGHT : Math.round(expandedH * scaleY),
+        };
+    return shrinking ? next : clampWidget(next, nextW, nextH, viewportScale);
   });
 
   return pullWidgetsIntoView(scaled, nextW, nextH, viewportScale);

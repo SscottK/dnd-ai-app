@@ -683,59 +683,94 @@ export function SessionPlayPage() {
     if (!el || !sessionStatus?.session_active) return;
     if (!character && !(sessionStatus.is_owner && !sessionStatus.character_id)) return;
 
+    const applyLayoutRecovery = (width, height, { reflow = false, prevW, prevH } = {}) => {
+      if (width <= 0 || height <= 0) return;
+
+      setLayout((prevLayout) => {
+        const viewportScale = prevLayout.viewport?.scale ?? DEFAULT_ZOOM;
+        const widgets = reflow
+          ? reflowWidgetsOnResize(
+              prevLayout.widgets,
+              prevW,
+              prevH,
+              width,
+              height,
+              viewportScale
+            )
+          : pullWidgetsIntoView(
+              prevLayout.widgets,
+              width,
+              height,
+              viewportScale
+            );
+        const next = {
+          ...prevLayout,
+          widgets,
+          viewport: withCanvasViewport(prevLayout.viewport, width, height),
+        };
+        layoutRef.current = next;
+        return next;
+      });
+    };
+
     const applyCanvasResize = (nextW, nextH) => {
-      if (interactingRef.current || nextW <= 0 || nextH <= 0) return;
+      if (nextW <= 0 || nextH <= 0) return;
 
       const prev = canvasBoundsRef.current;
       if (prev.width === nextW && prev.height === nextH) return;
-      if (
-        prev.width > 0 &&
-        prev.height > 0 &&
-        Math.abs(prev.width - nextW) < 2 &&
-        Math.abs(prev.height - nextH) < 2
-      ) {
-        return;
-      }
 
       const prevW = prev.width > 0 ? prev.width : nextW;
       const prevH = prev.height > 0 ? prev.height : nextH;
       canvasBoundsRef.current = { width: nextW, height: nextH };
 
-      setLayout((prevLayout) => {
-        const viewportScale = prevLayout.viewport?.scale ?? DEFAULT_ZOOM;
-        const next = {
-          widgets: reflowWidgetsOnResize(
-            prevLayout.widgets,
-            prevW,
-            prevH,
-            nextW,
-            nextH,
-            viewportScale
-          ),
-          viewport: withCanvasViewport(prevLayout.viewport, nextW, nextH),
-        };
-        layoutRef.current = next;
-        if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
-        resizeSaveTimer.current = setTimeout(() => {
-          saveLayoutSnapshot(layoutRef.current);
-        }, 500);
-        return next;
-      });
+      applyLayoutRecovery(nextW, nextH, { reflow: true, prevW, prevH });
+
+      if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
+      resizeSaveTimer.current = setTimeout(() => {
+        saveLayoutSnapshot(layoutRef.current);
+      }, 500);
+    };
+
+    const finalizeCanvasResize = () => {
+      const { width, height } = canvasBoundsRef.current;
+      if (width <= 0 || height <= 0) return;
+      applyLayoutRecovery(width, height, { reflow: false });
+      if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
+      resizeSaveTimer.current = setTimeout(() => {
+        saveLayoutSnapshot(layoutRef.current);
+      }, 500);
     };
 
     let raf = 0;
+    let resizeEndTimer = null;
     const observer = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         applyCanvasResize(Math.round(width), Math.round(height));
+        if (resizeEndTimer) clearTimeout(resizeEndTimer);
+        resizeEndTimer = setTimeout(finalizeCanvasResize, 120);
       });
     });
 
+    const onWindowResize = () => {
+      const measured = measureCanvas();
+      if (!measured) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        applyCanvasResize(measured.width, measured.height);
+        if (resizeEndTimer) clearTimeout(resizeEndTimer);
+        resizeEndTimer = setTimeout(finalizeCanvasResize, 120);
+      });
+    };
+
     observer.observe(el);
+    window.addEventListener("resize", onWindowResize);
     return () => {
       cancelAnimationFrame(raf);
+      if (resizeEndTimer) clearTimeout(resizeEndTimer);
       if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
+      window.removeEventListener("resize", onWindowResize);
       observer.disconnect();
     };
   }, [
@@ -744,6 +779,7 @@ export function SessionPlayPage() {
     sessionStatus?.character_id,
     character?.id,
     saveLayoutSnapshot,
+    measureCanvas,
   ]);
 
   const onCombatChange = (patch) => {
@@ -969,9 +1005,14 @@ export function SessionPlayPage() {
 
   const focusWidget = useCallback(
     (widgetId) => {
+      const { width, height } = canvasBoundsRef.current;
       const prev = layoutRef.current;
-      const nextWidgets = bringWidgetToFront(prev.widgets, widgetId);
-      if (nextWidgets === prev.widgets) return;
+      const viewportScale = prev.viewport?.scale ?? DEFAULT_ZOOM;
+      const nextWidgets = bringWidgetToFront(prev.widgets, widgetId).map((widget) =>
+        widget.id === widgetId
+          ? clampWidget(widget, width, height, viewportScale)
+          : widget
+      );
       const nextLayout = { ...prev, widgets: nextWidgets };
       layoutRef.current = nextLayout;
       setLayout(nextLayout);
@@ -1394,6 +1435,12 @@ export function SessionPlayPage() {
   }
 
   const scale = isMobileSession ? 1 : layout.viewport.scale;
+  const canvasW =
+    canvasBoundsRef.current.width || layout.viewport.canvasW || 1280;
+  const canvasH =
+    canvasBoundsRef.current.height || layout.viewport.canvasH || 800;
+  const layoutW = Math.max(1, Math.round(canvasW / scale));
+  const layoutH = Math.max(1, Math.round(canvasH / scale));
 
   return (
     <div className="session-ui flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
@@ -1543,10 +1590,15 @@ export function SessionPlayPage() {
           </span>
         </div>
         <div
-          className="absolute inset-0 overflow-hidden"
-          style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
+          className="absolute top-0 left-0 overflow-hidden"
+          style={{
+            width: layoutW,
+            height: layoutH,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
         >
-          <div className="relative h-full w-full overflow-hidden">
+          <div className="relative h-full w-full">
             {[...layout.widgets]
               .sort((left, right) => (left.z ?? 0) - (right.z ?? 0))
               .map((widget) => (
