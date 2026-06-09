@@ -227,20 +227,12 @@ export function DiceRoller({
 
   const selectedSkill = skills.find((skill) => skill.name === skillName) || skills[0];
 
-  const diceGridClass = fillPane
-    ? "grid flex-1 grid-cols-3 grid-rows-2 gap-1.5 min-h-[7rem]"
-    : "grid grid-cols-3 gap-1.5 sm:grid-cols-6";
-
-  const presetGridClass = fillPane
-    ? "grid grid-cols-3 gap-1.5 sm:grid-cols-5"
-    : "grid grid-cols-3 gap-1.5 sm:grid-cols-5";
-
   return (
     <div
       className={
         fillPane
-          ? "flex h-full min-h-0 flex-1 flex-col gap-2"
-          : "flex h-full min-h-0 flex-col gap-2"
+          ? "flex h-full min-h-0 flex-1 flex-col gap-2 overflow-hidden"
+          : "flex h-full min-h-0 flex-col gap-2 overflow-hidden"
       }
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
@@ -286,14 +278,15 @@ export function DiceRoller({
         </div>
       )}
 
-      <div className={fillPane ? "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto" : "space-y-3"}>
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex flex-col gap-3 pb-1">
         {mode === "quick" && (
           <>
-            <section className={fillPane ? "flex min-h-0 flex-1 flex-col gap-1.5" : "space-y-1.5"}>
-              <p className="shrink-0 text-[9px] font-black uppercase tracking-wider text-ink-faint">
+            <section className="space-y-1.5">
+              <p className="text-[9px] font-black uppercase tracking-wider text-ink-faint">
                 Standard dice
               </p>
-              <div className={diceGridClass}>
+              <div className="grid grid-cols-3 gap-1.5">
                 {QUICK_DICE.map((die) => (
                   <button
                     key={die}
@@ -308,9 +301,9 @@ export function DiceRoller({
               </div>
             </section>
 
-            <section className="shrink-0 space-y-1.5">
+            <section className="space-y-1.5">
               <p className="text-[9px] font-black uppercase tracking-wider text-ink-faint">Presets</p>
-              <div className={presetGridClass}>
+              <div className="flex flex-wrap gap-1.5">
                 {PRESET_FORMULAS.map((formula) => (
                   <button
                     key={formula}
@@ -419,9 +412,10 @@ export function DiceRoller({
             )}
           </div>
         )}
+        </div>
       </div>
 
-      <div className="mt-auto shrink-0 space-y-1.5 border-t border-border/60 pt-2">
+      <div className="shrink-0 space-y-1.5 border-t border-border/60 pt-2">
         {lastRoll && (
           <p className="text-xs font-mono text-neon-cyan">
             <span className="text-starlight">{lastRoll.message}</span>
