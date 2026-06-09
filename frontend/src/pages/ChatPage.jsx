@@ -3,7 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useChatStream } from "../hooks/useChatStream";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { SrdCitations } from "../components/SrdCitations";
-import { PullToRefresh } from "../components/PullToRefresh";
+import { PAGE_SCROLL_CLASS, PullToRefresh } from "../components/PullToRefresh";
 import { apiFetch } from "../lib/api";
 import {
   Plus,
@@ -261,43 +261,80 @@ export function ChatPage() {
   const showThreadList = !isMobile || !activeConvId;
   const showChatPane = !isMobile || Boolean(activeConvId);
 
+  const threadListContent = (
+    <div className="space-y-3 px-1 py-2">
+      <div className="px-2">
+        <button
+          onClick={handleCreateConversation}
+          className="flex w-full items-center justify-center gap-2 border-2 border-neon-magenta bg-black py-2 text-xs font-black uppercase tracking-widest text-neon-magenta hover:bg-neon-magenta hover:text-black"
+        >
+          <Plus className="h-4 w-4" /> New Thread
+        </button>
+      </div>
+      {pinnedThreads.length > 0 && (
+        <div className="space-y-0.5">
+          <div className="px-3 text-[10px] font-black uppercase tracking-widest text-starlight">Pinned</div>
+          {pinnedThreads.map(renderConversationItem)}
+        </div>
+      )}
+      <div className="space-y-0.5">
+        <div className="px-3 text-[10px] font-black uppercase tracking-widest text-neon-cyan">Threads</div>
+        {generalThreads.length > 0 ? (
+          generalThreads.map(renderConversationItem)
+        ) : (
+          pinnedThreads.length === 0 && (
+            <div className="py-6 text-center text-xs font-mono italic text-zinc-700">No threads yet</div>
+          )
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-black text-neon-cyan">
       {showThreadList && (
       <aside
         className={`flex min-h-0 flex-col border-neon-magenta/50 bg-zinc-950 ${
-          isMobile ? "w-full shrink-0" : "w-72 shrink-0 border-r-2"
+          isMobile ? "h-full w-full flex-1" : "w-72 shrink-0 border-r-2"
         }`}
       >
-        <div className="p-3 border-b border-neon-magenta/30">
-          <button
-            onClick={handleCreateConversation}
-            className="w-full py-2 bg-black hover:bg-neon-magenta text-neon-magenta hover:text-black border-2 border-neon-magenta font-black text-xs flex items-center justify-center gap-2 uppercase tracking-widest"
-          >
-            <Plus className="w-4 h-4" /> New Thread
-          </button>
-        </div>
-        <PullToRefresh
-          onRefresh={refreshThreads}
-          className="flex-1 overflow-y-auto overscroll-y-contain px-1 py-2 space-y-3"
-        >
-          {pinnedThreads.length > 0 && (
-            <div className="space-y-0.5">
-              <div className="px-3 text-[10px] font-black text-starlight uppercase tracking-widest">Pinned</div>
-              {pinnedThreads.map(renderConversationItem)}
+        {isMobile ? (
+          <PullToRefresh onRefresh={refreshThreads} className={PAGE_SCROLL_CLASS}>
+            {threadListContent}
+          </PullToRefresh>
+        ) : (
+          <>
+            <div className="shrink-0 border-b border-neon-magenta/30 p-3">
+              <button
+                onClick={handleCreateConversation}
+                className="flex w-full items-center justify-center gap-2 border-2 border-neon-magenta bg-black py-2 text-xs font-black uppercase tracking-widest text-neon-magenta hover:bg-neon-magenta hover:text-black"
+              >
+                <Plus className="h-4 w-4" /> New Thread
+              </button>
             </div>
-          )}
-          <div className="space-y-0.5">
-            <div className="px-3 text-[10px] font-black text-neon-cyan uppercase tracking-widest">Threads</div>
-            {generalThreads.length > 0 ? (
-              generalThreads.map(renderConversationItem)
-            ) : (
-              pinnedThreads.length === 0 && (
-                <div className="text-center py-6 text-zinc-700 text-xs font-mono italic">No threads yet</div>
-              )
-            )}
-          </div>
-        </PullToRefresh>
+            <PullToRefresh
+              onRefresh={refreshThreads}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 py-2 space-y-3"
+            >
+              {pinnedThreads.length > 0 && (
+                <div className="space-y-0.5">
+                  <div className="px-3 text-[10px] font-black uppercase tracking-widest text-starlight">Pinned</div>
+                  {pinnedThreads.map(renderConversationItem)}
+                </div>
+              )}
+              <div className="space-y-0.5">
+                <div className="px-3 text-[10px] font-black uppercase tracking-widest text-neon-cyan">Threads</div>
+                {generalThreads.length > 0 ? (
+                  generalThreads.map(renderConversationItem)
+                ) : (
+                  pinnedThreads.length === 0 && (
+                    <div className="py-6 text-center text-xs font-mono italic text-zinc-700">No threads yet</div>
+                  )
+                )}
+              </div>
+            </PullToRefresh>
+          </>
+        )}
       </aside>
       )}
 
@@ -305,22 +342,22 @@ export function ChatPage() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {activeConvId ? (
           <>
-            {isMobile && (
-              <div className="shrink-0 border-b border-neon-magenta/30 bg-zinc-950 px-3 py-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveConvId(null)}
-                  className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-neon-cyan hover:text-starlight"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Threads
-                </button>
-              </div>
-            )}
             <PullToRefresh
               onRefresh={refreshActiveChat}
-              className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-3 sm:space-y-6 sm:p-6"
+              className={`${PAGE_SCROLL_CLASS} space-y-4 p-3 sm:space-y-6 sm:p-6`}
             >
+              {isMobile && (
+                <div className="border-b border-neon-magenta/30 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveConvId(null)}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-neon-cyan hover:text-starlight"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Threads
+                  </button>
+                </div>
+              )}
               {messages.map((m, idx) => (
                 <div key={idx} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div

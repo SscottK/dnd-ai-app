@@ -5,9 +5,17 @@ import { APP_MOBILE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 const THRESHOLD = 64;
 const MAX_PULL = 96;
 
+/** Default classes for a page-filling scroll region inside AppLayout main. */
+export const PAGE_SCROLL_CLASS =
+  "h-full min-h-0 flex-1 overflow-y-auto overscroll-y-contain";
+
 /**
  * Wraps a scrollable region with mobile pull-to-refresh. Pass the same className
  * you would put on the scroll container (e.g. overflow-y-auto, flex-1, min-h-0).
+ *
+ * Use PAGE_SCROLL_CLASS (or include flex-1 + min-h-0 + overflow-y-auto) so the
+ * scroll area fills the main pane and pull-to-refresh applies to the whole page
+ * body, not a nested panel below a fixed in-page header.
  */
 export function PullToRefresh({ onRefresh, disabled = false, className = "", children }) {
   const isMobile = useMediaQuery(APP_MOBILE_QUERY);
@@ -96,7 +104,7 @@ export function PullToRefresh({ onRefresh, disabled = false, className = "", chi
   const showIndicator = enabled && (pullDistance > 0 || refreshing);
 
   return (
-    <div className={`relative min-h-0 ${className.includes("flex") ? "" : "h-full"}`}>
+    <div className="relative flex h-full min-h-0 flex-col">
       {showIndicator && (
         <div
           className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center"

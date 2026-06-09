@@ -22,6 +22,7 @@ import {
   sortCombatantsForTurns,
   turnStatusLabels,
 } from "../lib/encounterDisplay";
+import { PAGE_SCROLL_CLASS, PullToRefresh } from "../components/PullToRefresh";
 import { DiceRoller } from "../components/DiceRoller";
 import {
   EncounterCombatLog,
@@ -490,7 +491,7 @@ export function InitiativePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto overscroll-y-contain">
+    <PullToRefresh onRefresh={loadData} className={PAGE_SCROLL_CLASS}>
       <div className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Link
@@ -910,6 +911,6 @@ export function InitiativePage() {
           </aside>
         </div>
       </div>
-    </div>
+    </PullToRefresh>
   );
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Check, MessageSquarePlus, ShieldAlert, UserPlus, X } from "lucide-react";
-import { PullToRefresh } from "../components/PullToRefresh";
+import { PAGE_SCROLL_CLASS, PullToRefresh } from "../components/PullToRefresh";
 import { useAuth } from "../hooks/useAuth";
 import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
 import { apiFetch } from "../lib/api";
@@ -165,7 +165,7 @@ export function AdminAccessPage() {
         : "No reviewed feedback yet.";
 
   return (
-    <PullToRefresh onRefresh={refreshPage} className="h-full overflow-y-auto overscroll-y-contain p-3 sm:p-6">
+    <PullToRefresh onRefresh={refreshPage} className={`${PAGE_SCROLL_CLASS} p-3 sm:p-6`}>
       <div className="mx-auto max-w-3xl space-y-4 sm:space-y-6">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-black uppercase italic tracking-tight text-starlight sm:text-2xl">

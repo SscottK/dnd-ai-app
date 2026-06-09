@@ -86,8 +86,10 @@ export function AppLayout() {
         </nav>
       </header>
 
-      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        <Outlet />
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex h-full min-h-0 flex-1 flex-col">
+          <Outlet />
+        </div>
       </main>
 
       <footer className="shrink-0 border-t border-border/50 bg-void-deep/80 px-3 py-2">
