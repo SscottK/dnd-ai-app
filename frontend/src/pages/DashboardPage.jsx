@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  Images,
   Info,
   Hammer,
   MessageSquare,
@@ -1071,6 +1072,13 @@ export function DashboardPage() {
                       >
                         <FileText className="h-4 w-4" />
                         Digital sheet
+                      </LinkButton>
+                      <LinkButton
+                        to={`/character/${character.id}?view=photos`}
+                        className="border-border text-ink-muted hover:border-neon-cyan hover:text-neon-cyan"
+                      >
+                        <Images className="h-4 w-4" />
+                        Photo album
                       </LinkButton>
                       {character.pdf_url && (
                         <LinkButton

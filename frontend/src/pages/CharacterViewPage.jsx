@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, FileText, RefreshCw, Upload } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Images, RefreshCw, Upload } from "lucide-react";
+import { CharacterPhotoAlbum } from "../components/character/CharacterPhotoAlbum";
 import { AuthenticatedPdfFrame, openAuthenticatedPdfInTab } from "../components/sheet/AuthenticatedPdfFrame";
 import { DigitalSheetEditor } from "../components/sheet/DigitalSheetEditor";
 import { useNestedPageLayout } from "../contexts/PageRefreshContext";
@@ -21,8 +22,9 @@ export function CharacterViewPage() {
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const initialView = searchParams.get("view");
   const [view, setView] = useState(() =>
-    searchParams.get("view") === "pdf" ? "pdf" : "digital"
+    initialView === "pdf" || initialView === "photos" ? initialView : "digital"
   );
 
   const loadCharacter = useCallback(async () => {
@@ -230,10 +232,32 @@ export function CharacterViewPage() {
         >
           PDF (read-only)
         </button>
+        <button
+          type="button"
+          onClick={() => setView("photos")}
+          className={`inline-flex items-center gap-1 px-4 py-2 text-[10px] font-black uppercase ${
+            view === "photos"
+              ? "text-starlight border-b-2 border-neon-magenta"
+              : "text-zinc-600 hover:text-neon-cyan"
+          }`}
+        >
+          <Images className="h-3 w-3" />
+          Photo album
+        </button>
       </div>
 
       <div className="flex-1 overflow-hidden bg-void">
-        {view === "digital" ? (
+        {view === "photos" ? (
+          <CharacterPhotoAlbum
+            characterId={character.id}
+            portraitUrl={character.portrait_url}
+            portraitPhotoId={character.portrait_photo_id}
+            characterName={character.name}
+            token={token}
+            layout="page"
+            onPortraitChange={setCharacter}
+          />
+        ) : view === "digital" ? (
           <DigitalSheetEditor
             character={character}
             token={token}
