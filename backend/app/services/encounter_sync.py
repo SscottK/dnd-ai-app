@@ -131,12 +131,11 @@ def encounter_for_viewer(state: EncounterState, *, is_owner: bool) -> EncounterS
         for combatant in redacted.combatants:
             combatant.initiative = 0
         if redacted.team is not None:
+            # Keep party slot / roster visible in the tracker; hide per-PC roll totals.
             redacted.team = redacted.team.model_copy(
                 update={
-                    "party_initiative": 0,
                     "initiative_rolls": {},
                     "eligible_character_ids": [],
-                    "turn_slots": [],
                 }
             )
     return redacted

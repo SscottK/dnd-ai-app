@@ -37,8 +37,3 @@ export function AllyControllerSelect({
   );
 }
 
-export function partyControllerOptions(encounter) {
-  return (encounter?.combatants || [])
-    .filter((c) => c.is_pc && c.character_id)
-    .map((c) => ({ character_id: c.character_id, name: c.name }));
-}

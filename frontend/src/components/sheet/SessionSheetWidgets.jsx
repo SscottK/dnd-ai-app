@@ -13,23 +13,25 @@ import {
   isDefeatedEnemy,
   isWaitingForPcInitiative,
   parseEncounterPatchResponse,
-  sortCombatantsForDisplay,
-  sortCombatantsForTurns,
 } from "../../lib/encounterDisplay";
 import { encounterPatchBody } from "../../lib/encounterPatch";
 import {
-  displayCombatants,
+  buildTrackerCombatants,
+  hasTurnOrder,
   isPartyPhaseActive,
+  isPartySlotEntry,
   isTeamMode,
+  isTrackerEntryActive,
+  partyControllerOptions,
+  partyPcs,
+  partyRoster,
   passTargets,
+  resolveActiveCombatant,
   resolveMyCombatant,
   showPartyInitiative,
 } from "../../lib/teamInitiative";
 import { PassCombatDialog } from "../initiative/PassCombatDialog";
-import {
-  AllyControllerSelect,
-  partyControllerOptions,
-} from "../initiative/AllyControllerSelect";
+import { AllyControllerSelect } from "../initiative/AllyControllerSelect";
 import { ReadiedActionsPanel } from "../initiative/ReadiedActionsPanel";
 import { ConditionsEditor } from "./ConditionsEditor";
 import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
@@ -937,7 +939,9 @@ function InitiativeTurnBadge({ index, compact = false }) {
 function InitiativeStatusBadges({ combatant, isYou, isDefeated }) {
   const badges = [];
   if (isDefeated) badges.push({ key: "defeated", label: "Defeated", className: "text-ink-faint" });
-  if (isYou) badges.push({ key: "you", label: "You", className: "text-neon-cyan" });
+  if (isPartySlotEntry(combatant)) {
+    badges.push({ key: "party", label: "Party", className: "text-neon-cyan" });
+  } else if (isYou) badges.push({ key: "you", label: "You", className: "text-neon-cyan" });
   else if (combatant.is_pc) badges.push({ key: "pc", label: "PC", className: "text-ink-faint" });
   else if (combatant.is_ally) badges.push({ key: "ally", label: "Ally", className: "text-neon-cyan" });
 
@@ -965,6 +969,17 @@ function InitiativeCombatantStats({
   isActive,
   resourceSheet,
 }) {
+  if (isPartySlotEntry(combatant)) {
+    return (
+      <div className="flex w-full flex-col gap-0.5">
+        <InitiativeLabeledStat label="Init" value={combatant.initiative} />
+        {combatant.party_member_names ? (
+          <InitiativeLabeledStat label="PCs" value={combatant.party_member_names} />
+        ) : null}
+      </div>
+    );
+  }
+
   const conditions = formatConditionsList(combatant.conditions);
   const economy = isActive ? turnEconomy?.[combatant.id] : null;
   const turnStatuses = turnStatusLabels(economy, combatants);
@@ -1386,14 +1401,9 @@ export function InitiativeWidget({
 
   const teamMode = isTeamMode(encounter);
   const partyPhase = isPartyPhaseActive(encounter);
-  const trackerCombatants = displayCombatants(encounter, { isDmView: isOwner });
-  const displaySorted = sortCombatantsForDisplay(trackerCombatants);
-  const turnSorted = sortCombatantsForTurns(encounter.combatants);
-  const activeCombatant = encounter.active_combatant_id
-    ? (encounter.combatants || []).find((c) => c.id === encounter.active_combatant_id) ||
-      encounter.team?.party_roster?.find((r) => r.id === encounter.active_combatant_id) ||
-      null
-    : turnSorted[encounter.active_index] || null;
+  const trackerCombatants = buildTrackerCombatants(encounter, { isDmView: isOwner });
+  const displaySorted = trackerCombatants;
+  const activeCombatant = resolveActiveCombatant(encounter);
   const myCombatant = resolveMyCombatant(encounter, characterId);
   const isMyTurn = Boolean(
     myCombatant && encounter.active_combatant_id === myCombatant.id
@@ -1758,7 +1768,7 @@ export function InitiativeWidget({
         </div>
       </div>
 
-      {teamMode && partyPhase && (
+      {teamMode && partyRoster(encounter).length > 0 && partyPhase && (
         <div className="shrink-0 rounded-sm border border-starlight/60 bg-starlight/5 px-2 py-2">
           <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-neon-cyan">
             Party turn
@@ -1877,7 +1887,7 @@ export function InitiativeWidget({
         </div>
       )}
 
-      {!isOwner && characterId && myCombatant && turnSorted.length > 0 && (!partyPhase || isMyTurn) && (
+      {!isOwner && characterId && myCombatant && hasTurnOrder(encounter) && (!partyPhase || isMyTurn) && (
         <TurnActionsPanel
           campaignId={campaignId}
           token={token}
@@ -1906,14 +1916,12 @@ export function InitiativeWidget({
         />
       )}
 
-      {isOwner && activeCombatant && turnSorted.length > 0 && (
+      {isOwner && activeCombatant && hasTurnOrder(encounter) && (
         <TurnActionsPanel
           campaignId={campaignId}
           token={token}
           encounter={encounter}
-          actorCombatant={
-            turnSorted.find((c) => c.id === activeCombatant.id) || activeCombatant
-          }
+          actorCombatant={activeCombatant}
           canTakeTurn
           canAdjustMovement
           isDmProxy
@@ -1927,7 +1935,7 @@ export function InitiativeWidget({
         />
       )}
 
-      {turnSorted.length > 0 && encounter.combat_log?.length > 0 && (
+      {hasTurnOrder(encounter) && encounter.combat_log?.length > 0 && (
         <EncounterCombatLog log={encounter.combat_log} />
       )}
 
@@ -1941,7 +1949,10 @@ export function InitiativeWidget({
         <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto pb-1">
           {displaySorted.map((combatant, index) => {
             const defeated = isDefeatedEnemy(combatant);
-            const isActive = !defeated && activeCombatant?.id === combatant.id;
+            const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+            const isYou = isPartySlotEntry(combatant)
+              ? partyRoster(encounter).some((member) => member.character_id === characterId)
+              : combatant.character_id === characterId;
             return (
               <InitiativeCombatantCard
                 key={combatant.id}
@@ -1949,11 +1960,13 @@ export function InitiativeWidget({
                 combatants={encounter.combatants}
                 index={index}
                 isActive={isActive}
-                isYou={combatant.character_id === characterId}
+                isYou={isYou}
                 isDmView={isOwner}
                 isSelected={isOwner && selectedId === combatant.id}
                 isDefeated={defeated}
-                onSelect={isOwner ? handleSelectCombatant : undefined}
+                onSelect={
+                  isOwner && !isPartySlotEntry(combatant) ? handleSelectCombatant : undefined
+                }
                 onPortraitPreview={setPortraitPreview}
                 token={token}
                 turnEconomy={encounter.turn_economy}
@@ -1972,7 +1985,10 @@ export function InitiativeWidget({
         <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
           {displaySorted.map((combatant, index) => {
             const defeated = isDefeatedEnemy(combatant);
-            const isActive = !defeated && activeCombatant?.id === combatant.id;
+            const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+            const isYou = isPartySlotEntry(combatant)
+              ? partyRoster(encounter).some((member) => member.character_id === characterId)
+              : combatant.character_id === characterId;
             return (
               <InitiativeCombatantRow
                 key={combatant.id}
@@ -1980,11 +1996,13 @@ export function InitiativeWidget({
                 combatants={encounter.combatants}
                 index={index}
                 isActive={isActive}
-                isYou={combatant.character_id === characterId}
+                isYou={isYou}
                 isDmView={isOwner}
                 isSelected={isOwner && selectedId === combatant.id}
                 isDefeated={defeated}
-                onSelect={isOwner ? handleSelectCombatant : undefined}
+                onSelect={
+                  isOwner && !isPartySlotEntry(combatant) ? handleSelectCombatant : undefined
+                }
                 onPortraitPreview={setPortraitPreview}
                 token={token}
                 turnEconomy={encounter.turn_economy}
@@ -2034,7 +2052,7 @@ export function InitiativeWidget({
       )}
 
       <div className="shrink-0 space-y-2 border-t border-border pt-2">
-        {isOwner && turnSorted.length > 0 && (
+        {isOwner && hasTurnOrder(encounter) && (
           <div className="flex gap-1">
             <button
               type="button"

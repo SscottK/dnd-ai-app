@@ -19,28 +19,29 @@ import {
   isDefeatedEnemy,
   isWaitingForPcInitiative,
   parseEncounterPatchResponse,
-  sortCombatantsForDisplay,
-  sortCombatantsForTurns,
   turnStatusLabels,
 } from "../lib/encounterDisplay";
 import { encounterPatchBody } from "../lib/encounterPatch";
 import {
+  buildTrackerCombatants,
   combatHasStarted,
+  hasTurnOrder,
   isPartyPhaseActive,
+  isPartySlotEntry,
   isTeamMode,
+  isTrackerEntryActive,
+  partyControllerOptions,
   partyPcs,
   partyRoster,
   passTargets,
+  resolveActiveCombatant,
   showPartyInitiative,
 } from "../lib/teamInitiative";
 import { PageScroll } from "../components/PageScroll";
 import { DiceRoller } from "../components/DiceRoller";
 import { TeamRosterRollModal } from "../components/initiative/TeamRosterRollModal";
 import { PassCombatDialog } from "../components/initiative/PassCombatDialog";
-import {
-  AllyControllerSelect,
-  partyControllerOptions,
-} from "../components/initiative/AllyControllerSelect";
+import { AllyControllerSelect } from "../components/initiative/AllyControllerSelect";
 import { ReadiedActionsPanel } from "../components/initiative/ReadiedActionsPanel";
 import {
   EncounterCombatLog,
@@ -255,18 +256,8 @@ export function InitiativePage() {
 
   const teamMode = isTeamMode(encounter);
   const partyPhase = isPartyPhaseActive(encounter);
-  const trackerCombatants = teamMode
-    ? (encounter.combatants || []).filter(
-        (c) => !c.is_pc && !(c.is_ally && c.controller_character_id)
-      )
-    : encounter.combatants;
-  const displaySorted = sortCombatantsForDisplay(trackerCombatants);
-  const turnSorted = sortCombatantsForTurns(encounter.combatants);
-  const activeCombatant = encounter.active_combatant_id
-    ? (encounter.combatants || []).find((c) => c.id === encounter.active_combatant_id) ||
-      encounter.team?.party_roster?.find((r) => r.id === encounter.active_combatant_id) ||
-      null
-    : turnSorted[encounter.active_index] || null;
+  const displaySorted = buildTrackerCombatants(encounter, { isDmView: isOwner });
+  const activeCombatant = resolveActiveCombatant(encounter);
   const activeEconomy = activeCombatant ? encounter.turn_economy?.[activeCombatant.id] : null;
   const waitingForInitiative =
     !teamMode && isWaitingForPcInitiative(encounter.combatants);
@@ -423,7 +414,7 @@ export function InitiativePage() {
   };
 
   const nextTurn = async () => {
-    if (!token || !campaignId || !isOwner || !turnSorted.length) return;
+    if (!token || !campaignId || !isOwner || !hasTurnOrder(encounter)) return;
     setSaving(true);
     setError("");
     try {
@@ -761,7 +752,7 @@ export function InitiativePage() {
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
-                {turnSorted.length > 0 && (
+                {hasTurnOrder(encounter) && (
                   <button
                     type="button"
                     disabled={saving}
@@ -810,7 +801,7 @@ export function InitiativePage() {
           />
         )}
 
-        {teamMode && partyPcs(encounter).length > 0 && (
+        {teamMode && partyRoster(encounter).length > 0 && (
           <div
             className={`mb-4 border-2 p-3 ${
               partyPhase ? "border-starlight bg-starlight/5" : "border-neon-cyan/40 bg-black"
@@ -837,7 +828,7 @@ export function InitiativePage() {
                 </p>
               )}
             </div>
-            {isOwner && !combatHasStarted(encounter) && (
+            {isOwner && (!combatHasStarted(encounter) || partyPhase) && (
               <ul className="mt-2 flex flex-wrap gap-1">
                 {partyPcs(encounter).map((pc) => (
                   <li
@@ -970,7 +961,8 @@ export function InitiativePage() {
               <div className="space-y-2">
                 {displaySorted.map((combatant, index) => {
                   const defeated = isDefeatedEnemy(combatant);
-                  const isActive = !defeated && activeCombatant?.id === combatant.id;
+                  const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+                  const isPartySlot = isPartySlotEntry(combatant);
                   const economy = encounter.turn_economy?.[combatant.id];
                   const moveText = isActive
                     ? combatantMoveText(combatant, economy)
@@ -992,7 +984,7 @@ export function InitiativePage() {
                     }`}
                   >
                     <span className="text-[10px] font-mono text-zinc-600 w-6">{index + 1}</span>
-                    {isOwner ? (
+                    {isOwner && !isPartySlot ? (
                       <input
                         type="number"
                         value={combatant.initiative}
@@ -1013,7 +1005,10 @@ export function InitiativePage() {
                         {defeated && (
                           <span className="ml-2 text-[9px] text-zinc-500">DEFEATED</span>
                         )}
-                        {combatant.is_pc && (
+                        {isPartySlot && (
+                          <span className="ml-2 text-[9px] text-neon-cyan">PARTY</span>
+                        )}
+                        {!isPartySlot && combatant.is_pc && (
                           <span className="ml-2 text-[9px] text-neon-cyan">PC</span>
                         )}
                         {combatant.is_ally && !combatant.is_pc && (
@@ -1029,19 +1024,23 @@ export function InitiativePage() {
                           </span>
                         )}
                       </p>
-                      {(combatant.hp != null ||
-                        combatant.speed != null ||
-                        formatCombatantAc(combatant, isOwner)) && (
+                      {(isPartySlot && combatant.party_member_names) ||
+                      combatant.hp != null ||
+                      combatant.speed != null ||
+                      formatCombatantAc(combatant, isOwner) ? (
                         <p className="text-[10px] font-mono text-zinc-500">
-                          {combatant.hp != null && combatant.max_hp != null
+                          {isPartySlot && combatant.party_member_names
+                            ? combatant.party_member_names
+                            : null}
+                          {!isPartySlot && combatant.hp != null && combatant.max_hp != null
                             ? `HP ${combatant.hp}/${combatant.max_hp}`
                             : ""}
-                          {formatCombatantAc(combatant, isOwner)}
-                          {moveText ? ` · ${moveText}` : ""}
-                          {turnStatuses.length ? ` · ${turnStatuses.join(", ")}` : ""}
-                          {resourceSummary ? ` · ${resourceSummary}` : ""}
+                          {!isPartySlot && formatCombatantAc(combatant, isOwner)}
+                          {!isPartySlot && moveText ? ` · ${moveText}` : ""}
+                          {!isPartySlot && turnStatuses.length ? ` · ${turnStatuses.join(", ")}` : ""}
+                          {!isPartySlot && resourceSummary ? ` · ${resourceSummary}` : ""}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                     {isOwner && (
                       <>
