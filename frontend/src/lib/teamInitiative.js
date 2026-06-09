@@ -16,20 +16,24 @@ export function combatHasStarted(encounter) {
   return (encounter.combat_log || []).some((entry) => entry.kind === "turn");
 }
 
+function partyPcsFromCombatants(encounter) {
+  return (encounter?.combatants || []).filter((combatant) => combatant.is_pc && canTakeTurn(combatant));
+}
+
 export function partyRoster(encounter) {
   if (encounter?.team?.party_roster?.length) {
     return encounter.team.party_roster;
   }
-  return partyPcs(encounter).map((c) => ({
-    id: c.id,
-    name: c.name,
-    character_id: c.character_id,
+  return partyPcsFromCombatants(encounter).map((combatant) => ({
+    id: combatant.id,
+    name: combatant.name,
+    character_id: combatant.character_id,
   }));
 }
 
 /** PCs in the party group — falls back to server roster when PC rows are redacted. */
 export function partyPcs(encounter) {
-  const fromCombatants = (encounter?.combatants || []).filter((c) => c.is_pc && canTakeTurn(c));
+  const fromCombatants = partyPcsFromCombatants(encounter);
   if (fromCombatants.length) return fromCombatants;
   return partyRoster(encounter).map((member) => ({
     id: member.id,
