@@ -756,8 +756,14 @@ export function isOpponent(left, right) {
 }
 
 /** Living combatants eligible as targets (not defeated enemies). */
-export function filterTargetCandidates(combatants, actorCombatantId, targeting) {
-  const actor = (combatants || []).find((c) => c.id === actorCombatantId);
+export function filterTargetCandidates(
+  combatants,
+  actorCombatantId,
+  targeting,
+  actorCombatant = null
+) {
+  const actor =
+    actorCombatant || (combatants || []).find((combatant) => combatant.id === actorCombatantId);
   const living = (combatants || []).filter(
     (c) => !(isEnemyCombatant(c) && c.hp != null && c.hp <= 0)
   );
@@ -781,14 +787,25 @@ export function filterTargetCandidates(combatants, actorCombatantId, targeting) 
   }
 }
 
-export function validateTargetSelection(action, actorCombatantId, targetIds, combatants) {
+export function validateTargetSelection(
+  action,
+  actorCombatantId,
+  targetIds,
+  combatants,
+  actorCombatant = null
+) {
   if (!actionNeedsTarget(action)) {
     return targetIds.length === 0 ? { ok: true } : { ok: false, reason: "This action does not use a target." };
   }
   if (targetIds.length !== 1) {
     return { ok: false, reason: `Select exactly one target (${targetLabel(action.targeting)}).` };
   }
-  const allowed = filterTargetCandidates(combatants, actorCombatantId, action.targeting);
+  const allowed = filterTargetCandidates(
+    combatants,
+    actorCombatantId,
+    action.targeting,
+    actorCombatant
+  );
   const allowedIds = new Set(allowed.map((c) => c.id));
   if (!allowedIds.has(targetIds[0])) {
     return { ok: false, reason: "That target is not valid for this action." };

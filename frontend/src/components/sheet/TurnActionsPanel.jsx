@@ -277,7 +277,8 @@ export function TurnActionsPanel({
       const candidates = filterTargetCandidates(
         encounter.combatants,
         actorCombatant.id,
-        action.targeting
+        action.targeting,
+        actorCombatant
       );
       if (candidates.length === 0) {
         onError?.(`No valid targets for ${action.name} (${targetLabel(action.targeting)}).`);
@@ -296,7 +297,8 @@ export function TurnActionsPanel({
       pickedAction,
       actorCombatant.id,
       targetId ? [targetId] : [],
-      encounter.combatants
+      encounter.combatants,
+      actorCombatant
     );
     if (!check.ok) {
       onError?.(check.reason);
@@ -313,7 +315,8 @@ export function TurnActionsPanel({
       const candidates = filterTargetCandidates(
         encounter.combatants,
         actorCombatant.id,
-        resolved.targeting
+        resolved.targeting,
+        actorCombatant
       );
       if (candidates.length === 0) {
         onError?.(`No valid targets for ${resolved.name} (${targetLabel(resolved.targeting)}).`);
@@ -368,7 +371,12 @@ export function TurnActionsPanel({
   }
 
   const targetCandidates = pickedAction
-    ? filterTargetCandidates(encounter.combatants, actorCombatant.id, pickedAction.targeting)
+    ? filterTargetCandidates(
+        encounter.combatants,
+        actorCombatant.id,
+        pickedAction.targeting,
+        actorCombatant
+      )
     : [];
   const pickerActions = (() => {
     const list = available[pickedType] || [];
