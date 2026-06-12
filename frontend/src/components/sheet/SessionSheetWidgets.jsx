@@ -34,6 +34,7 @@ import {
 } from "../../lib/teamInitiative";
 import { PassCombatDialog } from "../initiative/PassCombatDialog";
 import { AllyControllerSelect } from "../initiative/AllyControllerSelect";
+import { CombatResolutionBanner } from "../initiative/CombatResolutionBanner";
 import { ReadiedActionsPanel } from "../initiative/ReadiedActionsPanel";
 import { ConditionsEditor } from "./ConditionsEditor";
 import { EncounterCombatLog, TurnActionsPanel } from "./TurnActionsPanel";
@@ -1456,7 +1457,28 @@ export function InitiativeWidget({
   const [portraitPreview, setPortraitPreview] = useState(null);
   const [passTarget, setPassTarget] = useState(null);
   const [passBusy, setPassBusy] = useState(false);
+  const [combatResolution, setCombatResolution] = useState(null);
   const savingRef = useRef(false);
+  const encounterSnapshotRef = useRef(encounter);
+
+  useEffect(() => {
+    if (!combatResolution) {
+      encounterSnapshotRef.current = encounter;
+    }
+  }, [encounter, combatResolution]);
+
+  const notifyCombatEnded = useCallback(
+    (logText, reason) => {
+      setCombatResolution({
+        reason,
+        logText,
+        encounter: encounterSnapshotRef.current,
+      });
+      setSelectedId(null);
+      onCombatEnded?.(logText, reason);
+    },
+    [onCombatEnded]
+  );
 
   const loadEncounter = useCallback(async () => {
     if (!token || !campaignId || savingRef.current) return;
@@ -1478,21 +1500,22 @@ export function InitiativeWidget({
     return () => clearInterval(timer);
   }, [loadEncounter]);
 
-  const teamMode = isTeamMode(encounter);
-  const partyPhase = isPartyPhaseActive(encounter);
-  const trackerCombatants = buildTrackerCombatants(encounter, { isDmView: isOwner });
+  const viewEncounter = combatResolution?.encounter ?? encounter;
+  const teamMode = isTeamMode(viewEncounter);
+  const partyPhase = isPartyPhaseActive(viewEncounter);
+  const trackerCombatants = buildTrackerCombatants(viewEncounter, { isDmView: isOwner });
   const displaySorted = trackerCombatants;
-  const activeCombatant = resolveActiveCombatant(encounter);
-  const myCombatant = resolveMyCombatant(encounter, characterId);
+  const activeCombatant = resolveActiveCombatant(viewEncounter);
+  const myCombatant = resolveMyCombatant(viewEncounter, characterId);
   const isMyTurn = Boolean(
-    myCombatant && encounter.active_combatant_id === myCombatant.id
+    myCombatant && viewEncounter.active_combatant_id === myCombatant.id
   );
-  const activeCombatantId = encounter.active_combatant_id ?? activeCombatant?.id ?? null;
+  const activeCombatantId = viewEncounter.active_combatant_id ?? activeCombatant?.id ?? null;
   const waitingForInitiative =
-    !teamMode && isWaitingForPcInitiative(encounter.combatants);
-  const passOptions = passTargets(encounter);
-  const partyInitDisplay = encounter.team?.party_initiative ?? 0;
-  const controllerOptions = partyControllerOptions(encounter);
+    !teamMode && isWaitingForPcInitiative(viewEncounter.combatants);
+  const passOptions = passTargets(viewEncounter);
+  const partyInitDisplay = viewEncounter.team?.party_initiative ?? 0;
+  const controllerOptions = partyControllerOptions(viewEncounter);
 
   const reloadDmActionSheet = useCallback(async () => {
     if (!isOwner || !token || !campaignId || !activeCombatantId) {
@@ -1517,7 +1540,7 @@ export function InitiativeWidget({
 
   useEffect(() => {
     void reloadDmActionSheet();
-  }, [reloadDmActionSheet]);
+  }, [reloadDmActionSheet, viewEncounter.combat_log?.length]);
 
   const handleSheetRefresh = useCallback(() => {
     onSheetRefresh?.();
@@ -1607,7 +1630,7 @@ export function InitiativeWidget({
       setEncounter(parsed.encounter);
       if (parsed.combatEnded) {
         setSelectedId(null);
-        onCombatEnded?.(parsed.combatLogText, parsed.reason);
+        notifyCombatEnded(parsed.combatLogText, parsed.reason);
       }
     } catch (err) {
       setActionError(err.message || "Could not end turn.");
@@ -1655,12 +1678,7 @@ export function InitiativeWidget({
       setEncounter(parsed.encounter);
       if (parsed.combatEnded) {
         setSelectedId(null);
-        onCombatEnded?.(parsed.combatLogText, parsed.reason);
-        setActionError(
-          parsed.reason === "defeat"
-            ? "Party defeated. Combat log added to everyone's Session notes."
-            : "Victory! All enemies defeated. Combat log added to everyone's Session notes."
-        );
+        notifyCombatEnded(parsed.combatLogText, parsed.reason);
       }
     } catch (err) {
       setActionError(err.message || "Could not end turn.");
@@ -1685,7 +1703,7 @@ export function InitiativeWidget({
       const data = await res.json();
       setEncounter(data.encounter || { round: 1, combatants: [] });
       setSelectedId(null);
-      onCombatEnded?.(data.combat_log_text, data.reason);
+      notifyCombatEnded(data.combat_log_text, data.reason);
     } catch (err) {
       setActionError(err.message || "Could not end combat.");
     } finally {
@@ -1714,10 +1732,7 @@ export function InitiativeWidget({
         setEncounter(parsed.encounter);
         if (parsed.combatEnded) {
           setSelectedId(null);
-          onCombatEnded?.(parsed.combatLogText, parsed.reason);
-          setActionError(
-            "Victory! All enemies defeated. Combat log added to everyone's Session notes."
-          );
+          notifyCombatEnded(parsed.combatLogText, parsed.reason);
         }
       } catch (err) {
         setActionError(err.message || "Could not save combatant.");
@@ -1727,7 +1742,7 @@ export function InitiativeWidget({
         setSaving(false);
       }
     },
-    [token, campaignId, isOwner, loadEncounter, onCombatEnded]
+    [token, campaignId, isOwner, loadEncounter, notifyCombatEnded]
   );
 
   const updateCombatant = (id, patch) => {
@@ -1818,15 +1833,15 @@ export function InitiativeWidget({
         <div className="flex gap-2 overflow-x-auto pb-1">
           {displaySorted.map((combatant, index) => {
             const defeated = isDefeatedEnemy(combatant);
-            const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+            const isActive = isTrackerEntryActive(combatant, viewEncounter, activeCombatant);
             const isYou = isPartySlotEntry(combatant)
-              ? partyRoster(encounter).some((member) => member.character_id === characterId)
+              ? partyRoster(viewEncounter).some((member) => member.character_id === characterId)
               : combatant.character_id === characterId;
             return (
               <InitiativeCombatantCard
                 key={combatant.id}
                 combatant={combatant}
-                combatants={encounter.combatants}
+                combatants={viewEncounter.combatants}
                 index={index}
                 isActive={isActive}
                 isYou={isYou}
@@ -1834,7 +1849,7 @@ export function InitiativeWidget({
                 isDefeated={defeated}
                 onPortraitPreview={setPortraitPreview}
                 token={token}
-                turnEconomy={encounter.turn_economy}
+                turnEconomy={viewEncounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
                   isActive,
                   characterId,
@@ -1852,15 +1867,15 @@ export function InitiativeWidget({
       <ul className="space-y-1.5">
         {displaySorted.map((combatant, index) => {
           const defeated = isDefeatedEnemy(combatant);
-          const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+          const isActive = isTrackerEntryActive(combatant, viewEncounter, activeCombatant);
           const isYou = isPartySlotEntry(combatant)
-            ? partyRoster(encounter).some((member) => member.character_id === characterId)
+            ? partyRoster(viewEncounter).some((member) => member.character_id === characterId)
             : combatant.character_id === characterId;
           return (
             <InitiativeCombatantRow
               key={combatant.id}
               combatant={combatant}
-              combatants={encounter.combatants}
+              combatants={viewEncounter.combatants}
               index={index}
               isActive={isActive}
               isYou={isYou}
@@ -1868,7 +1883,7 @@ export function InitiativeWidget({
               isDefeated={defeated}
               onPortraitPreview={setPortraitPreview}
               token={token}
-              turnEconomy={encounter.turn_economy}
+              turnEconomy={viewEncounter.turn_economy}
               resourceSheet={resourceSheetForCombatant(combatant, {
                 isActive,
                 characterId,
@@ -1895,7 +1910,7 @@ export function InitiativeWidget({
     ) : null;
 
   if (!isOwner) {
-    const combatActive = combatHasStarted(encounter) || hasTurnOrder(encounter);
+    const combatActive = combatHasStarted(viewEncounter) || hasTurnOrder(viewEncounter);
     const needsInitRoll = playerNeedsInitiativeRoll(encounter, characterId);
     const turnHeaderSlot =
       isMyTurn && (partyPhase || !teamMode) ? (
@@ -1922,9 +1937,13 @@ export function InitiativeWidget({
 
     return (
       <div className="session-ui flex h-full min-h-0 flex-col gap-2">
+        <CombatResolutionBanner
+          resolution={combatResolution}
+          onDismiss={() => setCombatResolution(null)}
+        />
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border pb-2">
           <p className="text-[10px] font-black uppercase tracking-widest text-ink-faint">
-            Round <span className="text-lg text-neon-cyan">{encounter.round}</span>
+            Round <span className="text-lg text-neon-cyan">{viewEncounter.round}</span>
           </p>
           <div className="flex items-center gap-1">
             <div className="flex overflow-hidden rounded-sm border border-border">
@@ -1979,14 +1998,14 @@ export function InitiativeWidget({
               token={token}
               sheet={sheet}
               actionCatalogMode="pc"
-              encounter={encounter}
+              encounter={viewEncounter}
               actorCombatant={myCombatant}
               canTakeTurn
               canAdjustMovement
               headerSlot={turnHeaderSlot}
               onEncounterUpdate={setEncounter}
               onSheetRefresh={handleSheetRefresh}
-              onCombatEnded={onCombatEnded}
+              onCombatEnded={notifyCombatEnded}
               onError={setActionError}
             />
           ) : needsInitRoll ? (
@@ -2047,13 +2066,13 @@ export function InitiativeWidget({
             </p>
           )}
 
-          {combatActive && encounter.combat_log?.length > 0 && (
+          {combatActive && viewEncounter.combat_log?.length > 0 && (
             <details className="shrink-0 rounded-sm border border-border/50 bg-void-deep/25 px-2 py-1.5">
               <summary className="cursor-pointer text-[10px] font-black uppercase tracking-widest text-ink-faint">
                 Combat log
               </summary>
               <div className="mt-2">
-                <EncounterCombatLog log={encounter.combat_log} limit={5} bare />
+                <EncounterCombatLog log={viewEncounter.combat_log} limit={5} bare />
               </div>
             </details>
           )}
@@ -2080,10 +2099,14 @@ export function InitiativeWidget({
 
   return (
     <div className="session-ui flex h-full min-h-0 flex-col gap-2 sm:gap-3">
+      <CombatResolutionBanner
+        resolution={combatResolution}
+        onDismiss={() => setCombatResolution(null)}
+      />
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border pb-2 sm:pb-3">
         <div>
           <p className="text-xs sm:text-sm font-black uppercase tracking-widest text-ink-faint">Round</p>
-          <p className="text-lg font-black text-neon-cyan">{encounter.round}</p>
+          <p className="text-lg font-black text-neon-cyan">{viewEncounter.round}</p>
         </div>
         <div className="flex items-center gap-1">
           <div className="flex overflow-hidden rounded-sm border border-border">
@@ -2216,20 +2239,20 @@ export function InitiativeWidget({
         </div>
       )}
 
-      {!isOwner && characterId && myCombatant && hasTurnOrder(encounter) && (!partyPhase || isMyTurn) && (
+      {!isOwner && characterId && myCombatant && hasTurnOrder(viewEncounter) && (!partyPhase || isMyTurn) && (
         <TurnActionsPanel
           campaignId={campaignId}
           token={token}
           sheet={sheet}
           actionCatalogMode="pc"
-          encounter={encounter}
+          encounter={viewEncounter}
           actorCombatant={myCombatant}
           canTakeTurn={isMyTurn}
           canAdjustMovement={isMyTurn}
           activeTurnName={activeCombatant?.name}
           onEncounterUpdate={setEncounter}
           onSheetRefresh={handleSheetRefresh}
-          onCombatEnded={onCombatEnded}
+          onCombatEnded={notifyCombatEnded}
           onError={setActionError}
         />
       )}
@@ -2238,35 +2261,38 @@ export function InitiativeWidget({
         <ReadiedActionsPanel
           campaignId={campaignId}
           token={token}
-          encounter={encounter}
+          encounter={viewEncounter}
           onEncounterUpdate={setEncounter}
           onError={setActionError}
           compact
         />
       )}
 
-      {isOwner && activeCombatant && hasTurnOrder(encounter) && (
+      {isOwner &&
+        activeCombatant &&
+        hasTurnOrder(viewEncounter) &&
+        (!activeCombatant.is_pc || !activeCombatant.character_id) && (
         <TurnActionsPanel
           campaignId={campaignId}
           token={token}
-          encounter={encounter}
+          encounter={viewEncounter}
           actorCombatant={activeCombatant}
           canTakeTurn
           canAdjustMovement
           isDmProxy
           headerSlot={dmPartyPassSlot}
-          actionCatalogMode={activeCombatant.character_id ? "pc" : "npc"}
+          actionCatalogMode="npc"
           actionSheet={dmActionSheet}
           actionSheetLoading={dmSheetLoading}
           onEncounterUpdate={setEncounter}
           onSheetRefresh={handleSheetRefresh}
-          onCombatEnded={onCombatEnded}
+          onCombatEnded={notifyCombatEnded}
           onError={setActionError}
         />
       )}
 
-      {hasTurnOrder(encounter) && encounter.combat_log?.length > 0 && (
-        <EncounterCombatLog log={encounter.combat_log} />
+      {hasTurnOrder(viewEncounter) && viewEncounter.combat_log?.length > 0 && (
+        <EncounterCombatLog log={viewEncounter.combat_log} />
       )}
 
       {displaySorted.length === 0 ? (
@@ -2279,15 +2305,15 @@ export function InitiativeWidget({
         <div className="flex min-h-0 flex-1 gap-2 overflow-x-auto pb-1">
           {displaySorted.map((combatant, index) => {
             const defeated = isDefeatedEnemy(combatant);
-            const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+            const isActive = isTrackerEntryActive(combatant, viewEncounter, activeCombatant);
             const isYou = isPartySlotEntry(combatant)
-              ? partyRoster(encounter).some((member) => member.character_id === characterId)
+              ? partyRoster(viewEncounter).some((member) => member.character_id === characterId)
               : combatant.character_id === characterId;
             return (
               <InitiativeCombatantCard
                 key={combatant.id}
                 combatant={combatant}
-                combatants={encounter.combatants}
+                combatants={viewEncounter.combatants}
                 index={index}
                 isActive={isActive}
                 isYou={isYou}
@@ -2299,7 +2325,7 @@ export function InitiativeWidget({
                 }
                 onPortraitPreview={setPortraitPreview}
                 token={token}
-                turnEconomy={encounter.turn_economy}
+                turnEconomy={viewEncounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
                   isActive,
                   characterId,
@@ -2315,15 +2341,15 @@ export function InitiativeWidget({
         <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
           {displaySorted.map((combatant, index) => {
             const defeated = isDefeatedEnemy(combatant);
-            const isActive = isTrackerEntryActive(combatant, encounter, activeCombatant);
+            const isActive = isTrackerEntryActive(combatant, viewEncounter, activeCombatant);
             const isYou = isPartySlotEntry(combatant)
-              ? partyRoster(encounter).some((member) => member.character_id === characterId)
+              ? partyRoster(viewEncounter).some((member) => member.character_id === characterId)
               : combatant.character_id === characterId;
             return (
               <InitiativeCombatantRow
                 key={combatant.id}
                 combatant={combatant}
-                combatants={encounter.combatants}
+                combatants={viewEncounter.combatants}
                 index={index}
                 isActive={isActive}
                 isYou={isYou}
@@ -2335,7 +2361,7 @@ export function InitiativeWidget({
                 }
                 onPortraitPreview={setPortraitPreview}
                 token={token}
-                turnEconomy={encounter.turn_economy}
+                turnEconomy={viewEncounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
                   isActive,
                   characterId,

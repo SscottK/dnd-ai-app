@@ -65,6 +65,7 @@ def _default_player_notes_widget() -> dict:
         "minimized": False,
         "playerNotesTabs": [
             {"id": "notes-session", "title": "Session", "content": ""},
+            {"id": "notes-log", "title": "Log", "content": ""},
             {"id": "notes-character", "title": "Character", "content": ""},
         ],
         "activeNotesTabId": "notes-session",
@@ -115,6 +116,7 @@ def append_text_to_notes_tab(
     *,
     widget_type: str = "player_notes",
     tabs_key: str = "playerNotesTabs",
+    switch_active: bool = True,
 ) -> dict:
     merged = copy.deepcopy(layout) if layout else {"widgets": [], "viewport": {}}
     widgets = list(merged.get("widgets") or [])
@@ -139,12 +141,13 @@ def append_text_to_notes_tab(
     if not any(tab.get("id") == tab_id for tab in next_tabs):
         next_tabs.insert(0, next_target)
 
+    prior_active = notes_widget.get("activeNotesTabId")
     for index, widget in enumerate(widgets):
         if widget.get("type") == widget_type:
             widgets[index] = {
                 **widget,
                 tabs_key: next_tabs,
-                "activeNotesTabId": tab_id,
+                "activeNotesTabId": tab_id if switch_active else (prior_active or tab_id),
             }
             break
 

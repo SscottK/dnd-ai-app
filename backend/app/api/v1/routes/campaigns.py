@@ -835,8 +835,14 @@ def next_encounter_turn(campaign_id: int, current_user: CurrentUser, session: Se
                 detail=str(exc),
             ) from exc
     else:
+        from app.services.death_saves import is_dying_pc, roll_death_save
+
         ordered = sorted_combatants(state)
         current = ordered[resolve_active_index(state)] if ordered else None
+        if current and is_dying_pc(current):
+            economy = state.turn_economy.get(current.id)
+            if economy is None or not economy.death_save_rolled:
+                roll_death_save(state, current)
         advance_turn(state)
         ordered_after = sorted_combatants(state)
         active_after = ordered_after[resolve_active_index(state)] if ordered_after else None
@@ -935,6 +941,54 @@ def use_encounter_action(
     resolved_data = data.model_copy(
         update={"action_type": resolved_type, "targeting": resolved_targeting}
     )
+
+    from app.services.death_saves import is_death_save_request, is_dying_pc, roll_death_save
+    from app.services.combat_resolution import validate_healing_targets
+
+    if is_death_save_request(
+        action_id=resolved_data.action_id,
+        action_name=resolved_data.action_name,
+    ):
+        if not is_dying_pc(actor):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only a dying character can roll a death saving throw.",
+            )
+        try:
+            action_messages = roll_death_save(state, actor)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        sync_encounter_combatants_to_characters(session, before, state)
+        end_response = _combat_end_response_if_needed(
+            session, campaign, state, is_owner=is_owner
+        )
+        if end_response:
+            return UseActionResponse(
+                encounter=end_response.encounter,
+                action_messages=action_messages,
+                combat_ended=True,
+                combat_log_id=end_response.combat_log_id,
+                combat_log_text=end_response.combat_log_text,
+                party_updated=end_response.party_updated,
+                reason=end_response.reason,
+            )
+        persist_encounter(session, campaign, state)
+        session.refresh(campaign)
+        return UseActionResponse(
+            encounter=build_encounter_response(session, campaign, is_owner=is_owner),
+            action_messages=action_messages,
+        )
+
+    if is_dying_pc(actor):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dying characters can only roll a death saving throw.",
+        )
+
+    try:
+        validate_healing_targets(state, actor, resolved_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     try:
         profile = resolve_attack_profile(

@@ -79,7 +79,7 @@ def spend_action_resource(
             continue
         current = entry.get("current")
         if current is None:
-            return []
+            raise ValueError(f"{resource_id.replace('-', ' ').title()} uses are not tracked on this sheet.")
         if int(current) < amount:
             label = str(entry.get("name") or resource_id)
             raise ValueError(f"Not enough {label} ({current} available, {amount} required).")
@@ -90,4 +90,5 @@ def spend_action_resource(
         remaining = entry["current"]
         return [f"{actor.name} spends {amount} {label} ({remaining} remaining)."]
 
-    return []
+    label = resource_id.replace("-", " ").title()
+    raise ValueError(f"{label} is not available on {actor.name}'s sheet.")

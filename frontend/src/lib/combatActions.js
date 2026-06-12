@@ -8,6 +8,7 @@ import {
   lookupCatalogAction,
   overrideActionType,
 } from "./actionRules";
+import { isDyingPc } from "./deathSaves";
 import { inferPrimaryActionType } from "./actionTypeInference";
 import { abilityModifier, getProficiencyBonus } from "./characterSheet";
 import { ACTION_TYPES as SCHEMA_ACTION_TYPES } from "./sheetSchema";
@@ -755,36 +756,60 @@ export function isOpponent(left, right) {
   return isAllyCombatant(left) !== isAllyCombatant(right);
 }
 
+export function actionHealsHp(action) {
+  if (!action) return false;
+  if (action.healingDice || action.healing_dice) return true;
+  const catalog = lookupCatalogAction(String(action.name || ""));
+  return Boolean(catalog?.healing_dice);
+}
+
+export function canReceiveHealing(combatant) {
+  if (!combatant) return false;
+  if (combatant.hp == null || combatant.max_hp == null) return true;
+  return combatant.hp < combatant.max_hp;
+}
+
 /** Living combatants eligible as targets (not defeated enemies). */
 export function filterTargetCandidates(
   combatants,
   actorCombatantId,
   targeting,
-  actorCombatant = null
+  actorCombatant = null,
+  action = null
 ) {
   const actor =
     actorCombatant || (combatants || []).find((combatant) => combatant.id === actorCombatantId);
   const living = (combatants || []).filter(
     (c) => !(isEnemyCombatant(c) && c.hp != null && c.hp <= 0)
   );
+  const heals = actionHealsHp(action);
 
+  let candidates;
   switch (targeting) {
     case TARGETING.self:
-      return living.filter((c) => c.id === actorCombatantId);
+      candidates = living.filter((c) => c.id === actorCombatantId);
+      break;
     case TARGETING.one_enemy:
       if (!actor) return [];
-      return living.filter((c) => c.id !== actorCombatantId && isOpponent(actor, c));
+      candidates = living.filter((c) => c.id !== actorCombatantId && isOpponent(actor, c));
+      break;
     case TARGETING.one_ally:
       if (!actor) return [];
-      return living.filter((c) => c.id !== actorCombatantId && isSameTeam(actor, c));
+      candidates = living.filter((c) => c.id !== actorCombatantId && isSameTeam(actor, c));
+      break;
     case TARGETING.one_ally_or_self:
-      if (!actor) return living.filter((c) => c.id === actorCombatantId);
-      return living.filter((c) => c.id === actorCombatantId || isSameTeam(actor, c));
+      if (!actor) candidates = living.filter((c) => c.id === actorCombatantId);
+      else candidates = living.filter((c) => c.id === actorCombatantId || isSameTeam(actor, c));
+      break;
     case TARGETING.one_creature:
-      return living.filter((c) => c.id !== actorCombatantId);
+      candidates = living.filter((c) => c.id !== actorCombatantId);
+      break;
     default:
       return [];
   }
+
+  if (!heals) return candidates;
+  return candidates.filter((combatant) => canReceiveHealing(combatant));
 }
 
 export function validateTargetSelection(
@@ -804,7 +829,8 @@ export function validateTargetSelection(
     combatants,
     actorCombatantId,
     action.targeting,
-    actorCombatant
+    actorCombatant,
+    action
   );
   const allowedIds = new Set(allowed.map((c) => c.id));
   if (!allowedIds.has(targetIds[0])) {

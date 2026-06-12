@@ -18,6 +18,12 @@ import {
   targetLabel,
   validateTargetSelection,
 } from "../../lib/combatActions";
+import {
+  AGENCY_BUTTON_CLASS,
+  AGENCY_LABEL_CLASS,
+  agencySlotClass,
+} from "../../lib/combatAgencyStyles";
+import { deathSaveAction, isDyingPc } from "../../lib/deathSaves";
 
 const TYPE_LABELS = {
   [ACTION_TYPES.action]: "Action",
@@ -132,6 +138,7 @@ export function TurnActionsPanel({
   const economy = economyForCombatant(encounter, actorCombatant?.id);
   const turnStatuses = turnStatusLabels(economy, encounter?.combatants);
   const incapacitated = impliesIncapacitated(actorCombatant?.conditions);
+  const dying = isDyingPc(actorCombatant);
 
   useEffect(() => {
     setLastOutcome("");
@@ -279,7 +286,8 @@ export function TurnActionsPanel({
         encounter.combatants,
         actorCombatant.id,
         action.targeting,
-        actorCombatant
+        actorCombatant,
+        action
       );
       if (candidates.length === 0) {
         onError?.(`No valid targets for ${action.name} (${targetLabel(action.targeting)}).`);
@@ -317,7 +325,8 @@ export function TurnActionsPanel({
         encounter.combatants,
         actorCombatant.id,
         resolved.targeting,
-        actorCombatant
+        actorCombatant,
+        resolved
       );
       if (candidates.length === 0) {
         onError?.(`No valid targets for ${resolved.name} (${targetLabel(resolved.targeting)}).`);
@@ -343,6 +352,30 @@ export function TurnActionsPanel({
         : actorCombatant.speed != null
           ? `${actorCombatant.speed} ft`
           : "—";
+
+  if (dying && canTakeTurn) {
+    const rolled = economy.death_save_rolled;
+    return (
+      <div className="session-ui space-y-2 rounded-sm border border-danger/50 bg-danger/5 p-2.5 sm:p-3">
+        <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-danger">
+          Dying — <span className="text-starlight">{actorCombatant.name}</span> at 0 HP
+        </p>
+        <p className="text-xs font-mono text-ink-muted">
+          Failures {actorCombatant.death_save_failures ?? 0}/3 · Successes{" "}
+          {actorCombatant.death_save_successes ?? 0}/3
+        </p>
+        <button
+          type="button"
+          disabled={busy || rolled}
+          onClick={() => void submitAction(deathSaveAction(), [])}
+          className={AGENCY_BUTTON_CLASS}
+        >
+          {rolled ? "Death save rolled" : "Roll Death Saving Throw"}
+        </button>
+        {headerSlot}
+      </div>
+    );
+  }
 
   if (!showTurnPanel && !showReaction) {
     if (incapacitated && canTakeTurn) {
@@ -376,7 +409,8 @@ export function TurnActionsPanel({
         encounter.combatants,
         actorCombatant.id,
         pickedAction.targeting,
-        actorCombatant
+        actorCombatant,
+        pickedAction
       )
     : [];
   const pickerActions = (() => {
@@ -422,38 +456,24 @@ export function TurnActionsPanel({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-1.5 text-[11px] sm:text-xs font-black uppercase">
+      <div className="flex flex-wrap gap-1.5 text-[11px] sm:text-xs uppercase">
         <span
-          className={
-            economy.action_used && !economy.extra_action_available
-              ? "text-ink-faint line-through"
-              : "text-starlight"
-          }
+          className={agencySlotClass(
+            economy.action_used && !economy.extra_action_available && economy.attacks_remaining <= 0
+          )}
         >
           Action {economy.action_used && !economy.extra_action_available && economy.attacks_remaining <= 0 ? "✓" : "○"}
           {economy.extra_action_available ? " (+1)" : ""}
           {economy.attacks_remaining > 0 ? ` · ${economy.attacks_remaining} atk` : ""}
         </span>
-        <span
-          className={
-            economy.bonus_action_used ? "text-ink-faint line-through" : "text-starlight"
-          }
-        >
-          Bonus {economy.bonus_action_used ? "✓" : "○"}
-        </span>
-        <span className={economy.reaction_used ? "text-ink-faint line-through" : "text-starlight"}>
-          Reaction {economy.reaction_used ? "✓" : "○"}
-        </span>
+        <span className={agencySlotClass(economy.bonus_action_used)}>Bonus {economy.bonus_action_used ? "✓" : "○"}</span>
+        <span className={agencySlotClass(economy.reaction_used)}>Reaction {economy.reaction_used ? "✓" : "○"}</span>
         {(available[ACTION_TYPES.magic_action] || []).length > 0 && (
-          <span
-            className={
-              economy.magic_action_used ? "text-ink-faint line-through" : "text-starlight"
-            }
-          >
+          <span className={agencySlotClass(economy.magic_action_used)}>
             Magic {economy.magic_action_used ? "✓" : "○"}
           </span>
         )}
-        <span className="text-neon-cyan">Move {movementLabel}</span>
+        <span className="font-black text-neon-cyan">Move {movementLabel}</span>
       </div>
 
       {turnStatuses.length > 0 && (
@@ -500,7 +520,7 @@ export function TurnActionsPanel({
                   type="button"
                   disabled={!enabled || busy}
                   onClick={() => handlePickType(type)}
-                  className="rounded-sm border border-starlight px-2 py-1 text-xs sm:text-sm font-black uppercase text-starlight hover:bg-starlight/10 disabled:opacity-40"
+                  className={AGENCY_BUTTON_CLASS}
                 >
                   {TYPE_LABELS[type]}
                   {actions.length > 0 ? ` (${actions.length})` : ""}
@@ -512,7 +532,7 @@ export function TurnActionsPanel({
               type="button"
               disabled={busy || (available[ACTION_TYPES.reaction] || []).length === 0}
               onClick={() => handlePickType(ACTION_TYPES.reaction)}
-              className="rounded-sm border border-neon-magenta px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+              className={AGENCY_BUTTON_CLASS}
             >
               Reaction
             </button>
@@ -522,7 +542,7 @@ export function TurnActionsPanel({
 
       {step === "pick_action" && pickedType && (
         <div className="space-y-1">
-          <p className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">
+          <p className={`text-[11px] sm:text-xs font-black uppercase ${AGENCY_LABEL_CLASS}`}>
             Choose {TYPE_LABELS[pickedType]}
           </p>
           <div className="max-h-40 space-y-2 overflow-y-auto">

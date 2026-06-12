@@ -106,9 +106,13 @@ export const DM_WIDGET_TYPES = [
   { type: "vtt_zone", label: "VTT Zone" },
 ];
 
+export const NOTES_LOG_TAB_ID = "notes-log";
+export const NOTES_LOG_TAB_TITLE = "Log";
+
 export function defaultDmNotesTabs() {
   return [
     { id: "notes-session", title: "Session", content: "" },
+    { id: NOTES_LOG_TAB_ID, title: NOTES_LOG_TAB_TITLE, content: "" },
     { id: "notes-plot", title: "Plot", content: "" },
   ];
 }
@@ -116,6 +120,7 @@ export function defaultDmNotesTabs() {
 export function defaultPlayerNotesTabs() {
   return [
     { id: "notes-session", title: "Session", content: "" },
+    { id: NOTES_LOG_TAB_ID, title: NOTES_LOG_TAB_TITLE, content: "" },
     { id: "notes-character", title: "Character", content: "" },
   ];
 }
@@ -218,6 +223,12 @@ export function ensurePlaySessionNotesTab(
   return { ...layout, widgets: nextWidgets };
 }
 
+function ensureNotesTabOnWidget(notesWidget, tabsKey, tabId, tabTitle) {
+  const tabs = Array.isArray(notesWidget[tabsKey]) ? [...notesWidget[tabsKey]] : [];
+  if (tabs.some((tab) => tab.id === tabId)) return tabs;
+  return [{ id: tabId, title: tabTitle, content: "" }, ...tabs];
+}
+
 function appendTextToNamedNotesTab(
   layout,
   combatLogText,
@@ -226,20 +237,27 @@ function appendTextToNamedNotesTab(
   widgetType,
   tabsKey,
   canvasW,
-  canvasH
+  canvasH,
+  switchActiveTab = false
 ) {
-  const withTab = ensurePlaySessionNotesTab(layout, tabId, tabTitle || "Session", {
-    widgetType,
-    tabsKey,
-    canvasW,
-    canvasH,
-  });
-  let notesWidget = withTab.widgets?.find((widget) => widget.type === widgetType);
-  if (!notesWidget) return withTab;
+  let notesWidget = layout.widgets?.find((widget) => widget.type === widgetType);
+  let widgets = layout.widgets || [];
 
-  const tabs = notesWidget[tabsKey] || [];
-  const target = tabs.find((tab) => tab.id === tabId);
-  if (!target) return withTab;
+  if (!notesWidget) {
+    if (widgetType === "dm_notes") {
+      notesWidget = createWidget("dm_notes", canvasW || 1280, canvasH || 800);
+      widgets = [...widgets, notesWidget];
+    } else if (widgetType === "player_notes") {
+      widgets = ensurePlayerNotesWidget(widgets, canvasW || 1280, canvasH || 800);
+      notesWidget = widgets.find((widget) => widget.type === "player_notes");
+    } else {
+      return layout;
+    }
+  }
+
+  const nextTabs = ensureNotesTabOnWidget(notesWidget, tabsKey, tabId, tabTitle);
+  const target = nextTabs.find((tab) => tab.id === tabId);
+  if (!target) return layout;
 
   const trimmed = String(target.content || "").trim();
   const separator = trimmed ? "\n\n---\n\n" : "";
@@ -247,23 +265,29 @@ function appendTextToNamedNotesTab(
     ...target,
     content: `${trimmed}${separator}${combatLogText}`,
   };
-  const nextTabs = tabs.map((tab) => (tab.id === tabId ? nextTarget : tab));
-  const nextWidgets = withTab.widgets.map((widget) =>
+  const mergedTabs = nextTabs.map((tab) => (tab.id === tabId ? nextTarget : tab));
+  const priorActive = notesWidget.activeNotesTabId;
+
+  const nextWidgets = widgets.map((widget) =>
     widget.id === notesWidget.id
-      ? { ...widget, [tabsKey]: nextTabs, activeNotesTabId: tabId }
+      ? {
+          ...widget,
+          [tabsKey]: mergedTabs,
+          activeNotesTabId: switchActiveTab ? tabId : priorActive || tabId,
+        }
       : widget
   );
   return { ...layout, widgets: nextWidgets };
 }
 
-/** Append a combat log block to the DM Notes play-session tab. */
+/** Append a combat log block to the Log tab (does not switch away from the active tab). */
 export function appendCombatLogToDmSessionNotes(
   layout,
   combatLogText,
   canvasW,
   canvasH,
-  tabId = "notes-session",
-  tabTitle = "Session"
+  tabId = NOTES_LOG_TAB_ID,
+  tabTitle = NOTES_LOG_TAB_TITLE
 ) {
   return appendTextToNamedNotesTab(
     layout,
@@ -273,7 +297,22 @@ export function appendCombatLogToDmSessionNotes(
     "dm_notes",
     "dmNotesTabs",
     canvasW,
-    canvasH
+    canvasH,
+    false
+  );
+}
+
+export function appendCombatLogToPlayerNotes(layout, combatLogText, canvasW, canvasH) {
+  return appendTextToNamedNotesTab(
+    layout,
+    combatLogText,
+    NOTES_LOG_TAB_ID,
+    NOTES_LOG_TAB_TITLE,
+    "player_notes",
+    "playerNotesTabs",
+    canvasW,
+    canvasH,
+    false
   );
 }
 

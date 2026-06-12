@@ -262,6 +262,41 @@ def _normalize_healing_expression(expression: str, actor_level: int | None) -> s
     return normalized
 
 
+def can_receive_healing(combatant: EncounterCombatant) -> bool:
+    if combatant.hp is None or combatant.max_hp is None:
+        return True
+    return combatant.hp < combatant.max_hp
+
+
+def action_heals_hp(data: UseActionRequest) -> bool:
+    if data.targeting == "self" and will_resolve_self_heal(data):
+        return True
+    clean_name = clean_action_label(data.action_name)
+    catalog = lookup_combat_action(clean_name) or lookup_spell(clean_name)
+    return bool(catalog and catalog.get("healing_dice"))
+
+
+def validate_healing_targets(
+    state: EncounterState,
+    actor: EncounterCombatant,
+    data: UseActionRequest,
+) -> None:
+    if not action_heals_hp(data):
+        return
+    if data.targeting == "self":
+        if not can_receive_healing(actor):
+            raise ValueError(f"{actor.name} is already at full hit points.")
+        return
+    if not data.target_ids:
+        return
+    by_id = {combatant.id: combatant for combatant in state.combatants}
+    target = by_id.get(data.target_ids[0])
+    if target is None:
+        return
+    if not can_receive_healing(target):
+        raise ValueError(f"{target.name} is already at full hit points and cannot be healed.")
+
+
 def _apply_healing(combatant: EncounterCombatant, amount: int) -> int | None:
     _ensure_hp_initialized(combatant)
     if combatant.hp is None:
@@ -310,6 +345,9 @@ def resolve_self_heal(
 
     if not healing_expr:
         return []
+
+    if not can_receive_healing(actor):
+        raise ValueError(f"{actor.name} is already at full hit points.")
 
     actor_level = None
     if actor.character_id:

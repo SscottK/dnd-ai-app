@@ -386,6 +386,8 @@ class EncounterCombatant(BaseModel):
     speed: int | None = None
     conditions: list[str] = Field(default_factory=list)
     combat_actions: list[CombatActionEntry] = Field(default_factory=list)
+    death_save_failures: int = Field(default=0, ge=0, le=3)
+    death_save_successes: int = Field(default=0, ge=0, le=3)
 
     @field_validator("conditions", mode="before")
     @classmethod
@@ -412,6 +414,7 @@ class TurnEconomySnapshot(BaseModel):
     helping_target_id: str | None = None
     readied_action: str | None = None
     readied_trigger: str | None = None
+    death_save_rolled: bool = False
 
 
 class EncounterState(BaseModel):

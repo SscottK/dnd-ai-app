@@ -645,12 +645,16 @@ export function SessionPlayPage() {
         const conditionsChanged =
           JSON.stringify(sheetData.conditions || []) !==
           JSON.stringify(sheetRef.current?.conditions || []);
+        const resourcesChanged =
+          JSON.stringify(sheetData.resources || []) !==
+          JSON.stringify(sheetRef.current?.resources || []);
         if (
           !current ||
           data.hp !== current.hp ||
           data.max_hp !== current.max_hp ||
           data.ac !== current.ac ||
-          conditionsChanged
+          conditionsChanged ||
+          resourcesChanged
         ) {
           hydrateCharacter(data, { applyLayout: false });
         }

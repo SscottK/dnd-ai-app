@@ -108,17 +108,27 @@ def build_combat_log_text(state: EncounterState, footer: str) -> str:
     return "\n".join(sections)
 
 
+COMBAT_LOG_TAB_ID = "notes-log"
+COMBAT_LOG_TAB_TITLE = "Log"
+
+
 def append_combat_log_to_layout(
     layout: dict | None,
     combat_log_text: str,
     *,
-    tab_id: str = "notes-session",
+    tab_id: str = COMBAT_LOG_TAB_ID,
 ) -> dict:
-    return append_text_to_notes_tab(layout, tab_id, combat_log_text)
+    return append_text_to_notes_tab(
+        layout,
+        tab_id,
+        combat_log_text,
+        switch_active=False,
+    )
 
 
 def distribute_combat_log(session: Session, campaign: Campaign, combat_log_text: str) -> int:
-    tab_id, tab_title = active_notes_tab(campaign)
+    tab_id = COMBAT_LOG_TAB_ID
+    tab_title = COMBAT_LOG_TAB_TITLE
     members = session.exec(
         select(CampaignMember).where(CampaignMember.campaign_id == campaign.id)
     ).all()

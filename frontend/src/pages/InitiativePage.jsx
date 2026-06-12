@@ -45,6 +45,7 @@ import { AllyControllerSelect } from "../components/initiative/AllyControllerSel
 import { ReadiedActionsPanel } from "../components/initiative/ReadiedActionsPanel";
 import { MonsterSrdSearch } from "../components/encounter/MonsterSrdSearch";
 import { SavedEncounterLoader } from "../components/encounter/SavedEncounterLoader";
+import { CombatResolutionBanner } from "../components/initiative/CombatResolutionBanner";
 import {
   EncounterCombatLog,
   TurnActionsPanel,
@@ -93,6 +94,8 @@ export function InitiativePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [combatResolution, setCombatResolution] = useState(null);
+  const encounterSnapshotRef = useRef(encounter);
   const [monsterName, setMonsterName] = useState("");
   const [monsterLabel, setMonsterLabel] = useState("");
   const [monsterInit, setMonsterInit] = useState("10");
@@ -136,6 +139,22 @@ export function InitiativePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!combatResolution) {
+      encounterSnapshotRef.current = encounter;
+    }
+  }, [encounter, combatResolution]);
+
+  const notifyCombatEnded = useCallback((logText, reason) => {
+    setCombatResolution({
+      reason,
+      logText,
+      encounter: encounterSnapshotRef.current,
+    });
+  }, []);
+
+  const viewEncounter = combatResolution?.encounter ?? encounter;
+
   const saveEncounter = useCallback(
     async (next) => {
       if (!token || !campaignId || !isOwner) return;
@@ -150,9 +169,7 @@ export function InitiativePage() {
         const parsed = parseEncounterPatchResponse(await res.json());
         setEncounter(parsed.encounter);
         if (parsed.combatEnded) {
-          setStatusMessage(
-            "Victory! All enemies defeated. Combat log added to everyone's Session notes."
-          );
+          notifyCombatEnded(parsed.combatLogText, parsed.reason);
         }
       } catch (err) {
         console.error(err);
@@ -231,7 +248,7 @@ export function InitiativePage() {
 
   const teamMode = isTeamMode(encounter);
   const partyPhase = isPartyPhaseActive(encounter);
-  const displaySorted = buildTrackerCombatants(encounter, { isDmView: isOwner });
+  const displaySorted = buildTrackerCombatants(viewEncounter, { isDmView: isOwner });
   const activeCombatant = resolveActiveCombatant(encounter);
   const activeEconomy = activeCombatant ? encounter.turn_economy?.[activeCombatant.id] : null;
   const waitingForInitiative =
@@ -437,11 +454,7 @@ export function InitiativePage() {
       const parsed = parseEncounterPatchResponse(await res.json());
       setEncounter(parsed.encounter);
       if (parsed.combatEnded) {
-        setStatusMessage(
-          parsed.reason === "defeat"
-            ? "Party defeated. Combat log added to everyone's Session notes."
-            : "Victory! All enemies defeated. Combat log added to everyone's Session notes."
-        );
+        notifyCombatEnded(parsed.combatLogText, parsed.reason);
       }
     } catch (err) {
       setError(err.message || "Could not advance turn.");
@@ -496,9 +509,7 @@ export function InitiativePage() {
       }
       const data = await res.json();
       setEncounter(data.encounter || { round: 1, combatants: [] });
-      setStatusMessage(
-        "Combat ended by DM. Initiative order, rolls, and events were added to everyone's Session notes."
-      );
+      notifyCombatEnded(data.combat_log_text, data.reason || "dm");
     } catch (err) {
       setError(err.message || "Could not end combat.");
     } finally {
@@ -774,6 +785,11 @@ export function InitiativePage() {
             )}
           </div>
         </div>
+
+        <CombatResolutionBanner
+          resolution={combatResolution}
+          onDismiss={() => setCombatResolution(null)}
+        />
 
         {statusMessage && (
           <p className="mb-4 text-[10px] font-mono text-neon-cyan border-l-2 border-neon-cyan pl-2">
