@@ -58,6 +58,7 @@ import {
   createWidget,
   defaultViewport,
   fitWidgetsToCanvas,
+  layoutNeedsReflowForCanvas,
   pullWidgetsIntoView,
   hydrateLayout,
   INITIATIVE_ORIENTATION_HORIZONTAL,
@@ -73,6 +74,8 @@ import {
 } from "../lib/sheetLayout";
 import {
   attachSessionCanvasResizeListeners,
+  canvasSizesMatch,
+  isStaleUpscaleReading,
   resolveCanvasResizeAction,
 } from "../lib/sessionCanvasResize";
 import { NotesArchiveModal } from "../components/notes/NotesArchiveModal";
@@ -105,6 +108,8 @@ export function SessionPlayPage() {
   const paneMenuRef = useRef(null);
   const canvasBoundsRef = useRef({ width: 0, height: 0 });
   const lastReflowBoundsRef = useRef({ width: 0, height: 0 });
+  const pendingCanvasRef = useRef(null);
+  const finalizeRetryRef = useRef(0);
   const boundsLockedRef = useRef(false);
   const interactingRef = useRef(false);
   const resizeSaveTimer = useRef(null);
@@ -778,18 +783,38 @@ export function SessionPlayPage() {
       }, 500);
     };
 
-    const remeasureCanvas = ({ finalize = false } = {}) => {
-      if (interactingRef.current) return;
+    const retrySettledCanvas = () => {
+      if (finalizeRetryRef.current >= 6) {
+        finalizeRetryRef.current = 0;
+        return;
+      }
+      finalizeRetryRef.current += 1;
+      setTimeout(() => {
+        const measured = measureCanvas();
+        if (measured) applySettledCanvasSize(measured);
+      }, 90);
+    };
 
-      const measured = measureCanvas();
-      if (!measured) return;
+    const applySettledCanvasSize = (measured) => {
+      if (interactingRef.current || !measured) return;
 
       canvasBoundsRef.current = { width: measured.width, height: measured.height };
+      const pending = pendingCanvasRef.current;
+      const lastReflow = lastReflowBoundsRef.current;
 
-      // Never move panes while the window is still being dragged — only after it settles.
-      if (!finalize) return;
+      if (pending && !canvasSizesMatch(pending, measured)) {
+        retrySettledCanvas();
+        return;
+      }
 
-      if (!lastReflowBoundsRef.current.width || !lastReflowBoundsRef.current.height) {
+      if (isStaleUpscaleReading(lastReflow, pending, measured)) {
+        retrySettledCanvas();
+        return;
+      }
+
+      finalizeRetryRef.current = 0;
+
+      if (!lastReflow.width || !lastReflow.height) {
         lastReflowBoundsRef.current = { width: measured.width, height: measured.height };
         setLayout((prevLayout) => {
           const next = {
@@ -802,8 +827,48 @@ export function SessionPlayPage() {
         return;
       }
 
-      const action = resolveCanvasResizeAction(measured, lastReflowBoundsRef.current);
+      const layoutSnapshot = layoutRef.current;
+      const viewportScale = layoutSnapshot?.viewport?.scale ?? DEFAULT_ZOOM;
+      let action = resolveCanvasResizeAction(measured, lastReflow);
+
+      const viewportW = layoutSnapshot?.viewport?.canvasW;
+      const viewportH = layoutSnapshot?.viewport?.canvasH;
+      if (
+        !action?.reflow &&
+        viewportW &&
+        viewportH &&
+        !canvasSizesMatch({ width: viewportW, height: viewportH }, measured) &&
+        layoutNeedsReflowForCanvas(
+          layoutSnapshot?.widgets,
+          measured.width,
+          measured.height,
+          viewportScale
+        )
+      ) {
+        action = {
+          nextW: Math.round(measured.width),
+          nextH: Math.round(measured.height),
+          prevW: Math.round(viewportW),
+          prevH: Math.round(viewportH),
+          reflow: true,
+        };
+      }
+
       if (!action?.reflow) {
+        if (
+          layoutNeedsReflowForCanvas(
+            layoutSnapshot?.widgets,
+            measured.width,
+            measured.height,
+            viewportScale
+          )
+        ) {
+          applyLayoutRecovery(measured.width, measured.height, {
+            reflow: false,
+            updateViewport: true,
+          });
+          queueLayoutSave();
+        }
         lastReflowBoundsRef.current = { width: measured.width, height: measured.height };
         return;
       }
@@ -818,10 +883,18 @@ export function SessionPlayPage() {
       queueLayoutSave();
     };
 
+    const remeasureCanvas = () => {
+      if (interactingRef.current) return;
+      const measured = measureCanvas();
+      if (!measured) return;
+      canvasBoundsRef.current = { width: measured.width, height: measured.height };
+      pendingCanvasRef.current = measured;
+    };
+
     return attachSessionCanvasResizeListeners({
       getCanvasEl: () => canvasRef.current,
-      onRemeasure: () => remeasureCanvas({ finalize: false }),
-      onResizeEnd: () => remeasureCanvas({ finalize: true }),
+      onRemeasure: remeasureCanvas,
+      onResizeSettled: applySettledCanvasSize,
     });
   }, [
     sessionStatus?.session_active,

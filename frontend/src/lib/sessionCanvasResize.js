@@ -3,14 +3,18 @@
  * ResizeObserver, visualViewport (zoom / mobile chrome), monitor moves, and DPI changes.
  */
 
-const SIZE_EPSILON = 8;
+export const CANVAS_SIZE_EPSILON = 8;
 
-function sizesDiffer(a, b) {
+export function canvasSizesMatch(a, b, epsilon = CANVAS_SIZE_EPSILON) {
   if (!a?.width || !a?.height || !b?.width || !b?.height) return false;
   return (
-    Math.abs(Math.round(a.width) - Math.round(b.width)) >= SIZE_EPSILON ||
-    Math.abs(Math.round(a.height) - Math.round(b.height)) >= SIZE_EPSILON
+    Math.abs(Math.round(a.width) - Math.round(b.width)) < epsilon &&
+    Math.abs(Math.round(a.height) - Math.round(b.height)) < epsilon
   );
+}
+
+function sizesDiffer(a, b) {
+  return !canvasSizesMatch(a, b);
 }
 
 /**
@@ -42,22 +46,56 @@ export function resolveCanvasResizeAction(measured, lastReflowBounds) {
   };
 }
 
+/** Reject a reflow when a larger stale reading arrives after the canvas already shrank. */
+export function isStaleUpscaleReading(lastReflowBounds, pendingBounds, measuredBounds) {
+  if (!pendingBounds?.width || !lastReflowBounds?.width || !measuredBounds?.width) {
+    return false;
+  }
+  if (measuredBounds.width <= lastReflowBounds.width + CANVAS_SIZE_EPSILON) {
+    return false;
+  }
+  return pendingBounds.width < measuredBounds.width - CANVAS_SIZE_EPSILON;
+}
+
+function readCanvasSize(getCanvasEl) {
+  const el = getCanvasEl();
+  if (!el) return null;
+  const width = el.clientWidth;
+  const height = el.clientHeight;
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
 /**
  * @param {object} options
  * @param {() => HTMLElement | null} options.getCanvasEl
  * @param {() => void} options.onRemeasure
- * @param {() => void} options.onResizeEnd
+ * @param {(size: { width: number, height: number }) => void} options.onResizeSettled
  * @param {number} [options.finalizeDelayMs]
  */
 export function attachSessionCanvasResizeListeners({
   getCanvasEl,
   onRemeasure,
-  onResizeEnd,
-  finalizeDelayMs = 150,
+  onResizeSettled,
+  finalizeDelayMs = 280,
 }) {
   let raf = 0;
   let resizeEndTimer = null;
   let devicePixelRatio = window.devicePixelRatio;
+
+  const settleResize = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const first = readCanvasSize(getCanvasEl);
+        requestAnimationFrame(() => {
+          const second = readCanvasSize(getCanvasEl);
+          const settled =
+            first && second && canvasSizesMatch(first, second) ? second : second || first;
+          if (settled) onResizeSettled(settled);
+        });
+      });
+    });
+  };
 
   const scheduleRemeasure = () => {
     cancelAnimationFrame(raf);
@@ -65,7 +103,7 @@ export function attachSessionCanvasResizeListeners({
       requestAnimationFrame(() => {
         onRemeasure();
         if (resizeEndTimer) clearTimeout(resizeEndTimer);
-        resizeEndTimer = setTimeout(onResizeEnd, finalizeDelayMs);
+        resizeEndTimer = setTimeout(settleResize, finalizeDelayMs);
       });
     });
   };

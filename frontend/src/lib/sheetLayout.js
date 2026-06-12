@@ -589,6 +589,19 @@ export function pullWidgetsIntoView(widgets, canvasW, canvasH, viewportScale = 1
   return clamped.map((widget) => recoveredById.get(widget.id) || widget);
 }
 
+/** True when pane footprint is out of proportion with the current canvas. */
+export function layoutNeedsReflowForCanvas(widgets, canvasW, canvasH, viewportScale = 1) {
+  if (!widgets?.length || !canvasW || !canvasH) return false;
+  const { width: effW, height: effH } = effectiveLayoutSize(canvasW, canvasH, viewportScale);
+  const { maxRight, maxBottom } = inferLayoutExtents(widgets);
+  const margin = 16;
+  if (maxRight > effW + margin || maxBottom > effH + margin) return true;
+  return widgets.some((widget) => {
+    const height = widget.minimized ? MIN_PANE_HEIGHT : widget.h ?? 0;
+    return widget.w > effW - margin || height > effH - margin;
+  });
+}
+
 /** Bounding box of all widgets in layout coordinates. */
 export function inferLayoutExtents(widgets) {
   let maxRight = 0;
