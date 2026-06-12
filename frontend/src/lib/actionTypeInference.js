@@ -19,6 +19,8 @@ const PRIMARY_BONUS =
   /(?:^|[.!?]\s+|\n)\s*(?:as a bonus action|you can use (?:a )?bonus action|you use (?:a )?bonus action|costs? (?:one |a )?bonus action)/i;
 const PRIMARY_REACTION =
   /(?:^|[.!?]\s+|\n)\s*(?:as a reaction|you can use (?:a )?reaction|you use (?:a )?reaction|costs? (?:one |a )?reaction)/i;
+const PRIMARY_MAGIC =
+  /(?:^|[.!?]\s+|\n)\s*(?:as a magic action|you can use (?:a )?magic action|you use (?:a )?magic action|costs? (?:one |a )?magic action)/i;
 const TRAILING_ECONOMY = /\(\s*\d+\s*\/\s*[^)]*\s*[•·]\s*(\d+)\s*(Action|Bonus Action|Reaction)s?\s*\)/i;
 
 export function overrideActionType(name) {
@@ -45,6 +47,7 @@ export function inferPrimaryActionType(name = "", description = "") {
     [PRIMARY_ACTION, "action"],
     [PRIMARY_BONUS, "bonus_action"],
     [PRIMARY_REACTION, "reaction"],
+    [PRIMARY_MAGIC, "magic_action"],
   ]) {
     const found = pattern.exec(text);
     if (found) matches.push([found.index, economy]);
@@ -60,7 +63,9 @@ export function inferPrimaryActionType(name = "", description = "") {
   const reactionIdx = lowered.indexOf("reaction");
 
   const indices = [];
+  const magicIdx = lowered.indexOf("magic action");
   if (bonusIdx >= 0) indices.push([bonusIdx, "bonus_action"]);
+  if (magicIdx >= 0) indices.push([magicIdx, "magic_action"]);
   if (actionMatch) indices.push([actionMatch.index, "action"]);
   if (reactionIdx >= 0) indices.push([reactionIdx, "reaction"]);
   if (!indices.length) return null;

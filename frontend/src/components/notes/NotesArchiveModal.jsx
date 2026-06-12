@@ -32,11 +32,15 @@ export function NotesArchiveModal({
         if (cancelled) return;
         const doc = serverNotesToClient(data);
         const openIds = new Set((openTabs || []).map((tab) => tab.id));
-        const archived = [
-          ...(doc.closedTabs || []),
-          ...(doc.tabs || []).filter((tab) => !openIds.has(tab.id)),
-        ];
-        setArchivedTabs(archived);
+        const byId = new Map();
+        for (const tab of doc.closedTabs || []) {
+          if (tab?.id) byId.set(tab.id, tab);
+        }
+        for (const tab of doc.tabs || []) {
+          if (!tab?.id || openIds.has(tab.id) || byId.has(tab.id)) continue;
+          byId.set(tab.id, tab);
+        }
+        setArchivedTabs([...byId.values()]);
       } catch (err) {
         if (!cancelled) setError(err.message || "Could not load archived notes.");
       } finally {

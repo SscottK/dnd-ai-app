@@ -650,7 +650,7 @@ export function SessionPlayPage() {
         }
 
         const charId = status.character_id ?? characterRef.current?.id;
-        if (!charId || dirtyRef.current) return;
+        if (!charId) return;
 
         const charRes = await apiFetch(`/characters/${charId}`, { token });
         if (!charRes.ok) return;
@@ -663,6 +663,17 @@ export function SessionPlayPage() {
         const resourcesChanged =
           JSON.stringify(sheetData.resources || []) !==
           JSON.stringify(sheetRef.current?.resources || []);
+
+        if (dirtyRef.current) {
+          if (resourcesChanged && current) {
+            const mergedSheet = { ...sheetRef.current, resources: sheetData.resources };
+            sheetRef.current = mergedSheet;
+            setSheet(mergedSheet);
+            setCharacter({ ...current, hp: data.hp, max_hp: data.max_hp, ac: data.ac });
+          }
+          return;
+        }
+
         if (
           !current ||
           data.hp !== current.hp ||
@@ -911,7 +922,15 @@ export function SessionPlayPage() {
       const existingTabs = notesWidget[tabsKey] || [];
       const nextClosed = (notesWidget.closedNotesTabs || []).filter((item) => item.id !== tab.id);
       const nextTabs = existingTabs.some((item) => item.id === tab.id)
-        ? existingTabs
+        ? existingTabs.map((item) =>
+            item.id === tab.id
+              ? {
+                  ...item,
+                  title: tab.title || item.title,
+                  content: tab.content || item.content,
+                }
+              : item
+          )
         : [...existingTabs, { id: tab.id, title: tab.title, content: tab.content || "" }];
 
       updateWidgetMeta(notesWidget.id, {

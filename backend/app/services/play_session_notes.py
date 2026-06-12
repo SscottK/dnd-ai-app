@@ -116,6 +116,7 @@ def append_text_to_notes_tab(
     *,
     widget_type: str = "player_notes",
     tabs_key: str = "playerNotesTabs",
+    tab_title: str | None = None,
     switch_active: bool = True,
 ) -> dict:
     merged = copy.deepcopy(layout) if layout else {"widgets": [], "viewport": {}}
@@ -128,7 +129,7 @@ def append_text_to_notes_tab(
     tabs = list(notes_widget.get(tabs_key) or [])
     target = next((tab for tab in tabs if tab.get("id") == tab_id), None)
     if target is None:
-        target = {"id": tab_id, "title": "Session", "content": ""}
+        target = {"id": tab_id, "title": tab_title or "Session", "content": ""}
         tabs.insert(0, target)
 
     existing = str(target.get("content") or "").strip()

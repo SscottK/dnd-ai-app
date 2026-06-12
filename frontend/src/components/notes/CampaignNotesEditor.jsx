@@ -121,7 +121,15 @@ export function CampaignNotesEditor({ campaignId, token, campaignName }) {
     const nextClosed = current.closedTabs.filter((item) => item.id !== tab.id);
     const hasTab = current.tabs.some((item) => item.id === tab.id);
     const nextTabs = hasTab
-      ? current.tabs
+      ? current.tabs.map((item) =>
+          item.id === tab.id
+            ? {
+                ...item,
+                title: tab.title || item.title,
+                content: tab.content || item.content,
+              }
+            : item
+        )
       : [...current.tabs, { id: tab.id, title: tab.title, content: tab.content || "" }];
     const nextState = {
       tabs: nextTabs,

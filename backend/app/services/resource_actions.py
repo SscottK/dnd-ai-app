@@ -45,6 +45,71 @@ def _resource_cost_for_action(
     return None
 
 
+def _action_resource_entry(
+    sheet: dict,
+    *,
+    action_id: str,
+    action_name: str,
+) -> tuple[dict, dict, int] | None:
+    resource_cost = _resource_cost_for_action(
+        sheet,
+        action_id=action_id,
+        action_name=action_name,
+    )
+    if not resource_cost or not resource_cost.get("resource_id"):
+        return None
+
+    resource_id = str(resource_cost["resource_id"])
+    amount = int(resource_cost.get("amount") or 1)
+    for entry in sheet.get("resources") or []:
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("id") or "") != resource_id:
+            continue
+        return entry, resource_cost, amount
+
+    label = resource_id.replace("-", " ").title()
+    raise ValueError(f"{label} is not available on this sheet.")
+
+
+def ensure_action_resource_available(
+    session: Session,
+    campaign_id: int,
+    *,
+    actor: EncounterCombatant,
+    data: UseActionRequest,
+) -> None:
+    """Validate resource cost without mutating the character sheet."""
+    if not actor.character_id:
+        return
+
+    character = session.get(Character, actor.character_id)
+    if character is None or character.campaign_id != campaign_id:
+        return
+
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+    match = _action_resource_entry(
+        sheet,
+        action_id=data.action_id,
+        action_name=data.action_name,
+    )
+    if match is None:
+        return
+
+    entry, resource_cost, amount = match
+    resource_id = str(resource_cost["resource_id"])
+    current = entry.get("current")
+    if current is None:
+        raise ValueError(f"{resource_id.replace('-', ' ').title()} uses are not tracked on this sheet.")
+    if int(current) < amount:
+        label = str(entry.get("name") or resource_id)
+        raise ValueError(f"Not enough {label} ({current} available, {amount} required).")
+
+
 def spend_action_resource(
     session: Session,
     campaign_id: int,
@@ -59,36 +124,29 @@ def spend_action_resource(
     if character is None or character.campaign_id != campaign_id:
         return []
 
-    sheet = parse_sheet_json(character.sheet_json)
-    resource_cost = _resource_cost_for_action(
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+    match = _action_resource_entry(
         sheet,
         action_id=data.action_id,
         action_name=data.action_name,
     )
-    if not resource_cost or not resource_cost.get("resource_id"):
+    if match is None:
         return []
 
+    entry, resource_cost, amount = match
     resource_id = str(resource_cost["resource_id"])
-    amount = int(resource_cost.get("amount") or 1)
-    resources = sheet.get("resources") or []
+    ensure_action_resource_available(session, campaign_id, actor=actor, data=data)
+    current = entry.get("current")
+    if current is None:
+        return []
 
-    for entry in resources:
-        if not isinstance(entry, dict):
-            continue
-        if str(entry.get("id") or "") != resource_id:
-            continue
-        current = entry.get("current")
-        if current is None:
-            raise ValueError(f"{resource_id.replace('-', ' ').title()} uses are not tracked on this sheet.")
-        if int(current) < amount:
-            label = str(entry.get("name") or resource_id)
-            raise ValueError(f"Not enough {label} ({current} available, {amount} required).")
-        entry["current"] = int(current) - amount
-        character.sheet_json = sheet_to_json(sheet)
-        session.add(character)
-        label = str(entry.get("name") or resource_id)
-        remaining = entry["current"]
-        return [f"{actor.name} spends {amount} {label} ({remaining} remaining)."]
-
-    label = resource_id.replace("-", " ").title()
-    raise ValueError(f"{label} is not available on {actor.name}'s sheet.")
+    entry["current"] = int(current) - amount
+    character.sheet_json = sheet_to_json(sheet)
+    session.add(character)
+    label = str(entry.get("name") or resource_id)
+    remaining = entry["current"]
+    return [f"{actor.name} spends {amount} {label} ({remaining} remaining)."]

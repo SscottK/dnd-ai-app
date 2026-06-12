@@ -25,6 +25,10 @@ from app.services.weapon_attacks import (
 _DIRECT_ATTACK_PREFIXES = ("weapon-", "attack-", "std-attack", "npc-attack")
 _SPELL_ATTACK_PREFIX = "spell-"
 _MULTI_ATTACK_ACTIONS = {"flurry of blows": 2}
+_MULTIATTACK_REF_RE = re.compile(
+    r"(\d+)\s+([\w][\w\s-]*?)\s+attacks?",
+    re.IGNORECASE,
+)
 
 
 def _helped_by_advantage(state: EncounterState, actor_id: str) -> bool:
@@ -118,8 +122,28 @@ def _delegate_melee_attack_profile(sheet: dict) -> AttackProfile:
     return AttackProfile()
 
 
+def _spell_action_profile(sheet: dict, action_id: str, action_name: str) -> AttackProfile:
+    clean_name = clean_action_label(action_name)
+    for spell in sheet.get("spells") or []:
+        if not isinstance(spell, dict):
+            continue
+        spell_id = str(spell.get("id") or f"spell-{spell.get('name')}")
+        spell_name = str(spell.get("name") or "")
+        if action_id.endswith(spell_id) or spell_name.casefold() == clean_name.casefold():
+            damage = extract_damage_dice(spell.get("damage"))
+            bonus = spell.get("attack_bonus") or spell.get("to_hit")
+            if bonus is not None or damage:
+                return AttackProfile(attack_bonus=bonus, damage_dice=damage)
+    return AttackProfile()
+
+
 def _sheet_action_profile(sheet: dict, action_id: str, action_name: str) -> AttackProfile:
     clean_name = clean_action_label(action_name)
+
+    if action_id.startswith(_SPELL_ATTACK_PREFIX):
+        spell_profile = _spell_action_profile(sheet, action_id, clean_name)
+        if spell_profile.attack_bonus is not None or spell_profile.damage_dice:
+            return spell_profile
 
     for attack in sheet.get("attacks") or []:
         if not isinstance(attack, dict):
@@ -154,6 +178,55 @@ def _combatant_action_profile(actor: EncounterCombatant, action_id: str) -> Atta
                 profile.damage_dice = profile.damage_dice or parsed.damage_dice
             return profile
     return AttackProfile()
+
+
+def _multiattack_description(monster: dict | None, detail: str | None) -> str:
+    if monster is None:
+        return str(detail or "")
+    stat_block = monster.get("stat_block_json") or {}
+    for row in stat_block.get("actions") or []:
+        if not isinstance(row, dict) or not row.get("name"):
+            continue
+        if "multiattack" in str(row["name"]).casefold():
+            return str(row.get("description") or row.get("desc") or detail or "")
+    return str(detail or "")
+
+
+def _multiattack_strikes(
+    actor: EncounterCombatant,
+    monster: dict | None,
+    *,
+    detail: str | None,
+) -> list[tuple[str, AttackProfile]]:
+    description = _multiattack_description(monster, detail)
+    strikes: list[tuple[str, AttackProfile]] = []
+
+    if monster is not None:
+        for match in _MULTIATTACK_REF_RE.finditer(description):
+            count = max(1, int(match.group(1)))
+            attack_name = match.group(2).strip()
+            profile = _srd_action_profile(monster, attack_name)
+            if profile.attack_bonus is None and profile.damage_dice is None:
+                continue
+            strikes.extend((attack_name, profile) for _ in range(count))
+
+    if not strikes:
+        for entry in actor.combat_actions:
+            if "multiattack" in entry.name.casefold():
+                continue
+            profile = AttackProfile(
+                attack_bonus=entry.attack_bonus,
+                damage_dice=entry.damage_dice,
+            )
+            if profile.attack_bonus is None and not profile.damage_dice and entry.description:
+                parsed = _parse_detail_stats(entry.description)
+                profile = parsed
+            if profile.attack_bonus is None and profile.damage_dice is None:
+                continue
+            strikes.extend((entry.name, profile) for _ in range(2))
+            break
+
+    return strikes
 
 
 def resolve_attack_profile(
@@ -407,6 +480,32 @@ def resolve_attack(
         return messages
 
     clean_name = clean_action_label(data.action_name)
+    if "multiattack" in clean_name.casefold():
+        monster = lookup_monster(actor.srd_name or actor.name)
+        strikes = _multiattack_strikes(actor, monster, detail=data.detail)
+        if not strikes:
+            message = f"{actor.name} uses Multiattack on {target.name} — attack profiles not available."
+            messages.append(message)
+            append_log(state, message, kind="action", actor=actor.name)
+            return messages
+
+        for strike_index, (strike_name, profile) in enumerate(strikes):
+            if profile.attack_bonus is None:
+                continue
+            strike_messages = _resolve_attack_strike(
+                state,
+                actor=actor,
+                target=target,
+                clean_name=strike_name,
+                profile=profile,
+                strike_index=strike_index,
+                strike_count=len(strikes),
+            )
+            messages.extend(strike_messages)
+            if strike_index == 0 and _helped_by_advantage(state, actor.id):
+                _consume_help_for_actor(state, actor.id)
+        return messages
+
     profile = resolve_attack_profile(
         session,
         campaign_id,

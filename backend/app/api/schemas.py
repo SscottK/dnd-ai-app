@@ -312,6 +312,7 @@ class CharacterRead(BaseModel):
     portrait_photo_id: int | None = None
     dnd_beyond_url: str | None
     created_at: datetime
+    parse_warning: str | None = None
 
 
 class CharacterPhotoRead(BaseModel):

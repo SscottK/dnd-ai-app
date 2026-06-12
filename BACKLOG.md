@@ -4,19 +4,7 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 
 ---
 
-## P3 — Sheet & combat depth (next up)
-
-| Status | Item |
-|--------|------|
-| pending | PDF import / resync reliability (attacks, resources, bonuses) |
-| pending | Turn-action UI: correct slots, dedupe, submenus (Wild Shape, etc.) |
-| pending | Combat resolution: multi-attack, resource spend, attack profiles |
-| pending | Encounter ↔ character sync — resource pools still sheet-only during combat |
-| pending | Verify notes/logging flow — archive modal / edge cases (core path tested) |
-
----
-
-## P4 — Social features
+## P4 — Social features (next up)
 
 | Status | Item |
 |--------|------|
@@ -49,6 +37,13 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 
 | Item |
 |------|
+| **P3 — Sheet & combat depth (complete)** |
+| P3 — PDF resync merge (resource current, orphaned pools, AC overrides); parse_warning on refresh |
+| P3 — Turn-action UI (display filter, magic-action spells, hide broken option menus) |
+| P3 — Combat resolution (Multiattack strikes, spell attack profiles, resource spend after resolve) |
+| P3 — Encounter sync (resource poll while sheet dirty; HP/AC/conditions tests) |
+| P3 — Notes/logging (archive dedupe, reopen merges content, play-session tab titles) |
+| P3 — Full Sheet entry points verified (digital default; legacy `/sheet` → digital) |
 | P2 — Action economy accent (orange labels + Action/Bonus/Magic/Reaction buttons) |
 | P2 — Heal target validation (full HP targets filtered client + server) |
 | P2 — Limited-use sync (server-enforced spend; DM panel hidden for player-controlled PCs; resource polling) |
@@ -64,9 +59,6 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 | P2 — Skill/save rolls → action log |
 | P2 — Initiative first turn when enemies added before party |
 | P2 — Combat log shared with all players on victory/end |
-| P3 — Full Sheet entry points verified (digital default; legacy `/sheet` → digital) |
-| P3 — Notes/logging: combat & action log distribution tests; live session reloads layout on log |
-| P3 — Encounter↔character sync tests (HP/AC/conditions bidirectional) |
 | Hidden enemies (encounter library + reveal during combat) |
 | Initiative tracker — monster stats hidden from players |
 | Session pane resize scales proportionally on shrink |
@@ -88,3 +80,12 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 | Item | Reason |
 |------|--------|
 | Full PHB/bestiary ingest | Licensing; SRD-only ceiling |
+
+---
+
+## P3 follow-ups (optional polish, not blocking P4)
+
+- Equip/unequip submenu in turn-action UI (helpers exist, not wired)
+- DM tracker: show resource pools for all party PCs without selecting each
+- PDF spell-slot row ingest from Gemini (catalog-only today)
+- Broader combat resolution (multi-target Extra Attack, full attack-profile catalog)

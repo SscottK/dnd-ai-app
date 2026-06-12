@@ -1017,14 +1017,14 @@ def use_encounter_action(
         self_heal_effect = will_resolve_self_heal(resolved_data)
         skip_economy = skips_action_economy(resolved_data.action_name)
 
-        resource_messages = spend_action_resource(
+        from app.services.resource_actions import ensure_action_resource_available
+
+        ensure_action_resource_available(
             session,
             campaign_id,
             actor=actor,
             data=resolved_data,
         )
-        for message in resource_messages:
-            append_log(state, message, kind="action", actor=actor.name)
 
         log_before = len(state.combat_log)
         if not skip_economy:
@@ -1084,6 +1084,15 @@ def use_encounter_action(
                 ]
             if not action_messages:
                 action_messages = [f"{actor.name} uses {resolved_data.action_name}."]
+
+        resource_messages = spend_action_resource(
+            session,
+            campaign_id,
+            actor=actor,
+            data=resolved_data,
+        )
+        for message in resource_messages:
+            append_log(state, message, kind="action", actor=actor.name)
         if resource_messages:
             action_messages = [*resource_messages, *action_messages]
     except ValueError as exc:

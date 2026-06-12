@@ -81,7 +81,12 @@ def distribute_action_log_to_player_notes(
         except (json.JSONDecodeError, TypeError, ValueError):
             layout = {}
         character.layout_json = json.dumps(
-            append_text_to_notes_tab(layout, tab_id, action_log_text)
+            append_text_to_notes_tab(
+                layout,
+                tab_id,
+                action_log_text,
+                tab_title=tab_title,
+            )
         )
         session.add(character)
         updated += 1

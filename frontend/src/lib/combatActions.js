@@ -162,8 +162,15 @@ export function actionNeedsReadyDetail(action) {
   return action.id === "std-ready" || actionNameKey(action.name) === "ready";
 }
 
+function isTurnMenuAction(raw) {
+  const display = raw?.display;
+  if (!Array.isArray(display) || display.length === 0) return true;
+  return display.includes("turn_actions");
+}
+
 export function canSelectTurnAction(action) {
   if (!action || isPassiveTurnAction(action)) return false;
+  if (action.requiresOption && !actionHasOptions(action)) return false;
   if (ON_HIT_RIDERS.has(actionNameKey(action.name))) return false;
   if (action.actionType === ACTION_TYPES.magic_action) return true;
   if (!actionNeedsTarget(action)) return true;
@@ -501,6 +508,18 @@ export function unequipItemAction(item, slotType = ACTION_TYPES.action) {
   );
 }
 
+function spellActionType(spell) {
+  const explicit = spell.action_type || spell.actionType;
+  if (explicit === ACTION_TYPES.magic_action || explicit === "magic_action") {
+    return ACTION_TYPES.magic_action;
+  }
+  const level = spell.level ?? spell.spell_level;
+  if (Number(level) > 0 && (!explicit || explicit === ACTION_TYPES.action)) {
+    return ACTION_TYPES.magic_action;
+  }
+  return explicit || ACTION_TYPES.action;
+}
+
 function spellActions(sheet) {
   return (sheet?.spells || [])
     .filter((spell) => spell?.name && spell.prepared !== false)
@@ -511,9 +530,10 @@ function spellActions(sheet) {
         {
           id: spell.id || `spell-${spell.name}`,
           name: `${spell.name}${suffix}`,
-          action_type: spell.action_type || spell.actionType || ACTION_TYPES.action,
+          action_type: spellActionType(spell),
           targeting: spell.targeting,
           description: spell.description,
+          display: spell.display,
         },
         index,
         "spell"
@@ -575,6 +595,7 @@ function combatActionCategory(action) {
 
 function explicitSheetActions(sheet) {
   return (sheet?.combat_actions || [])
+    .filter((action) => isTurnMenuAction(action))
     .map((action, index) => normalizeCombatAction(action, index, combatActionCategory(action)))
     .filter(Boolean);
 }
@@ -583,6 +604,7 @@ function featureActions(sheet) {
   return (sheet?.features || [])
     .filter(
       (feat) =>
+        isTurnMenuAction(feat) &&
         feat?.action_type &&
         feat?.targeting &&
         !isPassiveTurnAction(feat) &&

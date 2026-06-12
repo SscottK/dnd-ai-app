@@ -41,11 +41,13 @@ class NotesLoggingTests(unittest.TestCase):
             layout,
             "notes-play-99",
             "Stealth check: 18",
+            tab_title="Session — Jun 5, 2026",
             switch_active=False,
         )
         widget = next(w for w in updated["widgets"] if w["type"] == "player_notes")
         tab = next(t for t in widget["playerNotesTabs"] if t["id"] == "notes-play-99")
         self.assertEqual(tab["content"], "Stealth check: 18")
+        self.assertEqual(tab["title"], "Session — Jun 5, 2026")
 
     def test_build_combat_log_text_includes_order_and_events(self) -> None:
         state = EncounterState(

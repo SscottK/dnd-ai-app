@@ -173,7 +173,7 @@ async def read_and_store_pdf(current_user: CurrentUser, file: UploadFile) -> tup
     return dest, stored_name
 
 
-async def parse_and_apply_pdf(character: Character, pdf_file: Path, session: SessionDep) -> None:
+async def parse_and_apply_pdf(character: Character, pdf_file: Path, session: SessionDep) -> str | None:
     try:
         parsed = await parse_character_from_pdf(pdf_file)
     except ValueError as exc:
@@ -184,7 +184,7 @@ async def parse_and_apply_pdf(character: Character, pdf_file: Path, session: Ses
             detail="Could not parse character sheet from PDF",
         ) from exc
 
-    parsed.pop("parse_warning", None)
+    warning = parsed.pop("parse_warning", None)
     apply_parsed_to_character(character, parsed)
     session.add(character)
     session.commit()
@@ -207,6 +207,8 @@ async def parse_and_apply_pdf(character: Character, pdf_file: Path, session: Ses
         )
         session.commit()
         session.refresh(character)
+
+    return warning
 
 
 def apply_parsed_to_character(character: Character, parsed: dict) -> None:
@@ -457,8 +459,11 @@ async def refresh_character_from_pdf(
             detail="Stored PDF not found. Please re-upload.",
         )
 
-    await parse_and_apply_pdf(character, pdf_file, session)
-    return to_character_read(character, session)
+    warning = await parse_and_apply_pdf(character, pdf_file, session)
+    result = to_character_read(character, session)
+    if warning:
+        return result.model_copy(update={"parse_warning": warning})
+    return result
 
 
 @router.post("/{character_id}/upload-pdf", response_model=CharacterRead)
@@ -487,7 +492,7 @@ async def upload_character_pdf(
     try:
         delete_stored_pdf(character)
         character.pdf_path = f"{current_user.id}/{stored_name}"
-        await parse_and_apply_pdf(character, dest, session)
+        warning = await parse_and_apply_pdf(character, dest, session)
     except HTTPException:
         dest.unlink(missing_ok=True)
         raise
@@ -498,7 +503,10 @@ async def upload_character_pdf(
             detail="Could not replace character PDF",
         ) from exc
 
-    return to_character_read(character, session)
+    result = to_character_read(character, session)
+    if warning:
+        return result.model_copy(update={"parse_warning": warning})
+    return result
 
 
 @router.post("", response_model=CharacterRead, status_code=status.HTTP_201_CREATED)

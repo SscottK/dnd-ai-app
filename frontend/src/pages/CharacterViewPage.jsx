@@ -81,7 +81,11 @@ export function CharacterViewPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || "Re-sync failed");
       }
-      setCharacter(await res.json());
+      const data = await res.json();
+      setCharacter(data);
+      if (data.parse_warning) {
+        setError(data.parse_warning);
+      }
     } catch (err) {
       setError(err.message || "Could not re-sync from PDF.");
     } finally {
