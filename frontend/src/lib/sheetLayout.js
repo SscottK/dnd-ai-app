@@ -582,6 +582,19 @@ export function pullWidgetsIntoView(widgets, canvasW, canvasH, viewportScale = 1
   return clamped.map((widget) => recoveredById.get(widget.id) || widget);
 }
 
+/** Bounding box of all widgets in layout coordinates. */
+export function inferLayoutExtents(widgets) {
+  let maxRight = 0;
+  let maxBottom = 0;
+  for (const widget of widgets || []) {
+    const height = widget?.minimized ? MIN_PANE_HEIGHT : widget?.h ?? 0;
+    const width = widget?.w ?? 0;
+    maxRight = Math.max(maxRight, (widget?.x ?? 0) + width);
+    maxBottom = Math.max(maxBottom, (widget?.y ?? 0) + height);
+  }
+  return { maxRight, maxBottom };
+}
+
 /** Scale pane positions and sizes proportionally when the viewport changes, then clamp. */
 export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH, viewportScale = 1) {
   if (!prevW || !prevH || (prevW === nextW && prevH === nextH)) {
@@ -592,14 +605,15 @@ export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH, viewp
   const scaleY = nextH / prevH;
 
   const scaled = widgets.map((widget) => {
-    const expandedH = widget.expandedH ?? widget.h;
+    const expandedH = widget.expandedH ?? widget.h ?? MIN_PANE_HEIGHT;
+    const currentH = widget.minimized ? MIN_PANE_HEIGHT : widget.h ?? expandedH;
     const next = {
       ...widget,
       x: Math.round(widget.x * scaleX),
       y: Math.round(widget.y * scaleY),
       w: Math.round(widget.w * scaleX),
       expandedH: Math.round(expandedH * scaleY),
-      h: widget.minimized ? MIN_PANE_HEIGHT : Math.round(expandedH * scaleY),
+      h: widget.minimized ? MIN_PANE_HEIGHT : Math.round(currentH * scaleY),
     };
     return clampWidget(next, nextW, nextH, viewportScale);
   });

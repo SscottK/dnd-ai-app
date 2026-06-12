@@ -73,6 +73,7 @@ import {
 import {
   attachSessionCanvasResizeListeners,
   resolveCanvasResizeAction,
+  widgetsOverflowCanvas,
 } from "../lib/sessionCanvasResize";
 import { NotesArchiveModal } from "../components/notes/NotesArchiveModal";
 import {
@@ -103,6 +104,7 @@ export function SessionPlayPage() {
   const canvasRef = useRef(null);
   const paneMenuRef = useRef(null);
   const canvasBoundsRef = useRef({ width: 0, height: 0 });
+  const lastReflowBoundsRef = useRef({ width: 0, height: 0 });
   const boundsLockedRef = useRef(false);
   const interactingRef = useRef(false);
   const resizeSaveTimer = useRef(null);
@@ -272,6 +274,7 @@ export function SessionPlayPage() {
         widgets,
         viewport: withCanvasViewport(base.viewport, size.width, size.height),
       };
+      lastReflowBoundsRef.current = { width: size.width, height: size.height };
       if (dmMode) {
         writeStoredDmLayout(campaignId, next);
       }
@@ -776,18 +779,40 @@ export function SessionPlayPage() {
     };
 
     const remeasureCanvas = ({ finalize = false } = {}) => {
+      if (interactingRef.current) return;
+
       const measured = measureCanvas();
       if (!measured) return;
 
+      canvasBoundsRef.current = { width: measured.width, height: measured.height };
       const layoutSnapshot = layoutRef.current;
-      const action = resolveCanvasResizeAction(
-        measured,
-        layoutSnapshot?.viewport,
-        layoutSnapshot?.widgets
-      );
+      const viewportScale = layoutSnapshot?.viewport?.scale ?? DEFAULT_ZOOM;
 
+      if (!finalize) {
+        if (
+          widgetsOverflowCanvas(
+            layoutSnapshot?.widgets,
+            measured.width,
+            measured.height,
+            viewportScale
+          )
+        ) {
+          applyLayoutRecovery(measured.width, measured.height, {
+            reflow: false,
+            updateViewport: false,
+          });
+        }
+        return;
+      }
+
+      if (!lastReflowBoundsRef.current.width || !lastReflowBoundsRef.current.height) {
+        lastReflowBoundsRef.current = { width: measured.width, height: measured.height };
+        return;
+      }
+
+      const action = resolveCanvasResizeAction(measured, lastReflowBoundsRef.current);
       if (action?.reflow) {
-        canvasBoundsRef.current = { width: action.nextW, height: action.nextH };
+        lastReflowBoundsRef.current = { width: action.nextW, height: action.nextH };
         applyLayoutRecovery(action.nextW, action.nextH, {
           reflow: true,
           prevW: action.prevW,
@@ -798,18 +823,25 @@ export function SessionPlayPage() {
         return;
       }
 
-      if (finalize) {
-        canvasBoundsRef.current = { width: measured.width, height: measured.height };
+      if (
+        widgetsOverflowCanvas(
+          layoutSnapshot?.widgets,
+          measured.width,
+          measured.height,
+          viewportScale
+        )
+      ) {
         applyLayoutRecovery(measured.width, measured.height, {
           reflow: false,
-          updateViewport: false,
+          updateViewport: true,
         });
       }
     };
 
     return attachSessionCanvasResizeListeners({
       getCanvasEl: () => canvasRef.current,
-      onRemeasure: () => remeasureCanvas({ finalize: true }),
+      onRemeasure: () => remeasureCanvas({ finalize: false }),
+      onResizeEnd: () => remeasureCanvas({ finalize: true }),
     });
   }, [
     sessionStatus?.session_active,
@@ -868,6 +900,7 @@ export function SessionPlayPage() {
           : prev),
         viewport: withCanvasViewport(prev.viewport, width, height),
       };
+      lastReflowBoundsRef.current = { width, height };
       layoutRef.current = next;
       setLayout(next);
       saveLayoutSnapshot(next);
