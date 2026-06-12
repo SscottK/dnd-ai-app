@@ -181,12 +181,18 @@ function appendTextToSessionNotesTab(layout, combatLogText, widgetType, tabsKey,
   return { ...layout, widgets: nextWidgets };
 }
 
-/** Ensure the current play-session tab exists and is active (DM or player notes). */
+/** Ensure a play-session tab exists; optionally switch the active tab. */
 export function ensurePlaySessionNotesTab(
   layout,
   tabId,
   tabTitle,
-  { widgetType = "player_notes", tabsKey = "playerNotesTabs", canvasW, canvasH } = {}
+  {
+    widgetType = "player_notes",
+    tabsKey = "playerNotesTabs",
+    canvasW,
+    canvasH,
+    switchActive = true,
+  } = {}
 ) {
   if (!tabId || !tabTitle) return layout;
 
@@ -214,13 +220,39 @@ export function ensurePlaySessionNotesTab(
     ? existingTabs
     : [{ id: tabId, title: tabTitle, content: "" }, ...existingTabs];
 
+  const priorActive = notesWidget.activeNotesTabId;
   const nextWidgets = widgets.map((widget) =>
     widget.id === notesWidget.id
-      ? { ...widget, [tabsKey]: nextTabs, activeNotesTabId: tabId }
+      ? {
+          ...widget,
+          [tabsKey]: nextTabs,
+          activeNotesTabId: switchActive ? tabId : priorActive || tabId,
+        }
       : widget
   );
 
   return { ...layout, widgets: nextWidgets };
+}
+
+/** Ensure session notes + session logs tabs exist (notes tab active). */
+export function ensurePlaySessionTabs(
+  layout,
+  notesTabId,
+  notesTabTitle,
+  logsTabId,
+  logsTabTitle,
+  options = {}
+) {
+  if (!notesTabId || !notesTabTitle || !logsTabId || !logsTabTitle) return layout;
+  let next = ensurePlaySessionNotesTab(layout, notesTabId, notesTabTitle, {
+    ...options,
+    switchActive: true,
+  });
+  next = ensurePlaySessionNotesTab(next, logsTabId, logsTabTitle, {
+    ...options,
+    switchActive: false,
+  });
+  return next;
 }
 
 function ensureNotesTabOnWidget(notesWidget, tabsKey, tabId, tabTitle) {

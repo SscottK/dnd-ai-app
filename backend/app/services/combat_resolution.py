@@ -14,6 +14,7 @@ from app.services.character_sheet import parse_sheet_json
 from app.services.combat_dice import format_roll_detail, roll_d20_check, roll_dice_expression
 from app.services.combat_log import append_log
 from app.services.action_rules import lookup_combat_action, lookup_spell, parse_healing_dice
+from app.services.attack_economy import attack_budget_for_actor, use_weapon_attack
 from app.services.monster_catalog import lookup_monster
 from app.services.weapon_attacks import (
     clean_action_label,
@@ -120,6 +121,71 @@ def _delegate_melee_attack_profile(sheet: dict) -> AttackProfile:
             damage_dice=extract_damage_dice(first.get("damage")),
         )
     return AttackProfile()
+
+
+def _spell_catalog_attack_profile(action_name: str) -> AttackProfile:
+    catalog = lookup_spell(clean_action_label(action_name))
+    if not catalog:
+        return AttackProfile()
+    damage_dice = None
+    for row in catalog.get("damage") or []:
+        if isinstance(row, dict) and row.get("dice"):
+            damage_dice = extract_damage_dice(str(row["dice"]))
+            if damage_dice:
+                break
+    if not damage_dice:
+        damage_dice = extract_damage_dice(str(catalog.get("description") or ""))
+    attack_bonus = catalog.get("attack_bonus") or catalog.get("to_hit")
+    if attack_bonus is None and damage_dice is None:
+        return AttackProfile()
+    return AttackProfile(attack_bonus=attack_bonus, damage_dice=damage_dice)
+
+
+def _catalog_action_profile(action_name: str) -> AttackProfile:
+    catalog = lookup_combat_action(clean_action_label(action_name))
+    if not catalog:
+        return AttackProfile()
+    attack_bonus = catalog.get("attack_bonus") or catalog.get("to_hit")
+    damage_dice = catalog.get("damage_dice")
+    if not damage_dice:
+        damage_dice = extract_damage_dice(str(catalog.get("description") or ""))
+    if attack_bonus is None and not damage_dice:
+        parsed = _parse_detail_stats(str(catalog.get("description") or ""))
+        return parsed
+    return AttackProfile(attack_bonus=attack_bonus, damage_dice=damage_dice)
+
+
+def _is_weapon_attack_request(
+    action_id: str,
+    targeting: str,
+    profile: AttackProfile,
+) -> bool:
+    if targeting != "one_enemy":
+        return False
+    if action_id.startswith(_DIRECT_ATTACK_PREFIXES) or action_id.startswith("weapon-"):
+        return True
+    if profile.attack_bonus is not None or profile.damage_dice:
+        return True
+    return False
+
+
+def _remaining_weapon_swings(
+    state: EncounterState,
+    session: Session,
+    campaign_id: int,
+    actor: EncounterCombatant,
+) -> int:
+    from app.api.schemas import TurnEconomySnapshot
+
+    economy = state.turn_economy.get(actor.id, TurnEconomySnapshot())
+    budget = attack_budget_for_actor(session, campaign_id, actor)
+    if economy.attacks_remaining > 0:
+        return economy.attacks_remaining
+    if not economy.action_used:
+        return budget
+    if economy.extra_action_available:
+        return budget
+    return 0
 
 
 def _spell_action_profile(sheet: dict, action_id: str, action_name: str) -> AttackProfile:
@@ -247,6 +313,12 @@ def resolve_attack_profile(
         monster = lookup_monster(actor.name)
         if monster is not None:
             profile = _srd_action_profile(monster, clean_name)
+
+    if profile.attack_bonus is None and profile.damage_dice is None:
+        profile = _catalog_action_profile(clean_name)
+
+    if action_id.startswith(_SPELL_ATTACK_PREFIX) and profile.attack_bonus is None and profile.damage_dice is None:
+        profile = _spell_catalog_attack_profile(clean_name)
 
     if actor.character_id and profile.attack_bonus is None and profile.damage_dice is None:
         character = session.get(Character, actor.character_id)
@@ -464,7 +536,7 @@ def resolve_self_heal(
 
 
 def resolve_attack(
-    session: Session,
+    session: Session | None,
     campaign_id: int,
     state: EncounterState,
     *,
@@ -472,15 +544,16 @@ def resolve_attack(
     data: UseActionRequest,
 ) -> list[str]:
     messages: list[str] = []
-    if len(data.target_ids) != 1:
-        return messages
-
-    target = _find_combatant(state, data.target_ids[0])
-    if target is None:
+    target_ids = list(data.target_ids or [])
+    if not target_ids:
         return messages
 
     clean_name = clean_action_label(data.action_name)
-    if "multiattack" in clean_name.casefold():
+
+    if len(target_ids) == 1 and "multiattack" in clean_name.casefold():
+        target = _find_combatant(state, target_ids[0])
+        if target is None:
+            return messages
         monster = lookup_monster(actor.srd_name or actor.name)
         strikes = _multiattack_strikes(actor, monster, detail=data.detail)
         if not strikes:
@@ -489,15 +562,15 @@ def resolve_attack(
             append_log(state, message, kind="action", actor=actor.name)
             return messages
 
-        for strike_index, (strike_name, profile) in enumerate(strikes):
-            if profile.attack_bonus is None:
+        for strike_index, (strike_name, strike_profile) in enumerate(strikes):
+            if strike_profile.attack_bonus is None:
                 continue
             strike_messages = _resolve_attack_strike(
                 state,
                 actor=actor,
                 target=target,
                 clean_name=strike_name,
-                profile=profile,
+                profile=strike_profile,
                 strike_index=strike_index,
                 strike_count=len(strikes),
             )
@@ -520,6 +593,50 @@ def resolve_attack(
         targeting=data.targeting,
         profile=profile,
     ):
+        return messages
+
+    if (
+        len(target_ids) > 1
+        and session is not None
+        and _is_weapon_attack_request(data.action_id, data.targeting, profile)
+    ):
+        remaining = _remaining_weapon_swings(state, session, campaign_id, actor)
+        if len(target_ids) > remaining:
+            raise ValueError(
+                f"Not enough attacks remaining ({remaining}) for {len(target_ids)} targets."
+            )
+        for index, target_id in enumerate(target_ids):
+            target = _find_combatant(state, target_id)
+            if target is None:
+                continue
+            swing = data.model_copy(update={"target_ids": [target_id]})
+            use_weapon_attack(
+                state,
+                session,
+                campaign_id,
+                actor=actor,
+                data=swing,
+            )
+            messages.extend(
+                _resolve_attack_strike(
+                    state,
+                    actor=actor,
+                    target=target,
+                    clean_name=clean_name,
+                    profile=profile,
+                    strike_index=index,
+                    strike_count=len(target_ids),
+                )
+            )
+            if index == 0 and _helped_by_advantage(state, actor.id):
+                _consume_help_for_actor(state, actor.id)
+        return messages
+
+    if len(target_ids) != 1:
+        return messages
+
+    target = _find_combatant(state, target_ids[0])
+    if target is None:
         return messages
 
     if profile.attack_bonus is None:

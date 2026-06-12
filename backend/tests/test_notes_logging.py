@@ -35,19 +35,51 @@ class NotesLoggingTests(unittest.TestCase):
         self.assertIn("Round 3 ended.", log_tab["content"])
         self.assertEqual(widget["activeNotesTabId"], "notes-session")
 
-    def test_action_log_appends_to_play_session_tab(self) -> None:
-        layout = {"widgets": []}
+    def test_action_log_appends_to_session_logs_tab(self) -> None:
+        layout = {
+            "widgets": [
+                {
+                    "type": "player_notes",
+                    "playerNotesTabs": [
+                        {"id": "notes-play-99", "title": "Session — Jun 5, 2026", "content": ""},
+                    ],
+                    "activeNotesTabId": "notes-play-99",
+                }
+            ]
+        }
         updated = append_text_to_notes_tab(
             layout,
-            "notes-play-99",
+            "logs-play-99",
             "Stealth check: 18",
-            tab_title="Session — Jun 5, 2026",
+            tab_title="Logs — Jun 5, 2026",
             switch_active=False,
         )
         widget = next(w for w in updated["widgets"] if w["type"] == "player_notes")
-        tab = next(t for t in widget["playerNotesTabs"] if t["id"] == "notes-play-99")
+        tab = next(t for t in widget["playerNotesTabs"] if t["id"] == "logs-play-99")
         self.assertEqual(tab["content"], "Stealth check: 18")
-        self.assertEqual(tab["title"], "Session — Jun 5, 2026")
+        self.assertEqual(tab["title"], "Logs — Jun 5, 2026")
+        self.assertEqual(widget["activeNotesTabId"], "notes-play-99")
+
+    def test_new_play_session_creates_notes_and_logs_tabs(self) -> None:
+        from app.services.play_session_notes import (
+            add_play_session_tabs_to_layout,
+            new_play_session_tabs,
+            play_session_payload,
+        )
+
+        notes_id, notes_title, logs_id, logs_title = new_play_session_tabs()
+        payload = play_session_payload(notes_id, notes_title, logs_id, logs_title)
+        self.assertEqual(payload["notes_tab_id"], notes_id)
+        self.assertEqual(payload["logs_tab_id"], logs_id)
+
+        layout = add_play_session_tabs_to_layout(
+            None, notes_id, notes_title, logs_id, logs_title
+        )
+        widget = layout["widgets"][0]
+        tab_ids = [tab["id"] for tab in widget["playerNotesTabs"]]
+        self.assertIn(notes_id, tab_ids)
+        self.assertIn(logs_id, tab_ids)
+        self.assertEqual(widget["activeNotesTabId"], notes_id)
 
     def test_build_combat_log_text_includes_order_and_events(self) -> None:
         state = EncounterState(

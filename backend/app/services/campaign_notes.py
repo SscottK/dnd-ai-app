@@ -142,7 +142,12 @@ def get_or_create_user_notes(
 
 
 def append_text_to_notes_doc(
-    doc: dict, tab_id: str, text: str, *, tab_title: str = "Session"
+    doc: dict,
+    tab_id: str,
+    text: str,
+    *,
+    tab_title: str = "Session",
+    switch_active: bool = True,
 ) -> dict:
     merged = dict(doc)
     tabs = list(merged.get("tabs") or [])
@@ -161,8 +166,9 @@ def append_text_to_notes_doc(
     if not any(tab.get("id") == tab_id for tab in next_tabs):
         next_tabs.insert(0, next_target)
 
+    prior_active = merged.get("activeTabId")
     merged["tabs"] = next_tabs
-    merged["activeTabId"] = tab_id
+    merged["activeTabId"] = tab_id if switch_active else (prior_active or tab_id)
     return merged
 
 
@@ -194,11 +200,18 @@ def distribute_text_to_campaign_notes(
     text: str,
     *,
     tab_title: str = "Session",
+    switch_active: bool = True,
 ) -> int:
     updated = 0
     for user_id in campaign_participant_user_ids(session, campaign):
         doc = get_or_create_user_notes(session, user_id, campaign.id, migrate=True)
-        next_doc = append_text_to_notes_doc(doc, tab_id, text, tab_title=tab_title)
+        next_doc = append_text_to_notes_doc(
+            doc,
+            tab_id,
+            text,
+            tab_title=tab_title,
+            switch_active=switch_active,
+        )
         save_notes_document(session, user_id, campaign.id, next_doc)
         updated += 1
     return updated
@@ -211,6 +224,47 @@ def distribute_play_session_tab_to_notes(
     for user_id in campaign_participant_user_ids(session, campaign):
         doc = get_or_create_user_notes(session, user_id, campaign.id, migrate=True)
         next_doc = add_play_session_tab_to_doc(doc, tab_id, tab_title)
+        save_notes_document(session, user_id, campaign.id, next_doc)
+        updated += 1
+    return updated
+
+
+def add_play_session_tabs_to_doc(
+    doc: dict,
+    notes_tab_id: str,
+    notes_tab_title: str,
+    logs_tab_id: str,
+    logs_tab_title: str,
+) -> dict:
+    merged = add_play_session_tab_to_doc(doc, notes_tab_id, notes_tab_title)
+    tabs = list(merged.get("tabs") or [])
+    if not any(tab.get("id") == logs_tab_id for tab in tabs):
+        merged["tabs"] = [
+            {"id": logs_tab_id, "title": logs_tab_title, "content": ""},
+            *tabs,
+        ]
+    merged["activeTabId"] = notes_tab_id
+    return merged
+
+
+def distribute_play_session_tabs_to_notes(
+    session: Session,
+    campaign: Campaign,
+    notes_tab_id: str,
+    notes_tab_title: str,
+    logs_tab_id: str,
+    logs_tab_title: str,
+) -> int:
+    updated = 0
+    for user_id in campaign_participant_user_ids(session, campaign):
+        doc = get_or_create_user_notes(session, user_id, campaign.id, migrate=True)
+        next_doc = add_play_session_tabs_to_doc(
+            doc,
+            notes_tab_id,
+            notes_tab_title,
+            logs_tab_id,
+            logs_tab_title,
+        )
         save_notes_document(session, user_id, campaign.id, next_doc)
         updated += 1
     return updated

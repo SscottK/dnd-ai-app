@@ -83,9 +83,14 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 
 ---
 
-## P3 follow-ups (optional polish, not blocking P4)
+## P3 follow-ups (done)
 
-- Equip/unequip submenu in turn-action UI (helpers exist, not wired)
-- DM tracker: show resource pools for all party PCs without selecting each
-- PDF spell-slot row ingest from Gemini (catalog-only today)
-- Broader combat resolution (multi-target Extra Attack, full attack-profile catalog)
+- Equip/unequip submenu in turn-action UI (wired via `onInventoryEquip`)
+- DM tracker: resource pools for all party PCs on initiative rows
+- PDF spell-slot row ingest (`enrich_resources` normalizes Gemini spell-slot rows)
+
+## P3 follow-ups (done, continued)
+
+- Multi-target Extra Attack (one action, multiple `target_ids`)
+- Attack profiles from combat/spell catalogs + SRD stat blocks
+- Session logs tab: combat + action logs append to per-session logs tab, not notes tab

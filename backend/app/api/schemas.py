@@ -191,6 +191,8 @@ class CampaignSessionStatus(BaseModel):
     last_action_log_id: int | None = None
     play_session_notes_tab_id: str | None = None
     play_session_notes_tab_title: str | None = None
+    play_session_logs_tab_id: str | None = None
+    play_session_logs_tab_title: str | None = None
     action_log_text: str | None = None
 
 

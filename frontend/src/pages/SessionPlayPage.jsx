@@ -46,7 +46,7 @@ import {
   SINGLETON_WIDGET_TYPES,
   appendEncounterDmNotesTab,
   applyServerNotesToLayout,
-  ensurePlaySessionNotesTab,
+  ensurePlaySessionTabs,
   extractNotesPayloadFromLayout,
   notesDocHasContent,
   clampWidget,
@@ -433,7 +433,9 @@ export function SessionPlayPage() {
     (status, { save = false } = {}) => {
       const tabId = status?.play_session_notes_tab_id;
       const tabTitle = status?.play_session_notes_tab_title;
-      if (!tabId || !tabTitle) return;
+      const logsTabId = status?.play_session_logs_tab_id;
+      const logsTabTitle = status?.play_session_logs_tab_title;
+      if (!tabId || !tabTitle || !logsTabId || !logsTabTitle) return;
 
       const dmMode = Boolean(status?.is_owner && !status?.character_id);
       const { width, height } = canvasBoundsRef.current;
@@ -441,7 +443,7 @@ export function SessionPlayPage() {
       const tabsKey = dmMode ? "dmNotesTabs" : "playerNotesTabs";
 
       setLayout((prev) => {
-        const next = ensurePlaySessionNotesTab(prev, tabId, tabTitle, {
+        const next = ensurePlaySessionTabs(prev, tabId, tabTitle, logsTabId, logsTabTitle, {
           widgetType,
           tabsKey,
           canvasW: width || 1280,
@@ -552,11 +554,18 @@ export function SessionPlayPage() {
         const migrated = hydrateCharacter(await charRes.json());
         const { width, height } = canvasBoundsRef.current;
         let nextLayout = layoutRef.current;
-        if (status.play_session_notes_tab_id && status.play_session_notes_tab_title) {
-          nextLayout = ensurePlaySessionNotesTab(
+        if (
+          status.play_session_notes_tab_id &&
+          status.play_session_notes_tab_title &&
+          status.play_session_logs_tab_id &&
+          status.play_session_logs_tab_title
+        ) {
+          nextLayout = ensurePlaySessionTabs(
             nextLayout,
             status.play_session_notes_tab_id,
             status.play_session_notes_tab_title,
+            status.play_session_logs_tab_id,
+            status.play_session_logs_tab_title,
             {
               widgetType: "player_notes",
               tabsKey: "playerNotesTabs",
@@ -588,11 +597,18 @@ export function SessionPlayPage() {
         const bootH = bootSize.height > 0 ? bootSize.height : 800;
         const hydrated = stored ? hydrateLayout(stored, bootW, bootH) : null;
         let nextLayout = hydrated || { widgets: [], viewport: defaultViewport(DEFAULT_ZOOM, bootW, bootH) };
-        if (status.play_session_notes_tab_id && status.play_session_notes_tab_title) {
-          nextLayout = ensurePlaySessionNotesTab(
+        if (
+          status.play_session_notes_tab_id &&
+          status.play_session_notes_tab_title &&
+          status.play_session_logs_tab_id &&
+          status.play_session_logs_tab_title
+        ) {
+          nextLayout = ensurePlaySessionTabs(
             nextLayout,
             status.play_session_notes_tab_id,
             status.play_session_notes_tab_title,
+            status.play_session_logs_tab_id,
+            status.play_session_logs_tab_title,
             {
               widgetType: "dm_notes",
               tabsKey: "dmNotesTabs",
@@ -1392,6 +1408,7 @@ export function SessionPlayPage() {
             }
             onCombatEnded={handleCombatEnded}
             onSheetRefresh={refreshPlaySheet}
+            onSheetChange={onSheetChange}
           />
         );
       case "dm_rules_chat":

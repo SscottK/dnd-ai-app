@@ -10,7 +10,10 @@ from sqlmodel import Session, select
 from app.api.schemas import ActionLogEntry
 from app.db.models import Campaign, CampaignMember, Character, SessionActionLog
 from app.services.campaign_notes import distribute_text_to_campaign_notes
-from app.services.play_session_notes import active_notes_tab, append_text_to_notes_tab
+from app.services.play_session_notes import (
+    active_logs_tab,
+    append_text_to_notes_tab,
+)
 
 
 def utc_now_iso() -> str:
@@ -67,7 +70,7 @@ def build_action_log_text(entries: list[ActionLogEntry]) -> str:
 def distribute_action_log_to_player_notes(
     session: Session, campaign: Campaign, action_log_text: str
 ) -> int:
-    tab_id, tab_title = active_notes_tab(campaign)
+    tab_id, tab_title = active_logs_tab(campaign)
     members = session.exec(
         select(CampaignMember).where(CampaignMember.campaign_id == campaign.id)
     ).all()
@@ -86,12 +89,63 @@ def distribute_action_log_to_player_notes(
                 tab_id,
                 action_log_text,
                 tab_title=tab_title,
+                switch_active=False,
             )
         )
         session.add(character)
         updated += 1
     updated += distribute_text_to_campaign_notes(
-        session, campaign, tab_id, action_log_text, tab_title=tab_title
+        session,
+        campaign,
+        tab_id,
+        action_log_text,
+        tab_title=tab_title,
+        switch_active=False,
+    )
+    return updated
+
+
+def distribute_action_log_entry(
+    session: Session, campaign: Campaign, entry: ActionLogEntry
+) -> int:
+    """Append a single action-log line to the active session logs tab."""
+    if not campaign.session_active:
+        return 0
+    lines = format_action_log_entries([entry])
+    if not lines:
+        return 0
+    text = lines[0]
+    tab_id, tab_title = active_logs_tab(campaign)
+    members = session.exec(
+        select(CampaignMember).where(CampaignMember.campaign_id == campaign.id)
+    ).all()
+    updated = 0
+    for member in members:
+        character = session.get(Character, member.character_id)
+        if character is None:
+            continue
+        try:
+            layout = json.loads(character.layout_json or "{}")
+        except (json.JSONDecodeError, TypeError, ValueError):
+            layout = {}
+        character.layout_json = json.dumps(
+            append_text_to_notes_tab(
+                layout,
+                tab_id,
+                text,
+                tab_title=tab_title,
+                switch_active=False,
+            )
+        )
+        session.add(character)
+        updated += 1
+    updated += distribute_text_to_campaign_notes(
+        session,
+        campaign,
+        tab_id,
+        text,
+        tab_title=tab_title,
+        switch_active=False,
     )
     return updated
 
@@ -135,7 +189,7 @@ def latest_formatted_action_log(session: Session, campaign_id: int) -> tuple[int
 
 
 def finalize_session_action_log(session: Session, campaign: Campaign) -> tuple[int | None, str, int]:
-    """Archive, distribute to player notes, and clear the live action log."""
+    """Archive and clear the live action log (entries already on session logs tab)."""
     entries = parse_action_log(campaign)
     action_log_text = build_action_log_text(entries)
     if not action_log_text:
@@ -143,7 +197,6 @@ def finalize_session_action_log(session: Session, campaign: Campaign) -> tuple[i
         return None, "", 0
 
     record = archive_session_action_log(session, campaign, action_log_text)
-    party_updated = distribute_action_log_to_player_notes(session, campaign, action_log_text)
     clear_action_log(campaign)
     session.add(campaign)
-    return record.id if record else None, action_log_text, party_updated
+    return record.id if record else None, action_log_text, 0

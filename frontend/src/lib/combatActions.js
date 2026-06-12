@@ -738,6 +738,15 @@ export function buildAvailableActions(sheet, options = {}) {
 
   resolveStandardActions(sheet, { mode }).forEach(add);
 
+  if (mode === "pc") {
+    if (getEquippableItems(sheet).length > 0) {
+      add(equipmentMetaForSlot("equip", ACTION_TYPES.action));
+    }
+    if (getUnequippableItems(sheet).length > 0) {
+      add(equipmentMetaForSlot("unequip", ACTION_TYPES.action));
+    }
+  }
+
   return byType;
 }
 
@@ -876,7 +885,16 @@ export function resourceCostLabel(action) {
   return `${amount} ${cost.resource_id.replace(/-/g, " ")}`;
 }
 
-const PICKER_CATEGORY_ORDER = ["attack", "weapon", "feature", "spell", "combat", "standard", "npc"];
+const PICKER_CATEGORY_ORDER = [
+  "attack",
+  "weapon",
+  "feature",
+  "spell",
+  "equipment",
+  "combat",
+  "standard",
+  "npc",
+];
 
 const PICKER_CATEGORY_LABELS = {
   attack: "Attacks",
@@ -884,6 +902,7 @@ const PICKER_CATEGORY_LABELS = {
   feature: "Features",
   class_feature: "Features",
   spell: "Spells",
+  equipment: "Equipment",
   combat: "Abilities",
   standard: "Standard",
   npc: "NPC",

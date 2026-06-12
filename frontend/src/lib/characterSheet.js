@@ -1,3 +1,5 @@
+import { apiFetch } from "./api";
+
 const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
 const ABILITY_LABELS = {
   str: "STR",
@@ -286,6 +288,28 @@ export function applyEquippedOverrides(sheet) {
       return item;
     }),
   };
+}
+
+export async function patchInventoryItemEquipped({ token, characterId, sheet, item, equipped }) {
+  const inventory = sheet?.inventory || [];
+  const index = inventory.findIndex(
+    (entry) => (item?.id && entry.id === item.id) || entry.name === item?.name
+  );
+  if (index < 0) {
+    throw new Error("Item not found on character sheet.");
+  }
+  const nextSheet = setInventoryItemEquipped(sheet, index, equipped);
+  const res = await apiFetch(`/characters/${characterId}`, {
+    token,
+    method: "PATCH",
+    body: { sheet_json: sheetToJson(nextSheet) },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const detail = err?.detail;
+    throw new Error(typeof detail === "string" ? detail : "Could not save equipment change.");
+  }
+  return nextSheet;
 }
 
 export function setInventoryItemEquipped(sheet, index, equipped) {

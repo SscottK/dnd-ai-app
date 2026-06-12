@@ -62,6 +62,7 @@ import {
   resolvePassivePerception,
   resolveSaveBonus,
   resolveSkillBonus,
+  patchInventoryItemEquipped,
   setInventoryItemEquipped,
 } from "../../lib/characterSheet";
 
@@ -998,7 +999,7 @@ function InitiativeCombatantStats({
   const economy = isActive ? turnEconomy?.[combatant.id] : null;
   const turnStatuses = showStats ? turnStatusLabels(economy, combatants) : [];
   const resourceSummary =
-    showStats && isActive ? formatCombatResources(resourceSheet) : null;
+    showStats && resourceSheet ? formatCombatResources(resourceSheet) : null;
   const initValue =
     combatant.hidden_from_players && !combatant.is_pc && !combatant.is_ally
       ? "—"
@@ -1436,11 +1437,17 @@ function InitiativeCombatantCard({
   );
 }
 
-function resourceSheetForCombatant(combatant, { isActive, characterId, sheet, dmActionSheet, isOwner }) {
+function resourceSheetForCombatant(
+  combatant,
+  { characterId, sheet, partyPcSheets, dmActionSheet, isOwner }
+) {
   if (!combatant?.character_id) return null;
   if (combatant.character_id === characterId) return sheet;
-  if (isOwner && isActive) return dmActionSheet;
-  return null;
+  if (!isOwner) return null;
+  return (
+    partyPcSheets?.[combatant.character_id] ??
+    (dmActionSheet && combatant.character_id ? dmActionSheet : null)
+  );
 }
 
 function partySliceRequestBody(activeCombatant, isOwner) {
@@ -1509,6 +1516,7 @@ export function InitiativeWidget({
   onOrientationChange,
   onCombatEnded,
   onSheetRefresh,
+  onSheetChange,
 }) {
   const isHorizontal = orientation === INITIATIVE_ORIENTATION_HORIZONTAL;
   const initiativeBonus = getInitiativeBonus(sheet);
@@ -1529,6 +1537,7 @@ export function InitiativeWidget({
   const [saving, setSaving] = useState(false);
   const [dmActionSheet, setDmActionSheet] = useState(null);
   const [dmSheetLoading, setDmSheetLoading] = useState(false);
+  const [partyPcSheets, setPartyPcSheets] = useState({});
   const [movementBusy, setMovementBusy] = useState(false);
   const [portraitPreview, setPortraitPreview] = useState(null);
   const [passTarget, setPassTarget] = useState(null);
@@ -1614,14 +1623,104 @@ export function InitiativeWidget({
     }
   }, [isOwner, token, campaignId, activeCombatantId]);
 
+  const loadPartyPcSheets = useCallback(async () => {
+    if (!isOwner || !token || !campaignId) {
+      setPartyPcSheets({});
+      return;
+    }
+    const byCharacterId = new Map();
+    for (const combatant of viewEncounter.combatants || []) {
+      if (combatant.character_id && combatant.is_pc) {
+        byCharacterId.set(combatant.character_id, combatant.id);
+      }
+    }
+    if (byCharacterId.size === 0) {
+      setPartyPcSheets({});
+      return;
+    }
+    const entries = await Promise.all(
+      [...byCharacterId.entries()].map(async ([charId, combatantId]) => {
+        try {
+          const res = await apiFetch(
+            `/campaigns/${campaignId}/encounter/combatants/${combatantId}/action-sheet`,
+            { token }
+          );
+          if (!res.ok) return [charId, null];
+          const data = await res.json();
+          return [charId, data.sheet || null];
+        } catch {
+          return [charId, null];
+        }
+      })
+    );
+    setPartyPcSheets(
+      Object.fromEntries(entries.filter(([, sheetData]) => sheetData))
+    );
+  }, [isOwner, token, campaignId, viewEncounter.combatants]);
+
   useEffect(() => {
     void reloadDmActionSheet();
   }, [reloadDmActionSheet, viewEncounter.combat_log?.length]);
 
+  useEffect(() => {
+    void loadPartyPcSheets();
+  }, [loadPartyPcSheets, viewEncounter.combat_log?.length]);
+
   const handleSheetRefresh = useCallback(() => {
     onSheetRefresh?.();
     void reloadDmActionSheet();
-  }, [onSheetRefresh, reloadDmActionSheet]);
+    void loadPartyPcSheets();
+  }, [onSheetRefresh, reloadDmActionSheet, loadPartyPcSheets]);
+
+  const handleInventoryEquip = useCallback(
+    async ({ item, equipped, characterId: targetCharacterId }) => {
+      const targetId = targetCharacterId || characterId;
+      if (!targetId) {
+        throw new Error("No character linked to this combatant.");
+      }
+      if (targetId === characterId) {
+        if (!onSheetChange) {
+          throw new Error("Sheet updates are not available.");
+        }
+        const inventory = sheet?.inventory || [];
+        const index = inventory.findIndex(
+          (entry) => (item?.id && entry.id === item.id) || entry.name === item?.name
+        );
+        if (index < 0) {
+          throw new Error("Item not found on your sheet.");
+        }
+        onSheetChange(setInventoryItemEquipped(sheet, index, equipped), { immediate: true });
+        return;
+      }
+      if (!token) {
+        throw new Error("Not signed in.");
+      }
+      const remoteSheet = partyPcSheets[targetId] || dmActionSheet;
+      if (!remoteSheet) {
+        throw new Error("Could not load that character's sheet.");
+      }
+      const nextSheet = await patchInventoryItemEquipped({
+        token,
+        characterId: targetId,
+        sheet: remoteSheet,
+        item,
+        equipped,
+      });
+      setPartyPcSheets((prev) => ({ ...prev, [targetId]: nextSheet }));
+      if (activeCombatant?.character_id === targetId) {
+        setDmActionSheet(nextSheet);
+      }
+    },
+    [
+      characterId,
+      onSheetChange,
+      sheet,
+      token,
+      partyPcSheets,
+      dmActionSheet,
+      activeCombatant?.character_id,
+    ]
+  );
 
   const submitInitiative = async (body) => {
     if (!token || !campaignId) return;
@@ -1951,9 +2050,9 @@ export function InitiativeWidget({
                 token={token}
                 turnEconomy={viewEncounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
-                  isActive,
                   characterId,
                   sheet,
+                  partyPcSheets: null,
                   dmActionSheet: null,
                   isOwner: false,
                 })}
@@ -1985,9 +2084,9 @@ export function InitiativeWidget({
               token={token}
               turnEconomy={viewEncounter.turn_economy}
               resourceSheet={resourceSheetForCombatant(combatant, {
-                isActive,
                 characterId,
                 sheet,
+                partyPcSheets: null,
                 dmActionSheet: null,
                 isOwner: false,
               })}
@@ -2105,6 +2204,7 @@ export function InitiativeWidget({
               headerSlot={turnHeaderSlot}
               onEncounterUpdate={setEncounter}
               onSheetRefresh={handleSheetRefresh}
+              onInventoryEquip={handleInventoryEquip}
               onCombatEnded={notifyCombatEnded}
               onError={setActionError}
             />
@@ -2352,6 +2452,7 @@ export function InitiativeWidget({
           activeTurnName={activeCombatant?.name}
           onEncounterUpdate={setEncounter}
           onSheetRefresh={handleSheetRefresh}
+          onInventoryEquip={handleInventoryEquip}
           onCombatEnded={notifyCombatEnded}
           onError={setActionError}
         />
@@ -2427,9 +2528,9 @@ export function InitiativeWidget({
                 token={token}
                 turnEconomy={viewEncounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
-                  isActive,
                   characterId,
                   sheet,
+                  partyPcSheets,
                   dmActionSheet,
                   isOwner,
                 })}
@@ -2463,9 +2564,9 @@ export function InitiativeWidget({
                 token={token}
                 turnEconomy={viewEncounter.turn_economy}
                 resourceSheet={resourceSheetForCombatant(combatant, {
-                  isActive,
                   characterId,
                   sheet,
+                  partyPcSheets,
                   dmActionSheet,
                   isOwner,
                 })}

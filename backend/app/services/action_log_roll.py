@@ -7,7 +7,12 @@ from sqlmodel import Session
 from app.api.schemas import ActionLogEntry, ActionRollRequest
 from app.db.models import Campaign, Character, User
 from app.services.action_dice import format_action_roll_message, roll_expression
-from app.services.action_log import append_action_log, parse_action_log, utc_now_iso
+from app.services.action_log import (
+    append_action_log,
+    distribute_action_log_entry,
+    parse_action_log,
+    utc_now_iso,
+)
 from app.services.campaign_membership import get_campaign_member_for_user
 from app.services.character_sheet import computed_save_bonus, computed_skill_bonus, parse_sheet_json
 from app.services.encounter_sync import parse_encounter
@@ -170,4 +175,5 @@ def perform_action_roll(
         )
 
     append_action_log(campaign, entry)
+    distribute_action_log_entry(session, campaign, entry)
     return entry

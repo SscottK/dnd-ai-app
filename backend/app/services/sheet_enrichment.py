@@ -252,6 +252,30 @@ def normalize_classes(
     return classes
 
 
+_SPELL_SLOT_ID = re.compile(r"^spell[-_]?slot[-_]?(\d+)$", re.IGNORECASE)
+_SPELL_SLOT_NAME = re.compile(
+    r"(?:(\d+)(?:st|nd|rd|th))[\s-]*(?:level\s*)?spell\s*slots?|"
+    r"spell\s*slots?\s*(?:level\s*)?(\d+)|"
+    r"level\s*(\d+)\s*spell\s*slots?",
+    re.IGNORECASE,
+)
+
+
+def _spell_slot_level_from_entry(entry: dict) -> int | None:
+    rid = _slugify(str(entry.get("id") or ""))
+    match = _SPELL_SLOT_ID.match(rid)
+    if match:
+        return int(match.group(1))
+    name = str(entry.get("name") or "").strip()
+    match = _SPELL_SLOT_NAME.search(name)
+    if not match:
+        return None
+    for group in match.groups():
+        if group:
+            return int(group)
+    return None
+
+
 def _existing_resource_ids(resources: list[dict]) -> set[str]:
     ids: set[str] = set()
     for entry in resources:
@@ -269,7 +293,13 @@ def _normalize_resource_row(entry: dict, *, source_class: str) -> dict | None:
     name = str(entry.get("name") or "").strip()
     if not name:
         return None
-    rid = canonical_resource_id(str(entry.get("id") or _slugify(name)))
+    slot_level = _spell_slot_level_from_entry(entry)
+    if slot_level is not None:
+        rid = f"spell-slot-{slot_level}"
+        if not name.lower().startswith("level"):
+            name = f"Level {slot_level} Spell Slots"
+    else:
+        rid = canonical_resource_id(str(entry.get("id") or _slugify(name)))
     try:
         current = int(entry.get("current") if entry.get("current") is not None else entry.get("max"))
     except (TypeError, ValueError):
@@ -387,6 +417,36 @@ def enrich_resources(sheet: dict, classes: list[dict]) -> list[dict]:
                     }
                 )
                 known_ids.add(rid)
+
+    for feat in sheet.get("features") or []:
+        if not isinstance(feat, dict):
+            continue
+        name = str(feat.get("name") or "")
+        text = f"{name} {feat.get('description') or ''}"
+        slot_level = _spell_slot_level_from_entry({"name": name})
+        if slot_level is None:
+            continue
+        rid = f"spell-slot-{slot_level}"
+        if rid in known_ids:
+            continue
+        match = re.search(r"(\d+)\s*/\s*(\d+)", text)
+        if not match:
+            continue
+        current, max_val = int(match.group(1)), int(match.group(2))
+        if max_val <= 0:
+            continue
+        resources.append(
+            {
+                "id": rid,
+                "name": f"Level {slot_level} Spell Slots",
+                "current": current,
+                "max": max_val,
+                "recharge": "long_rest",
+                "source_class": str((classes[0] or {}).get("name") or ""),
+                "display": ["combat_pane"],
+            }
+        )
+        known_ids.add(rid)
 
     return resources
 

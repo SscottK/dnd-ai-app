@@ -67,9 +67,10 @@ from app.services.action_log import (
 )
 from app.services.action_log_roll import ActionRollError, perform_action_roll
 from app.services.play_session_notes import (
+    active_logs_tab,
     active_notes_tab,
     distribute_play_session_tabs,
-    new_play_session_tab,
+    new_play_session_tabs,
     parse_play_session,
     play_session_payload,
 )
@@ -433,6 +434,8 @@ def build_session_status(
     play_session = parse_play_session(campaign) if campaign.session_active else {}
     tab_id = play_session.get("notes_tab_id")
     tab_title = play_session.get("notes_tab_title")
+    logs_tab_id = play_session.get("logs_tab_id")
+    logs_tab_title = play_session.get("logs_tab_title")
     return CampaignSessionStatus(
         campaign_id=campaign.id,
         campaign_name=campaign.name,
@@ -444,6 +447,8 @@ def build_session_status(
         last_action_log_id=latest_action_log_id(session, campaign.id),
         play_session_notes_tab_id=tab_id,
         play_session_notes_tab_title=tab_title,
+        play_session_logs_tab_id=logs_tab_id,
+        play_session_logs_tab_title=logs_tab_title,
     )
 
 
@@ -1028,7 +1033,7 @@ def use_encounter_action(
 
         log_before = len(state.combat_log)
         if not skip_economy:
-            if will_resolve_attack:
+            if will_resolve_attack and len(resolved_data.target_ids or []) <= 1:
                 use_weapon_attack(
                     state,
                     session,
@@ -1036,7 +1041,7 @@ def use_encounter_action(
                     actor=actor,
                     data=resolved_data,
                 )
-            else:
+            elif not will_resolve_attack:
                 use_combat_action(
                     state,
                     actor=actor,
@@ -1049,13 +1054,19 @@ def use_encounter_action(
                     log_usage=not standard_effect and not self_heal_effect,
                 )
         if will_resolve_attack:
-            action_messages = resolve_attack(
-                session,
-                campaign_id,
-                state,
-                actor=actor,
-                data=resolved_data,
-            )
+            try:
+                action_messages = resolve_attack(
+                    session,
+                    campaign_id,
+                    state,
+                    actor=actor,
+                    data=resolved_data,
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
         elif extra_action_effect:
             action_messages = resolve_extra_action_effect(
                 state,
@@ -1648,12 +1659,16 @@ def update_session_status(
     campaign.session_active = data.session_active
 
     if data.session_active and not was_active:
-        tab_id, tab_title = new_play_session_tab()
-        campaign.play_session_json = json.dumps(play_session_payload(tab_id, tab_title))
+        notes_id, notes_title, logs_id, logs_title = new_play_session_tabs()
+        campaign.play_session_json = json.dumps(
+            play_session_payload(notes_id, notes_title, logs_id, logs_title)
+        )
         clear_action_log(campaign)
         session.add(campaign)
         session.commit()
-        distribute_play_session_tabs(session, campaign, tab_id, tab_title)
+        distribute_play_session_tabs(
+            session, campaign, notes_id, notes_title, logs_id, logs_title
+        )
         session.refresh(campaign)
     elif not data.session_active and was_active:
         tab_id, tab_title = active_notes_tab(campaign)

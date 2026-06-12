@@ -5,17 +5,23 @@ import { impliesIncapacitated } from "../../lib/conditions";
 import { formatCombatResources, parseCombatEndPayload, turnStatusLabels } from "../../lib/encounterDisplay";
 import {
   ACTION_TYPES,
+  EQUIP_META_ACTION,
   actionHasOptions,
   actionNeedsReadyDetail,
   actionNeedsTarget,
   buildAvailableActions,
   canAffordResourceCost,
+  equipItemAction,
+  getEquippableItems,
+  getUnequippableItems,
   groupActionsForPicker,
+  isEquipmentMetaAction,
   resolveOptionAction,
   filterTargetCandidates,
   formatApiErrorDetail,
   resourceCostLabel,
   targetLabel,
+  unequipItemAction,
   validateTargetSelection,
 } from "../../lib/combatActions";
 import {
@@ -104,6 +110,7 @@ export function TurnActionsPanel({
   canAdjustMovement = false,
   onEncounterUpdate,
   onSheetRefresh,
+  onInventoryEquip,
   onCombatEnded,
   onError,
   headerSlot = null,
@@ -131,10 +138,15 @@ export function TurnActionsPanel({
   }, [token]);
 
   const catalogSheet = actionSheet !== undefined ? actionSheet : sheet;
-  const available = useMemo(
-    () => buildAvailableActions(catalogSheet || {}, { mode: actionCatalogMode }),
-    [catalogSheet, actionCatalogMode, rulesReady]
-  );
+  const available = useMemo(() => {
+    const byType = buildAvailableActions(catalogSheet || {}, { mode: actionCatalogMode });
+    if (!onInventoryEquip) {
+      for (const type of Object.keys(byType)) {
+        byType[type] = byType[type].filter((action) => !isEquipmentMetaAction(action));
+      }
+    }
+    return byType;
+  }, [catalogSheet, actionCatalogMode, rulesReady, onInventoryEquip]);
   const economy = economyForCombatant(encounter, actorCombatant?.id);
   const turnStatuses = turnStatusLabels(economy, encounter?.combatants);
   const incapacitated = impliesIncapacitated(actorCombatant?.conditions);
@@ -273,6 +285,10 @@ export function TurnActionsPanel({
       setStep("pick_detail");
       return;
     }
+    if (isEquipmentMetaAction(action)) {
+      setStep("pick_equip");
+      return;
+    }
     if (actionHasOptions(action)) {
       setStep("pick_option");
       return;
@@ -314,6 +330,30 @@ export function TurnActionsPanel({
       return;
     }
     void submitAction(pickedAction, [targetId]);
+  };
+
+  const handlePickEquipItem = async (item) => {
+    if (!pickedAction || !pickedType || !actorCombatant) return;
+    const equipping = pickedAction.id === EQUIP_META_ACTION.id;
+    onError?.("");
+    try {
+      if (!onInventoryEquip) {
+        onError?.("Equipping is not available for this combatant.");
+        return;
+      }
+      await onInventoryEquip({
+        item,
+        equipped: equipping,
+        characterId: actorCombatant.character_id,
+      });
+    } catch (err) {
+      onError?.(err.message || "Could not update equipment.");
+      return;
+    }
+    const action = equipping
+      ? equipItemAction(item, pickedType)
+      : unequipItemAction(item, pickedType);
+    void submitAction(action, []);
   };
 
   const handlePickOption = (option) => {
@@ -425,6 +465,12 @@ export function TurnActionsPanel({
     return list;
   })();
   const pickerGroups = groupActionsForPicker(pickerActions);
+  const equipItems =
+    pickedAction?.id === EQUIP_META_ACTION.id
+      ? getEquippableItems(catalogSheet)
+      : pickedAction && isEquipmentMetaAction(pickedAction)
+        ? getUnequippableItems(catalogSheet)
+        : [];
   const resourceSummary = formatCombatResources(catalogSheet);
 
   const handleConfirmReadyDetail = () => {
@@ -592,6 +638,48 @@ export function TurnActionsPanel({
           <button
             type="button"
             onClick={resetFlow}
+            className="text-[11px] sm:text-xs font-black uppercase text-ink-faint hover:text-starlight"
+          >
+            Back
+          </button>
+        </div>
+      )}
+
+      {step === "pick_equip" && pickedAction && (
+        <div className="space-y-1">
+          <p className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">
+            {pickedAction.name} — choose item
+          </p>
+          <div className="max-h-40 space-y-1 overflow-y-auto">
+            {equipItems.length === 0 ? (
+              <p className="text-xs sm:text-sm font-mono text-ink-faint">
+                No items available to {pickedAction.id === EQUIP_META_ACTION.id ? "equip" : "unequip"}.
+              </p>
+            ) : (
+              equipItems.map((item, index) => (
+                <button
+                  key={item.id || item.name || index}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handlePickEquipItem(item)}
+                  className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
+                >
+                  <span className="text-xs sm:text-sm font-black uppercase text-starlight">{item.name}</span>
+                  {item.notes ? (
+                    <span className="text-[11px] sm:text-xs font-mono text-ink-faint line-clamp-2">
+                      {item.notes}
+                    </span>
+                  ) : null}
+                </button>
+              ))
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setStep("pick_action");
+              setPickedAction(null);
+            }}
             className="text-[11px] sm:text-xs font-black uppercase text-ink-faint hover:text-starlight"
           >
             Back

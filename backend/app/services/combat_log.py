@@ -16,7 +16,7 @@ from app.services.encounter_actions import (
     sorted_combatants_for_display,
 )
 from app.services.campaign_notes import distribute_text_to_campaign_notes
-from app.services.play_session_notes import active_notes_tab, append_text_to_notes_tab
+from app.services.play_session_notes import active_logs_tab, append_text_to_notes_tab
 
 
 def utc_now_iso() -> str:
@@ -127,8 +127,7 @@ def append_combat_log_to_layout(
 
 
 def distribute_combat_log(session: Session, campaign: Campaign, combat_log_text: str) -> int:
-    tab_id = COMBAT_LOG_TAB_ID
-    tab_title = COMBAT_LOG_TAB_TITLE
+    tab_id, tab_title = active_logs_tab(campaign)
     members = session.exec(
         select(CampaignMember).where(CampaignMember.campaign_id == campaign.id)
     ).all()
@@ -147,7 +146,12 @@ def distribute_combat_log(session: Session, campaign: Campaign, combat_log_text:
         session.add(character)
         updated += 1
     updated += distribute_text_to_campaign_notes(
-        session, campaign, tab_id, combat_log_text, tab_title=tab_title
+        session,
+        campaign,
+        tab_id,
+        combat_log_text,
+        tab_title=tab_title,
+        switch_active=False,
     )
     return updated
 

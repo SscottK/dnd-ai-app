@@ -50,6 +50,7 @@ import {
   EncounterCombatLog,
   TurnActionsPanel,
 } from "../components/sheet/TurnActionsPanel";
+import { patchInventoryItemEquipped } from "../lib/characterSheet";
 
 function newId() {
   return `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -105,6 +106,7 @@ export function InitiativePage() {
   const [sessionActive, setSessionActive] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
   const [activeResourceSheet, setActiveResourceSheet] = useState(null);
+  const [partyPcSheets, setPartyPcSheets] = useState({});
   const [dicePanelWidth, setDicePanelWidth] = useState(() => {
     const stored = localStorage.getItem(`initiative-dice-width-${campaignId}`);
     const parsed = stored ? Number(stored) : 280;
@@ -308,6 +310,70 @@ export function InitiativePage() {
     };
   }, [isOwner, token, campaignId, activeCombatant?.id]);
 
+  const loadPartyPcSheets = useCallback(async () => {
+    if (!isOwner || !token || !campaignId) {
+      setPartyPcSheets({});
+      return;
+    }
+    const byCharacterId = new Map();
+    for (const combatant of viewEncounter.combatants || []) {
+      if (combatant.character_id && combatant.is_pc) {
+        byCharacterId.set(combatant.character_id, combatant.id);
+      }
+    }
+    if (byCharacterId.size === 0) {
+      setPartyPcSheets({});
+      return;
+    }
+    const entries = await Promise.all(
+      [...byCharacterId.entries()].map(async ([charId, combatantId]) => {
+        try {
+          const res = await apiFetch(
+            `/campaigns/${campaignId}/encounter/combatants/${combatantId}/action-sheet`,
+            { token }
+          );
+          if (!res.ok) return [charId, null];
+          const data = await res.json();
+          return [charId, data.sheet || null];
+        } catch {
+          return [charId, null];
+        }
+      })
+    );
+    setPartyPcSheets(
+      Object.fromEntries(entries.filter(([, sheetData]) => sheetData))
+    );
+  }, [isOwner, token, campaignId, viewEncounter.combatants]);
+
+  useEffect(() => {
+    void loadPartyPcSheets();
+  }, [loadPartyPcSheets, encounter.combat_log?.length]);
+
+  const handleInventoryEquip = useCallback(
+    async ({ item, equipped, characterId: targetCharacterId }) => {
+      if (!token || !targetCharacterId) {
+        throw new Error("No character linked to this combatant.");
+      }
+      const remoteSheet = partyPcSheets[targetCharacterId] || dmActionSheet;
+      if (!remoteSheet) {
+        throw new Error("Could not load that character's sheet.");
+      }
+      const nextSheet = await patchInventoryItemEquipped({
+        token,
+        characterId: targetCharacterId,
+        sheet: remoteSheet,
+        item,
+        equipped,
+      });
+      setPartyPcSheets((prev) => ({ ...prev, [targetCharacterId]: nextSheet }));
+      if (activeCombatant?.character_id === targetCharacterId) {
+        setDmActionSheet(nextSheet);
+        setActiveResourceSheet(nextSheet);
+      }
+    },
+    [token, partyPcSheets, dmActionSheet, activeCombatant?.character_id]
+  );
+
   const reloadDmActionSheet = useCallback(async () => {
     if (!isOwner || !token || !campaignId || !activeCombatant?.id) return;
     setDmSheetLoading(true);
@@ -320,14 +386,29 @@ export function InitiativePage() {
       const data = await res.json();
       setDmActionSheet(data.sheet || {});
       if (activeCombatant.character_id) {
-        setActiveResourceSheet(data.sheet || null);
+        const loaded = data.sheet || null;
+        setActiveResourceSheet(loaded);
+        if (loaded) {
+          setPartyPcSheets((prev) => ({
+            ...prev,
+            [activeCombatant.character_id]: loaded,
+          }));
+        }
       }
     } catch {
       setDmActionSheet({});
     } finally {
       setDmSheetLoading(false);
     }
-  }, [isOwner, token, campaignId, activeCombatant?.id, activeCombatant?.character_id]);
+    void loadPartyPcSheets();
+  }, [
+    isOwner,
+    token,
+    campaignId,
+    activeCombatant?.id,
+    activeCombatant?.character_id,
+    loadPartyPcSheets,
+  ]);
 
   const pushEncounter = (next) => {
     setEncounter(next);
@@ -941,6 +1022,7 @@ export function InitiativePage() {
               isDmProxy
               onEncounterUpdate={setEncounter}
               onSheetRefresh={reloadDmActionSheet}
+              onInventoryEquip={handleInventoryEquip}
               onError={setActionError}
             />
           </div>
@@ -990,6 +1072,7 @@ export function InitiativePage() {
                   isDmProxy
                   onEncounterUpdate={setEncounter}
                   onSheetRefresh={reloadDmActionSheet}
+                  onInventoryEquip={handleInventoryEquip}
                   onError={setActionError}
                 />
               </div>
@@ -1023,7 +1106,9 @@ export function InitiativePage() {
                     ? turnStatusLabels(economy, encounter.combatants)
                     : [];
                   const resourceSummary =
-                    isActive && isOwner ? formatCombatResources(activeResourceSheet) : null;
+                    isOwner && combatant.character_id
+                      ? formatCombatResources(partyPcSheets[combatant.character_id])
+                      : null;
                   return (
                   <div
                     key={combatant.id}
