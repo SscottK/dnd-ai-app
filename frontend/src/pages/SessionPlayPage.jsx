@@ -461,11 +461,26 @@ export function SessionPlayPage() {
     [campaignId, persistCharacter, buildPatch]
   );
 
+  const reloadDistributedNotesFromServer = useCallback(async () => {
+    const charId = characterRef.current?.id;
+    if (charId && token) {
+      try {
+        const res = await apiFetch(`/characters/${charId}`, { token });
+        if (res.ok) {
+          hydrateCharacter(await res.json(), { applyLayout: true });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    await refreshCampaignNotesFromServer();
+  }, [token, hydrateCharacter, refreshCampaignNotesFromServer]);
+
   const handleActionLogEnded = useCallback(async () => {
     dirtyRef.current = false;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    await refreshCampaignNotesFromServer();
-  }, [refreshCampaignNotesFromServer]);
+    await reloadDistributedNotesFromServer();
+  }, [reloadDistributedNotesFromServer]);
 
   const rollActionLogCheck = useCallback(
     async (body) => {
@@ -510,8 +525,8 @@ export function SessionPlayPage() {
   const handleCombatEnded = useCallback(async () => {
     dirtyRef.current = false;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    await refreshCampaignNotesFromServer();
-  }, [refreshCampaignNotesFromServer]);
+    await reloadDistributedNotesFromServer();
+  }, [reloadDistributedNotesFromServer]);
 
   const loadSession = useCallback(async () => {
     if (!token || !campaignId) return;
@@ -666,7 +681,7 @@ export function SessionPlayPage() {
     pollNotes();
     const timer = setInterval(pollNotes, 8000);
     return () => clearInterval(timer);
-  }, [token, campaignId, sessionStatus?.session_active, hydrateCharacter, applyPlaySessionNotesTab, handleCombatEnded, handleActionLogEnded, refreshCampaignNotesFromServer]);
+  }, [token, campaignId, sessionStatus?.session_active, hydrateCharacter, applyPlaySessionNotesTab, handleCombatEnded, handleActionLogEnded, reloadDistributedNotesFromServer]);
 
   const saveLayoutSnapshot = useCallback(
     (nextLayout) => {

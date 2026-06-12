@@ -16,7 +16,7 @@ import { EncountersPage } from "./pages/EncountersPage";
 
 function LegacySheetRedirect() {
   const { characterId } = useParams();
-  return <Navigate to={`/character/${characterId}`} replace />;
+  return <Navigate to={`/character/${characterId}?view=digital`} replace />;
 }
 
 export default function App() {

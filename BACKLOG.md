@@ -11,9 +11,8 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 | pending | PDF import / resync reliability (attacks, resources, bonuses) |
 | pending | Turn-action UI: correct slots, dedupe, submenus (Wild Shape, etc.) |
 | pending | Combat resolution: multi-attack, resource spend, attack profiles |
-| pending | Encounter ↔ character sync (HP/resources on tracker + sheet) |
-| pending | Verify notes/logging flow (combat log, action log, session close, archive) |
-| pending | Verify all Full Sheet entry points open digital sheet, not PDF |
+| pending | Encounter ↔ character sync — resource pools still sheet-only during combat |
+| pending | Verify notes/logging flow — archive modal / edge cases (core path tested) |
 
 ---
 
@@ -23,6 +22,7 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 |--------|------|
 | pending | Friends list |
 | pending | Send campaign join requests to friends from friends list |
+| pending | Messaging — 1-on-1 and group chats; message friends or anyone in a shared campaign (DM + players, including non-friends) |
 
 ---
 
@@ -64,6 +64,9 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 | P2 — Skill/save rolls → action log |
 | P2 — Initiative first turn when enemies added before party |
 | P2 — Combat log shared with all players on victory/end |
+| P3 — Full Sheet entry points verified (digital default; legacy `/sheet` → digital) |
+| P3 — Notes/logging: combat & action log distribution tests; live session reloads layout on log |
+| P3 — Encounter↔character sync tests (HP/AC/conditions bidirectional) |
 | Hidden enemies (encounter library + reveal during combat) |
 | Initiative tracker — monster stats hidden from players |
 | Session pane resize scales proportionally on shrink |
