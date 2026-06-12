@@ -44,14 +44,17 @@ def build_npc_combatant_from_enemy(
     srd_name = resolve_enemy_srd_name(enemy)
     display_name = enemy_display_label(enemy, index=index, count=count)
     raw_actions = getattr(enemy, "combat_actions", None) or []
+    hidden = bool(getattr(enemy, "hidden_at_start", False))
+    initiative = 0 if hidden else int(getattr(enemy, "initiative", 0) or 0)
     combatant = EncounterCombatant(
         id=new_combatant_id(),
         name=display_name,
         srd_name=srd_name,
-        initiative=int(getattr(enemy, "initiative", 0) or 0),
+        initiative=initiative,
         is_pc=False,
         is_ally=False,
         character_id=None,
+        hidden_from_players=hidden,
         hp=getattr(enemy, "hp", None),
         max_hp=getattr(enemy, "max_hp", None) or getattr(enemy, "hp", None),
         ac=getattr(enemy, "ac", None),

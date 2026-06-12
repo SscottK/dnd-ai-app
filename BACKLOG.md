@@ -64,6 +64,9 @@ Prioritized work queue for dnd-ai-app. Update this file when items are added, co
 | P2 — Skill/save rolls → action log |
 | P2 — Initiative first turn when enemies added before party |
 | P2 — Combat log shared with all players on victory/end |
+| Hidden enemies (encounter library + reveal during combat) |
+| Initiative tracker — monster stats hidden from players |
+| Session pane resize scales proportionally on shrink |
 | Encounter library — per-user templates, DM tracker load, monster labels |
 | Action/combat logs → session notes on close |
 | SRD 2024 full ingest, browse UI, polish |

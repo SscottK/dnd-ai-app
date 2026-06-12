@@ -49,6 +49,8 @@ def is_defeated_enemy(combatant: EncounterCombatant) -> bool:
 
 
 def can_take_turn(combatant: EncounterCombatant) -> bool:
+    if combatant.hidden_from_players:
+        return False
     return not is_defeated_enemy(combatant)
 
 
@@ -402,6 +404,50 @@ def roll_initiative_for_character(character: Character) -> tuple[int, int, int]:
     bonus = initiative_bonus_from_character(character)
     d20 = random.randint(1, 20)
     return d20, bonus, d20 + bonus
+
+
+def roll_npc_initiative(combatant: EncounterCombatant) -> tuple[int, int, int]:
+    from app.services.monster_catalog import lookup_monster
+
+    monster = lookup_monster(combatant.srd_name or combatant.name)
+    bonus = int(monster.get("initiative_modifier") or 0) if monster else 0
+    d20 = random.randint(1, 20)
+    return d20, bonus, d20 + bonus
+
+
+def reveal_hidden_combatant(state: EncounterState, combatant_id: str) -> EncounterCombatant:
+    """Reveal a hidden enemy to players and roll initiative when combat is underway."""
+    combatant = next(
+        (entry for entry in state.combatants if entry.id == combatant_id),
+        None,
+    )
+    if combatant is None:
+        raise ValueError("Combatant not found")
+    if combatant.is_pc or combatant.is_ally:
+        raise ValueError("Only hidden enemies can be revealed")
+    if not combatant.hidden_from_players:
+        raise ValueError("Combatant is already visible to players")
+    if not combat_has_started(state):
+        raise ValueError("Combat has not started — edit visibility on the tracker instead")
+
+    d20, bonus, total = roll_npc_initiative(combatant)
+    updated = combatant.model_copy(update={"hidden_from_players": False, "initiative": total})
+    state.combatants = [
+        updated if entry.id == combatant_id else entry for entry in state.combatants
+    ]
+    _append_combat_log(
+        state,
+        f"{updated.name} revealed — initiative {total} (d20 {d20}{'+' if bonus >= 0 else ''}{bonus})",
+        kind="roll",
+        actor=updated.name,
+        roller_name="DM",
+        dice="d20",
+        result=d20,
+        bonus=bonus,
+        total=total,
+    )
+    sync_initiative_order_after_setup_change(state)
+    return updated
 
 
 def add_enemies_to_encounter(

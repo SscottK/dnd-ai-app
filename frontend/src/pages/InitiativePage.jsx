@@ -21,7 +21,7 @@ import {
   parseEncounterPatchResponse,
   turnStatusLabels,
 } from "../lib/encounterDisplay";
-import { encounterPatchBody } from "../lib/encounterPatch";
+import { encounterPatchBody, revealHiddenCombatant } from "../lib/encounterPatch";
 import {
   buildTrackerCombatants,
   combatHasStarted,
@@ -100,6 +100,7 @@ export function InitiativePage() {
   const [monsterLabel, setMonsterLabel] = useState("");
   const [monsterInit, setMonsterInit] = useState("10");
   const [monsterAlly, setMonsterAlly] = useState(false);
+  const [monsterHidden, setMonsterHidden] = useState(false);
   const [monsterControllerId, setMonsterControllerId] = useState(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
@@ -396,7 +397,12 @@ export function InitiativePage() {
     setSaving(true);
     setError("");
     try {
-      const enemy = { srd_name: srdName, name: srdName, initiative };
+      const enemy = {
+        srd_name: srdName,
+        name: srdName,
+        initiative: monsterHidden ? 0 : initiative,
+        hidden_at_start: monsterHidden,
+      };
       if (label) enemy.label = label;
       const res = await apiFetch(`/campaigns/${campaignId}/encounter/add-enemies`, {
         token,
@@ -411,8 +417,30 @@ export function InitiativePage() {
       setEncounter(parsed.encounter);
       setMonsterName("");
       setMonsterLabel("");
+      setMonsterHidden(false);
     } catch (err) {
       setError(err.message || "Could not add monster.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const revealCombatant = async (combatantId) => {
+    if (!token || !campaignId || !isOwner) return;
+    setSaving(true);
+    setError("");
+    try {
+      const parsed = await revealHiddenCombatant(token, campaignId, combatantId);
+      setEncounter(parsed.encounter);
+      if (parsed.combatEnded) {
+        setCombatResolution({
+          combatLogText: parsed.combatLogText,
+          reason: parsed.reason,
+          encounter: parsed.encounter,
+        });
+      }
+    } catch (err) {
+      setError(err.message || "Could not reveal enemy.");
     } finally {
       setSaving(false);
     }
@@ -1009,17 +1037,23 @@ export function InitiativePage() {
                   >
                     <span className="text-[10px] font-mono text-zinc-600 w-6">{index + 1}</span>
                     {isOwner && !isPartySlot ? (
-                      <input
-                        type="number"
-                        value={combatant.initiative}
-                        onChange={(e) =>
-                          updateCombatant(combatant.id, {
-                            initiative: parseInt(e.target.value, 10) || 0,
-                          })
-                        }
-                        className="w-14 px-2 py-1 bg-black border border-zinc-700 text-center font-mono"
-                        title="Initiative"
-                      />
+                      combatant.hidden_from_players && !combatant.is_pc && !combatant.is_ally ? (
+                        <span className="w-14 text-center font-mono text-zinc-500" title="Hidden">
+                          —
+                        </span>
+                      ) : (
+                        <input
+                          type="number"
+                          value={combatant.initiative}
+                          onChange={(e) =>
+                            updateCombatant(combatant.id, {
+                              initiative: parseInt(e.target.value, 10) || 0,
+                            })
+                          }
+                          className="w-14 px-2 py-1 bg-black border border-zinc-700 text-center font-mono"
+                          title="Initiative"
+                        />
+                      )
                     ) : (
                       <span className="w-14 text-center font-mono">{combatant.initiative}</span>
                     )}
@@ -1034,6 +1068,9 @@ export function InitiativePage() {
                         )}
                         {!isPartySlot && combatant.is_pc && (
                           <span className="ml-2 text-[9px] text-neon-cyan">PC</span>
+                        )}
+                        {combatant.hidden_from_players && !combatant.is_pc && !combatant.is_ally && (
+                          <span className="ml-2 text-[9px] text-neon-magenta">HIDDEN</span>
                         )}
                         {combatant.is_ally && !combatant.is_pc && (
                           <span className="ml-2 text-[9px] text-neon-cyan">
@@ -1070,6 +1107,32 @@ export function InitiativePage() {
                       <>
                         {!combatant.is_pc && (
                           <>
+                            {combatant.hidden_from_players && combatHasStarted(encounter) ? (
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() => revealCombatant(combatant.id)}
+                                className="px-2 py-1 text-[9px] font-black uppercase border border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+                              >
+                                Reveal
+                              </button>
+                            ) : (
+                              <label className="flex items-center gap-1 text-[9px] font-mono uppercase text-zinc-500">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(combatant.hidden_from_players)}
+                                  disabled={saving || combatHasStarted(encounter)}
+                                  onChange={(e) =>
+                                    updateCombatant(combatant.id, {
+                                      hidden_from_players: e.target.checked,
+                                      initiative: e.target.checked ? 0 : combatant.initiative,
+                                    })
+                                  }
+                                  className="accent-neon-magenta"
+                                />
+                                Hidden
+                              </label>
+                            )}
                             <label className="flex items-center gap-1 text-[9px] font-mono uppercase text-zinc-500">
                               <input
                                 type="checkbox"
@@ -1230,12 +1293,24 @@ export function InitiativePage() {
                       checked={monsterAlly}
                       onChange={(e) => {
                         setMonsterAlly(e.target.checked);
+                        if (e.target.checked) setMonsterHidden(false);
                         if (!e.target.checked) setMonsterControllerId(null);
                       }}
                       className="accent-neon-cyan"
                     />
                     Ally
                   </label>
+                  {!monsterAlly && (
+                    <label className="flex items-center gap-1 px-2 text-[10px] font-mono uppercase text-zinc-500">
+                      <input
+                        type="checkbox"
+                        checked={monsterHidden}
+                        onChange={(e) => setMonsterHidden(e.target.checked)}
+                        className="accent-neon-magenta"
+                      />
+                      Hidden
+                    </label>
+                  )}
                   {monsterAlly && teamMode && controllerOptions.length > 0 && (
                     <AllyControllerSelect
                       compact

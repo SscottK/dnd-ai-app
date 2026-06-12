@@ -60,6 +60,26 @@ class EncounterViewerTeamTests(unittest.TestCase):
         self.assertEqual(view.team.turn_slots, ["goblin", PARTY_SLOT, "wolf"])
         self.assertEqual(len(view.team.party_roster), 2)
 
+    def test_player_view_hides_enemy_combat_stats(self) -> None:
+        state = EncounterState(
+            combatants=[
+                _enemy("goblin", "Goblin", 18),
+            ]
+        )
+        state.combatants[0].hp = 12
+        state.combatants[0].max_hp = 22
+        state.combatants[0].ac = 15
+        state.combatants[0].speed = 30
+        state.combatants[0].conditions = ["poisoned"]
+
+        view = encounter_for_viewer(state, is_owner=False)
+        goblin = view.combatants[0]
+        self.assertIsNone(goblin.hp)
+        self.assertIsNone(goblin.max_hp)
+        self.assertIsNone(goblin.ac)
+        self.assertIsNone(goblin.speed)
+        self.assertEqual(goblin.conditions, [])
+
     def test_player_view_hides_pc_rows_but_keeps_party_tracker_data(self) -> None:
         state = self._team_combat_state()
         view = encounter_for_viewer(state, is_owner=False)

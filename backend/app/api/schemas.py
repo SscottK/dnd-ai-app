@@ -388,6 +388,7 @@ class EncounterCombatant(BaseModel):
     combat_actions: list[CombatActionEntry] = Field(default_factory=list)
     death_save_failures: int = Field(default=0, ge=0, le=3)
     death_save_successes: int = Field(default=0, ge=0, le=3)
+    hidden_from_players: bool = False
 
     @field_validator("conditions", mode="before")
     @classmethod
@@ -480,6 +481,10 @@ class AdjustMovementRequest(BaseModel):
     delta: int = Field(ge=-1000, le=1000)
 
 
+class RevealCombatantRequest(BaseModel):
+    combatant_id: str = Field(min_length=1, max_length=64)
+
+
 class EncounterUpdate(BaseModel):
     round: int | None = Field(default=None, ge=1)
     active_index: int | None = Field(default=None, ge=0)
@@ -547,6 +552,7 @@ class EncounterEnemyInput(BaseModel):
     ac: int | None = Field(default=None, ge=0)
     conditions: list[str] = Field(default_factory=list)
     combat_actions: list[CombatActionEntry] = Field(default_factory=list)
+    hidden_at_start: bool = False
 
     @field_validator("conditions", mode="before")
     @classmethod
@@ -663,6 +669,7 @@ class SavedEncounterMonsterEntry(BaseModel):
     srd_name: str = Field(min_length=1, max_length=120)
     count: int = Field(default=1, ge=1, le=12)
     label: str | None = Field(default=None, max_length=120)
+    hidden_at_start: bool = False
 
 
 class SavedEncounterTemplateRead(BaseModel):

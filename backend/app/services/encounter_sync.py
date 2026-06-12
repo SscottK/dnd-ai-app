@@ -100,9 +100,23 @@ def encounter_for_viewer(state: EncounterState, *, is_owner: bool) -> EncounterS
         return state
 
     redacted = state.model_copy(deep=True)
+    redacted.combatants = [
+        combatant
+        for combatant in redacted.combatants
+        if not combatant.hidden_from_players or combatant.is_pc or combatant.is_ally
+    ]
     for combatant in redacted.combatants:
         if not combatant.is_pc and not combatant.is_ally:
             combatant.ac = None
+            combatant.speed = None
+            combatant.combat_actions = []
+            if combatant.hp is not None and combatant.hp <= 0:
+                combatant.hp = 0
+                combatant.max_hp = None
+            else:
+                combatant.hp = None
+                combatant.max_hp = None
+            combatant.conditions = []
 
     if is_team_mode(state):
         from app.services.team_initiative import party_pc_combatants

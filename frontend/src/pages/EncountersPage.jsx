@@ -14,7 +14,7 @@ import {
 
 function MonsterRowEditor({ row, index, token, onChange, onRemove, canRemove }) {
   return (
-    <div className="grid gap-2 rounded-sm border border-border/60 bg-void-deep/40 p-2 sm:grid-cols-[1fr_4rem_1fr_auto] sm:items-end">
+    <div className="grid gap-2 rounded-sm border border-border/60 bg-void-deep/40 p-2 sm:grid-cols-[1fr_4rem_1fr_auto_auto] sm:items-end">
       <label className="block min-w-0">
         <span className="text-[10px] font-black uppercase text-ink-faint">Stat block</span>
         <MonsterSrdSearch
@@ -45,6 +45,18 @@ function MonsterRowEditor({ row, index, token, onChange, onRemove, canRemove }) 
           placeholder={row.srd_name || "Uses SRD name"}
           className="w-full rounded-sm border border-border bg-black px-2 py-1.5 text-xs font-mono text-starlight"
         />
+      </label>
+      <label
+        className="flex items-center gap-1.5 self-center text-[10px] font-black uppercase text-ink-faint"
+        title="Hidden from players until you reveal them during combat"
+      >
+        <input
+          type="checkbox"
+          checked={Boolean(row.hidden_at_start)}
+          onChange={(e) => onChange(index, { ...row, hidden_at_start: e.target.checked })}
+          className="accent-neon-magenta"
+        />
+        Hidden
       </label>
       <button
         type="button"
@@ -105,6 +117,7 @@ export function EncountersPage() {
             srd_name: row.srd_name,
             count: row.count || 1,
             label: row.label || "",
+            hidden_at_start: Boolean(row.hidden_at_start),
           }))
         : [emptyMonsterRow()]
     );
@@ -128,6 +141,7 @@ export function EncountersPage() {
         srd_name: row.srd_name.trim(),
         count: row.count || 1,
         label: row.label?.trim() || null,
+        hidden_at_start: Boolean(row.hidden_at_start),
       }))
       .filter((row) => row.srd_name);
 

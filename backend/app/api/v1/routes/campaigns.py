@@ -27,6 +27,7 @@ from app.api.schemas import (
     EncounterState,
     EncounterUpdate,
     AdjustMovementRequest,
+    RevealCombatantRequest,
     CancelReadiedRequest,
     CombatantActionSheetResponse,
     MonsterSearchEntry,
@@ -91,6 +92,7 @@ from app.services.encounter_actions import (
     persist_encounter,
     resolve_active_index,
     roll_initiative_for_character,
+    reveal_hidden_combatant,
     sorted_combatants,
     sync_initiative_order_after_setup_change,
     upsert_pc_combatant,
@@ -1529,6 +1531,39 @@ def add_enemies_to_tracker(
     add_enemies_to_encounter(session, campaign, data.enemies)
     session.refresh(campaign)
     return build_encounter_response(session, campaign, is_owner=True)
+
+
+@router.post("/{campaign_id}/encounter/reveal-combatant", response_model=EncounterPatchResponse)
+def reveal_combatant_to_players(
+    campaign_id: int,
+    data: RevealCombatantRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can reveal hidden enemies",
+        )
+
+    state = parse_encounter(campaign)
+    try:
+        reveal_hidden_combatant(state, data.combatant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    ensure_active_combatant(state)
+    persist_encounter(session, campaign, state)
+    session.refresh(campaign)
+
+    end_response = _combat_end_response_if_needed(session, campaign, state, is_owner=True)
+    if end_response:
+        return end_response
+
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=True),
+    )
 
 
 @router.post("/{campaign_id}/encounter/add-from-template", response_model=EncounterPatchResponse)

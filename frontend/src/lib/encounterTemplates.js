@@ -1,7 +1,7 @@
 import { apiFetch } from "./api";
 
 export function emptyMonsterRow() {
-  return { srd_name: "", count: 1, label: "" };
+  return { srd_name: "", count: 1, label: "", hidden_at_start: false };
 }
 
 export async function fetchEncounterTemplates(token) {
@@ -68,7 +68,8 @@ export function formatTemplateSummary(template) {
     .map((row) => {
       const label = row.label?.trim();
       const base = label || row.srd_name;
-      return row.count > 1 ? `${base} ×${row.count}` : base;
+      const countLabel = row.count > 1 ? `${base} ×${row.count}` : base;
+      return row.hidden_at_start ? `${countLabel} (hidden)` : countLabel;
     })
     .join(", ");
   return { total, names };

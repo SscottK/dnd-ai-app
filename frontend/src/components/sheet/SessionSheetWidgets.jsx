@@ -13,8 +13,9 @@ import {
   isDefeatedEnemy,
   isWaitingForPcInitiative,
   parseEncounterPatchResponse,
+  shouldShowCombatantTrackerStats,
 } from "../../lib/encounterDisplay";
-import { encounterPatchBody } from "../../lib/encounterPatch";
+import { encounterPatchBody, revealHiddenCombatant } from "../../lib/encounterPatch";
 import {
   buildTrackerCombatants,
   combatHasStarted,
@@ -939,9 +940,17 @@ function InitiativeTurnBadge({ index, compact = false }) {
   );
 }
 
-function InitiativeStatusBadges({ combatant, isYou, isDefeated }) {
+function InitiativeStatusBadges({ combatant, isYou, isDefeated, isDmView = false }) {
   const badges = [];
   if (isDefeated) badges.push({ key: "defeated", label: "Defeated", className: "text-ink-faint" });
+  if (
+    isDmView &&
+    combatant.hidden_from_players &&
+    !combatant.is_pc &&
+    !combatant.is_ally
+  ) {
+    badges.push({ key: "hidden", label: "Hidden", className: "text-neon-magenta" });
+  }
   if (isPartySlotEntry(combatant)) {
     badges.push({ key: "party", label: "Party", className: "text-neon-cyan" });
   } else if (isYou) badges.push({ key: "you", label: "You", className: "text-neon-cyan" });
@@ -984,38 +993,59 @@ function InitiativeCombatantStats({
     );
   }
 
-  const conditions = formatConditionsList(combatant.conditions);
+  const showStats = shouldShowCombatantTrackerStats(combatant, isDmView);
+  const conditions = showStats ? formatConditionsList(combatant.conditions) : null;
   const economy = isActive ? turnEconomy?.[combatant.id] : null;
-  const turnStatuses = turnStatusLabels(economy, combatants);
-  const resourceSummary = isActive ? formatCombatResources(resourceSheet) : null;
+  const turnStatuses = showStats ? turnStatusLabels(economy, combatants) : [];
+  const resourceSummary =
+    showStats && isActive ? formatCombatResources(resourceSheet) : null;
+  const initValue =
+    combatant.hidden_from_players && !combatant.is_pc && !combatant.is_ally
+      ? "—"
+      : combatant.initiative;
   return (
     <div className="flex w-full flex-col gap-0.5">
-      <InitiativeLabeledStat label="Init" value={combatant.initiative} />
-      <InitiativeLabeledStat label="HP" value={combatantHpText(combatant)} />
-      <InitiativeLabeledStat label="AC" value={combatantAcText(combatant, isDmView)} />
-      <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant, economy)} />
-      {resourceSummary ? (
-        <InitiativeLabeledStat
-          label="Uses"
-          value={resourceSummary}
-          valueClassName="text-neon-cyan"
-        />
-      ) : null}
-      {turnStatuses.length ? (
-        <InitiativeLabeledStat
-          label="Turn"
-          value={turnStatuses.join(", ")}
-          valueClassName="text-neon-magenta"
-        />
-      ) : null}
-      {conditions ? (
-        <InitiativeLabeledStat label="Cond" value={conditions} valueClassName="text-neon-magenta" />
+      <InitiativeLabeledStat label="Init" value={initValue} />
+      {showStats ? (
+        <>
+          <InitiativeLabeledStat label="HP" value={combatantHpText(combatant)} />
+          <InitiativeLabeledStat label="AC" value={combatantAcText(combatant, isDmView)} />
+          <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant, economy)} />
+          {resourceSummary ? (
+            <InitiativeLabeledStat
+              label="Uses"
+              value={resourceSummary}
+              valueClassName="text-neon-cyan"
+            />
+          ) : null}
+          {turnStatuses.length ? (
+            <InitiativeLabeledStat
+              label="Turn"
+              value={turnStatuses.join(", ")}
+              valueClassName="text-neon-magenta"
+            />
+          ) : null}
+          {conditions ? (
+            <InitiativeLabeledStat
+              label="Cond"
+              value={conditions}
+              valueClassName="text-neon-magenta"
+            />
+          ) : null}
+        </>
       ) : null}
     </div>
   );
 }
 
-function initiativeCardClass(isActive, isYou, isSelected = false, isDefeated = false) {
+function initiativeCardClass(
+  isActive,
+  isYou,
+  isSelected = false,
+  isDefeated = false,
+  isHidden = false
+) {
+  if (isHidden) return "border-neon-magenta/50 border-dashed bg-void-deep/35";
   if (isDefeated) return "border-border/30 bg-void-deep/25 opacity-45";
   if (isSelected) return "border-starlight bg-starlight/10";
   if (isActive) return "border-starlight bg-starlight/5";
@@ -1058,6 +1088,8 @@ function DmCombatantEditor({
   onPatch,
   onRemove,
   onClose,
+  onReveal,
+  combatStarted = false,
   isActiveTurn = false,
   movementRemaining = null,
   onAdjustMovement,
@@ -1122,15 +1154,19 @@ function DmCombatantEditor({
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">Init</span>
-          <input
-            type="number"
-            value={combatant.initiative}
-            disabled={saving}
-            onChange={(e) =>
-              onPatch({ initiative: parseInt(e.target.value, 10) || 0 })
-            }
-            className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-xs sm:text-sm font-mono text-starlight"
-          />
+          {combatant.hidden_from_players && isEnemy ? (
+            <span className="w-10 text-center text-xs sm:text-sm font-mono text-ink-faint">—</span>
+          ) : (
+            <input
+              type="number"
+              value={combatant.initiative}
+              disabled={saving}
+              onChange={(e) =>
+                onPatch({ initiative: parseInt(e.target.value, 10) || 0 })
+              }
+              className="w-10 rounded-sm border border-border bg-black px-1 py-0.5 text-center text-xs sm:text-sm font-mono text-starlight"
+            />
+          )}
           <span className="text-[11px] sm:text-xs font-mono uppercase text-ink-faint">HP</span>
           <input
             type="number"
@@ -1216,6 +1252,32 @@ function DmCombatantEditor({
         />
         {isEnemy && (
           <div className="space-y-1.5">
+            {combatant.hidden_from_players && combatStarted ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={onReveal}
+                className="w-full rounded-sm border border-neon-magenta px-2 py-1.5 text-xs sm:text-sm font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+              >
+                Reveal to players (roll initiative)
+              </button>
+            ) : (
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm font-mono uppercase text-ink-faint">
+                <input
+                  type="checkbox"
+                  checked={Boolean(combatant.hidden_from_players)}
+                  disabled={saving || combatStarted}
+                  onChange={(e) =>
+                    onPatch({
+                      hidden_from_players: e.target.checked,
+                      initiative: e.target.checked ? 0 : combatant.initiative,
+                    })
+                  }
+                  className="accent-neon-magenta"
+                />
+                Hidden from players at combat start
+              </label>
+            )}
             <label className="flex items-center gap-1.5 text-xs sm:text-sm font-mono uppercase text-ink-faint">
               <input
                 type="checkbox"
@@ -1274,12 +1336,14 @@ function InitiativeCombatantRow({
   resourceSheet,
 }) {
   const selectable = isDmView && onSelect;
+  const isHidden =
+    isDmView && combatant.hidden_from_players && !combatant.is_pc && !combatant.is_ally;
   return (
     <li
       onClick={selectable ? () => onSelect(combatant.id) : undefined}
       className={`flex w-full items-center gap-3 rounded-sm border-2 px-3 py-3 sm:py-3.5 ${
         selectable ? "cursor-pointer" : ""
-      } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
+      } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated, isHidden)}`}
     >
       <InitiativeTurnBadge index={index} compact />
       <CombatantAvatar
@@ -1292,7 +1356,12 @@ function InitiativeCombatantRow({
         <p className="truncate text-xs font-black uppercase text-starlight" title={combatant.name}>
           {combatant.name}
         </p>
-        <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
+        <InitiativeStatusBadges
+          combatant={combatant}
+          isYou={isYou}
+          isDefeated={isDefeated}
+          isDmView={isDmView}
+        />
         <div className="mt-1 w-full max-w-full sm:max-w-[280px]">
           <InitiativeCombatantStats
             combatant={combatant}
@@ -1324,12 +1393,14 @@ function InitiativeCombatantCard({
   resourceSheet,
 }) {
   const selectable = isDmView && onSelect;
+  const isHidden =
+    isDmView && combatant.hidden_from_players && !combatant.is_pc && !combatant.is_ally;
   return (
     <div
       onClick={selectable ? () => onSelect(combatant.id) : undefined}
       className={`flex min-w-[9.5rem] max-w-[11rem] flex-1 flex-col items-stretch gap-2 border-2 p-2.5 sm:min-w-[7.5rem] sm:max-w-[9rem] ${
         selectable ? "cursor-pointer" : ""
-      } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated)}`}
+      } ${initiativeCardClass(isActive, isYou, isSelected, isDefeated, isHidden)}`}
     >
       <InitiativeTurnBadge index={index} />
       <div className="flex justify-center">
@@ -1355,7 +1426,12 @@ function InitiativeCombatantCard({
         isActive={isActive}
         resourceSheet={resourceSheet}
       />
-      <InitiativeStatusBadges combatant={combatant} isYou={isYou} isDefeated={isDefeated} />
+      <InitiativeStatusBadges
+        combatant={combatant}
+        isYou={isYou}
+        isDefeated={isDefeated}
+        isDmView={isDmView}
+      />
     </div>
   );
 }
@@ -1775,6 +1851,30 @@ export function InitiativeWidget({
       }
     },
     [token, campaignId]
+  );
+
+  const handleRevealCombatant = useCallback(
+    async (combatantId) => {
+      if (!token || !campaignId || !isOwner) return;
+      savingRef.current = true;
+      setSaving(true);
+      setActionError("");
+      try {
+        const parsed = await revealHiddenCombatant(token, campaignId, combatantId);
+        setEncounter(parsed.encounter);
+        if (parsed.combatEnded) {
+          setSelectedId(null);
+          notifyCombatEnded(parsed.combatLogText, parsed.reason);
+        }
+      } catch (err) {
+        setActionError(err.message || "Could not reveal enemy.");
+        await loadEncounter();
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    },
+    [token, campaignId, isOwner, loadEncounter, notifyCombatEnded]
   );
 
   const removeCombatant = (id) => {
@@ -2391,6 +2491,8 @@ export function InitiativeWidget({
             onPatch={(patch) => updateCombatant(selectedCombatant.id, patch)}
             onRemove={() => removeCombatant(selectedCombatant.id)}
             onClose={() => setSelectedId(null)}
+            combatStarted={combatHasStarted(encounter)}
+            onReveal={() => handleRevealCombatant(selectedCombatant.id)}
             isActiveTurn={activeCombatant?.id === selectedCombatant.id}
             movementRemaining={
               encounter.turn_economy?.[selectedCombatant.id]?.movement_remaining ?? null

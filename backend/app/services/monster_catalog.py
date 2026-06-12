@@ -237,7 +237,7 @@ def apply_monster_catalog_to_combatant(combatant: EncounterCombatant) -> Encount
         updated.max_hp = int(monster["hp_max"])
     if updated.ac is None and monster.get("armor_class") is not None:
         updated.ac = int(monster["armor_class"])
-    if updated.initiative == 0:
+    if updated.initiative == 0 and not updated.hidden_from_players:
         updated.initiative = monster_default_initiative(monster)
     if updated.speed is None:
         walk = monster_walk_speed(monster)

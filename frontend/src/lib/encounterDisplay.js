@@ -41,6 +41,12 @@ export function shouldShowCombatantAc(combatant, isDmView) {
   return playerCanSeeCombatantAc(combatant);
 }
 
+/** Whether HP, AC, speed, conditions, etc. appear on initiative tracker cards. */
+export function shouldShowCombatantTrackerStats(combatant, isDmView) {
+  if (isDmView) return true;
+  return playerCanSeeCombatantAc(combatant);
+}
+
 /** Normalize PATCH /encounter response (wraps encounter when combat auto-ends). */
 export function parseEncounterPatchResponse(data) {
   return parseCombatEndPayload(data);

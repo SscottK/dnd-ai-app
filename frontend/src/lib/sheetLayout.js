@@ -556,23 +556,20 @@ export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH, viewp
     return pullWidgetsIntoView(clampWidgets(widgets, nextW, nextH, viewportScale), nextW, nextH, viewportScale);
   }
 
-  const shrinking = nextW < prevW || nextH < prevH;
   const scaleX = nextW / prevW;
   const scaleY = nextH / prevH;
 
   const scaled = widgets.map((widget) => {
     const expandedH = widget.expandedH ?? widget.h;
-    const next = shrinking
-      ? clampWidget(widget, nextW, nextH, viewportScale)
-      : {
-          ...widget,
-          x: Math.round(widget.x * scaleX),
-          y: Math.round(widget.y * scaleY),
-          w: Math.round(widget.w * scaleX),
-          expandedH: Math.round(expandedH * scaleY),
-          h: widget.minimized ? MIN_PANE_HEIGHT : Math.round(expandedH * scaleY),
-        };
-    return shrinking ? next : clampWidget(next, nextW, nextH, viewportScale);
+    const next = {
+      ...widget,
+      x: Math.round(widget.x * scaleX),
+      y: Math.round(widget.y * scaleY),
+      w: Math.round(widget.w * scaleX),
+      expandedH: Math.round(expandedH * scaleY),
+      h: widget.minimized ? MIN_PANE_HEIGHT : Math.round(expandedH * scaleY),
+    };
+    return clampWidget(next, nextW, nextH, viewportScale);
   });
 
   return pullWidgetsIntoView(scaled, nextW, nextH, viewportScale);
