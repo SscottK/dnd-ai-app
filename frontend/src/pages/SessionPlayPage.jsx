@@ -70,6 +70,10 @@ import {
   WIDGET_TYPES,
   writeStoredDmLayout,
 } from "../lib/sheetLayout";
+import {
+  attachSessionCanvasResizeListeners,
+  resolveCanvasResizeAction,
+} from "../lib/sessionCanvasResize";
 import { NotesArchiveModal } from "../components/notes/NotesArchiveModal";
 import {
   fetchCampaignNotes,
@@ -725,8 +729,7 @@ export function SessionPlayPage() {
   );
 
   useEffect(() => {
-    const el = canvasRef.current;
-    if (!el || !sessionStatus?.session_active) return;
+    if (!sessionStatus?.session_active) return;
     if (!character && !(sessionStatus.is_owner && !sessionStatus.character_id)) return;
 
     const applyLayoutRecovery = (width, height, { reflow = false, prevW, prevH } = {}) => {
@@ -759,66 +762,47 @@ export function SessionPlayPage() {
       });
     };
 
-    const applyCanvasResize = (nextW, nextH) => {
-      if (nextW <= 0 || nextH <= 0) return;
-
-      const prev = canvasBoundsRef.current;
-      if (prev.width === nextW && prev.height === nextH) return;
-
-      const prevW = prev.width > 0 ? prev.width : nextW;
-      const prevH = prev.height > 0 ? prev.height : nextH;
-      canvasBoundsRef.current = { width: nextW, height: nextH };
-
-      applyLayoutRecovery(nextW, nextH, { reflow: true, prevW, prevH });
-
+    const queueLayoutSave = () => {
       if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
       resizeSaveTimer.current = setTimeout(() => {
         saveLayoutSnapshot(layoutRef.current);
       }, 500);
     };
 
-    const finalizeCanvasResize = () => {
-      const { width, height } = canvasBoundsRef.current;
-      if (width <= 0 || height <= 0) return;
-      applyLayoutRecovery(width, height, { reflow: false });
-      if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
-      resizeSaveTimer.current = setTimeout(() => {
-        saveLayoutSnapshot(layoutRef.current);
-      }, 500);
-    };
-
-    let raf = 0;
-    let resizeEndTimer = null;
-    const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        applyCanvasResize(Math.round(width), Math.round(height));
-        if (resizeEndTimer) clearTimeout(resizeEndTimer);
-        resizeEndTimer = setTimeout(finalizeCanvasResize, 120);
-      });
-    });
-
-    const onWindowResize = () => {
+    const remeasureCanvas = ({ finalize = false } = {}) => {
       const measured = measureCanvas();
       if (!measured) return;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        applyCanvasResize(measured.width, measured.height);
-        if (resizeEndTimer) clearTimeout(resizeEndTimer);
-        resizeEndTimer = setTimeout(finalizeCanvasResize, 120);
-      });
+
+      const action = resolveCanvasResizeAction(
+        canvasBoundsRef.current,
+        measured,
+        layoutRef.current?.viewport
+      );
+
+      if (action) {
+        canvasBoundsRef.current = { width: action.nextW, height: action.nextH };
+        applyLayoutRecovery(action.nextW, action.nextH, {
+          reflow: action.reflow,
+          prevW: action.prevW,
+          prevH: action.prevH,
+        });
+        queueLayoutSave();
+        return;
+      }
+
+      if (finalize) {
+        const { width, height } = canvasBoundsRef.current;
+        if (width > 0 && height > 0) {
+          applyLayoutRecovery(width, height, { reflow: false });
+          queueLayoutSave();
+        }
+      }
     };
 
-    observer.observe(el);
-    window.addEventListener("resize", onWindowResize);
-    return () => {
-      cancelAnimationFrame(raf);
-      if (resizeEndTimer) clearTimeout(resizeEndTimer);
-      if (resizeSaveTimer.current) clearTimeout(resizeSaveTimer.current);
-      window.removeEventListener("resize", onWindowResize);
-      observer.disconnect();
-    };
+    return attachSessionCanvasResizeListeners({
+      getCanvasEl: () => canvasRef.current,
+      onRemeasure: () => remeasureCanvas({ finalize: true }),
+    });
   }, [
     sessionStatus?.session_active,
     sessionStatus?.is_owner,
