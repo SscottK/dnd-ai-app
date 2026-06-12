@@ -113,14 +113,83 @@ function PartyMemberRow({ member, isYou, token, isOwner, onViewSheet, onPortrait
   ].filter(Boolean);
 
   const openSheet = () => onViewSheet?.(member);
+  const cardClass = `${
+    isYou ? "border-neon-cyan/60 bg-neon-cyan/5" : "border-border bg-void-deep/40"
+  } ${isOwner && onViewSheet ? "hover:border-neon-cyan/40" : ""}`;
+
+  if (horizontal) {
+    return (
+      <li
+        className={`flex min-w-[148px] max-w-[168px] shrink-0 flex-col items-center gap-2 rounded-sm border px-2 py-2.5 text-center ${cardClass}`}
+      >
+        <CombatantAvatar
+          portraitUrl={member.portrait_url}
+          token={token}
+          name={member.character_name}
+          size="lg"
+          onPreview={onPortraitPreview}
+        />
+        <button
+          type="button"
+          onClick={isOwner && onViewSheet ? openSheet : undefined}
+          disabled={!isOwner || !onViewSheet}
+          className={`min-w-0 w-full ${
+            isOwner && onViewSheet ? "cursor-pointer hover:opacity-90" : "cursor-default"
+          }`}
+        >
+          <p className="line-clamp-2 text-[11px] font-black uppercase leading-tight text-starlight">
+            {member.character_name}
+          </p>
+          {isYou && <p className="mt-0.5 text-[10px] font-black uppercase text-neon-cyan">You</p>}
+          {subtitle && (
+            <p className="mt-1 line-clamp-2 text-[10px] font-mono leading-snug text-ink-faint">
+              {subtitle}
+            </p>
+          )}
+        </button>
+        <div className="grid w-full grid-cols-3 gap-1 text-[10px] font-mono">
+          <div>
+            <p className="text-ink-faint">AC</p>
+            <p className="font-black text-starlight">{acLabel}</p>
+          </div>
+          <div>
+            <p className="text-ink-faint">HP</p>
+            <p className="font-black text-starlight">{hpLabel}</p>
+          </div>
+          <div>
+            <p className="text-ink-faint">Move</p>
+            <p className="font-black text-starlight">{speedLabel.replace(" ft", "")}</p>
+          </div>
+        </div>
+        {resourceLabels.length > 0 && (
+          <div className="flex w-full flex-col gap-1">
+            {resourceLabels.map((label) => (
+              <span
+                key={label}
+                className="rounded-sm border border-neon-magenta/30 bg-neon-magenta/5 px-1 py-0.5 text-[9px] font-mono leading-tight text-neon-magenta"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
+        {isOwner && onViewSheet && (
+          <button
+            type="button"
+            onClick={() => onViewSheet(member)}
+            className="w-full rounded-sm border border-neon-cyan/50 px-2 py-1 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
+            title={`View ${member.character_name}'s sheet`}
+          >
+            Sheet
+          </button>
+        )}
+      </li>
+    );
+  }
 
   return (
     <li
-      className={`flex items-center gap-2 rounded-sm border px-2 py-2 ${
-        horizontal ? "min-w-[220px] shrink-0" : ""
-      } ${
-        isYou ? "border-neon-cyan/60 bg-neon-cyan/5" : "border-border bg-void-deep/40"
-      } ${isOwner && onViewSheet ? "hover:border-neon-cyan/40" : ""}`}
+      className={`flex items-center gap-2 rounded-sm border px-2 py-2 ${cardClass}`}
     >
       <CombatantAvatar
         portraitUrl={member.portrait_url}
@@ -189,6 +258,7 @@ export function PartyWidget({
   isOwner = false,
   orientation = PANE_ORIENTATION_VERTICAL,
   onOrientationChange,
+  portraitSyncKey = null,
 }) {
   const isHorizontal = orientation === PANE_ORIENTATION_HORIZONTAL;
   const [members, setMembers] = useState([]);
@@ -231,6 +301,11 @@ export function PartyWidget({
     const timer = setInterval(loadParty, 8000);
     return () => clearInterval(timer);
   }, [loadParty]);
+
+  useEffect(() => {
+    if (portraitSyncKey == null) return;
+    void loadParty();
+  }, [portraitSyncKey, loadParty]);
 
   if (loading) {
     return <p className="text-xs sm:text-sm font-mono text-ink-faint">Loading party...</p>;

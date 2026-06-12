@@ -45,6 +45,17 @@ export function getProficiencyBonus(sheet) {
   return sheet?.proficiency_bonus ?? null;
 }
 
+export function proficiencyBonusFromLevel(level) {
+  if (level == null || level === "") return null;
+  const parsed = Number(level);
+  if (Number.isNaN(parsed) || parsed < 1) return null;
+  return Math.floor((parsed - 1) / 4) + 2;
+}
+
+export function resolveProficiencyBonus(sheet, level) {
+  return getProficiencyBonus(sheet) ?? proficiencyBonusFromLevel(level);
+}
+
 export function resolveSaveBonus(save, sheet) {
   if (save?.bonus != null) return save.bonus;
   const mod = abilityModifier(sheet?.abilities?.[save?.ability]) ?? 0;

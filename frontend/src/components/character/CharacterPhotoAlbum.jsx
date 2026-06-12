@@ -4,6 +4,13 @@ import { apiFetch, apiUpload } from "../../lib/api";
 import { AuthenticatedImage } from "../sheet/AuthenticatedImage";
 import { PortraitPreviewModal } from "../sheet/PortraitPreviewModal";
 
+function portraitPreviewUrl(portraitUrl, portraitPhotoId) {
+  if (!portraitUrl) return null;
+  if (portraitPhotoId == null) return portraitUrl;
+  const base = portraitUrl.split("?")[0];
+  return `${base}?photo=${portraitPhotoId}`;
+}
+
 export function CharacterPhotoAlbum({
   characterId,
   portraitUrl,
@@ -29,8 +36,10 @@ export function CharacterPhotoAlbum({
       const data = await res.json();
       setPhotos(data.photos || []);
       setActivePortraitId(data.portrait_photo_id ?? null);
+      setError("");
     } catch (err) {
       console.error(err);
+      setError("Could not load photo album.");
     }
   }, [characterId, token]);
 
@@ -42,9 +51,26 @@ export function CharacterPhotoAlbum({
     setActivePortraitId(portraitPhotoId ?? null);
   }, [portraitPhotoId]);
 
+  useEffect(() => {
+    const reload = () => {
+      if (document.visibilityState === "visible") {
+        void loadAlbum();
+      }
+    };
+    document.addEventListener("visibilitychange", reload);
+    window.addEventListener("focus", reload);
+    return () => {
+      document.removeEventListener("visibilitychange", reload);
+      window.removeEventListener("focus", reload);
+    };
+  }, [loadAlbum]);
+
   const refreshCharacter = async () => {
     const charRes = await apiFetch(`/characters/${characterId}`, { token });
-    if (charRes.ok) onPortraitChange?.(await charRes.json());
+    if (!charRes.ok) return;
+    const character = await charRes.json();
+    setActivePortraitId(character.portrait_photo_id ?? null);
+    onPortraitChange?.(character);
   };
 
   const handleFile = async (file) => {
@@ -60,7 +86,7 @@ export function CharacterPhotoAlbum({
       const data = await res.json();
       setPhotos(data.photos || []);
       setActivePortraitId(data.portrait_photo_id ?? null);
-      if (data.portrait_photo_id) await refreshCharacter();
+      await refreshCharacter();
     } catch (err) {
       setError(err.message || "Could not add photo.");
     } finally {
@@ -129,10 +155,7 @@ export function CharacterPhotoAlbum({
 
   const activePhoto = photos.find((photo) => photo.id === activePortraitId);
   const previewSrc =
-    activePhoto?.url ||
-    (portraitUrl && activePortraitId
-      ? `${portraitUrl.split("?")[0]}?photo=${activePortraitId}`
-      : portraitUrl);
+    activePhoto?.url || portraitPreviewUrl(portraitUrl, activePortraitId);
 
   return (
     <div
@@ -167,7 +190,7 @@ export function CharacterPhotoAlbum({
             title="View larger portrait"
           >
             <AuthenticatedImage
-              key={activePortraitId ?? "no-portrait"}
+              key={`${activePortraitId ?? "none"}-${previewSrc}`}
               src={previewSrc}
               token={token}
               alt={characterName || "Character"}
@@ -181,7 +204,7 @@ export function CharacterPhotoAlbum({
           </button>
         ) : (
           <AuthenticatedImage
-            key={activePortraitId ?? "no-portrait"}
+            key={`${activePortraitId ?? "none"}-empty`}
             src={previewSrc}
             token={token}
             alt={characterName || "Character"}

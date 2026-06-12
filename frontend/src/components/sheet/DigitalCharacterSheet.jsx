@@ -8,7 +8,7 @@ import {
   ABILITY_LABELS,
   formatModifier,
   getInitiativeBonus,
-  getProficiencyBonus,
+  resolveProficiencyBonus,
   itemAffectsAc,
   resolveCombatStats,
   resolvePassiveSkill,
@@ -216,7 +216,8 @@ function CombatStrip({
   onSheetChange,
   readOnly = false,
 }) {
-  const prof = getProficiencyBonus(sheet);
+  const prof = resolveProficiencyBonus(sheet, character?.level);
+  const displaySpeed = sheet.speed ?? combat.speed;
   const init = getInitiativeBonus(sheet);
   const resources = sheet.resources || [];
 
@@ -228,33 +229,33 @@ function CombatStrip({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {readOnly || !onSheetChange ? (
           <StatPill label="Prof" value={prof != null ? `+${prof}` : "—"} />
         ) : (
           <label className="rounded-sm border border-zinc-800 px-2 py-2 text-center focus-within:border-neon-cyan/50">
-            <p className="text-[10px] font-black uppercase text-zinc-600 lg:text-xs">Prof</p>
+            <p className="text-[10px] font-black uppercase text-zinc-600">Prof</p>
             <input
               type="number"
               min={2}
               max={12}
-              value={sheet.proficiency_bonus ?? ""}
+              value={sheet.proficiency_bonus ?? prof ?? ""}
               onChange={(e) => onSheetChange(setProficiencyBonus(sheet, e.target.value))}
-              className="w-full border-0 bg-transparent text-center text-base font-black tabular-nums text-starlight focus:outline-none lg:text-lg"
+              className="w-full min-w-0 border-0 bg-transparent text-center text-base font-black tabular-nums text-starlight focus:outline-none"
             />
           </label>
         )}
         {readOnly || !onSheetChange ? (
-          <StatPill label="Speed" value={combat.speed != null ? `${combat.speed}` : "—"} />
+          <StatPill label="Speed" value={displaySpeed != null ? `${displaySpeed}` : "—"} />
         ) : (
           <label className="rounded-sm border border-zinc-800 px-2 py-2 text-center focus-within:border-neon-cyan/50">
-            <p className="text-[10px] font-black uppercase text-zinc-600 lg:text-xs">Speed</p>
+            <p className="text-[10px] font-black uppercase text-zinc-600">Speed</p>
             <input
               type="number"
               min={0}
-              value={sheet.speed ?? ""}
+              value={sheet.speed ?? displaySpeed ?? ""}
               onChange={(e) => onSheetChange(setSheetSpeed(sheet, e.target.value))}
-              className="w-full border-0 bg-transparent text-center text-base font-black tabular-nums text-starlight focus:outline-none lg:text-lg"
+              className="w-full min-w-0 border-0 bg-transparent text-center text-base font-black tabular-nums text-starlight focus:outline-none"
             />
           </label>
         )}
@@ -320,6 +321,7 @@ function CombatStrip({
           </>
         )}
       </div>
+      <div className="max-h-36 space-y-1 overflow-y-auto pr-0.5">
       {resources.map((resource, index) => (
         <div
           key={resource.id || index}
@@ -358,6 +360,7 @@ function CombatStrip({
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -713,7 +716,7 @@ export function DigitalCharacterSheet({
         />
 
         <div className="grid gap-3 lg:grid-cols-12 lg:gap-4">
-          <div className="lg:col-span-2 xl:col-span-2">
+          <div className="lg:col-span-2">
             <SheetSection title="Saves & senses" compact>
               <SavesGrid sheet={sheet} onShowDetail={setDetail} />
               <div className="mt-1.5 border-t border-zinc-900 pt-1.5">
@@ -722,13 +725,13 @@ export function DigitalCharacterSheet({
             </SheetSection>
           </div>
 
-          <div className="lg:col-span-7 xl:col-span-8">
+          <div className="lg:col-span-6">
             <SheetSection title="Skills" compact>
               <SkillsGrid sheet={sheet} onShowDetail={setDetail} />
             </SheetSection>
           </div>
 
-          <div className="lg:col-span-3 xl:col-span-2">
+          <div className="lg:col-span-4">
             <SheetSection title="Combat" compact>
               <CombatStrip
                 character={character}

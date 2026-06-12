@@ -998,9 +998,14 @@ export function SessionPlayPage() {
         let next = { ...w, [orientationKey]: orientation };
         if (orientation === PANE_ORIENTATION_HORIZONTAL && w.type === "party") {
           const memberCount = 4;
-          const idealW = Math.min(canvasW - w.x, Math.max(w.w, 180 + memberCount * 120));
+          const cardW = 168;
+          const gap = 8;
+          const idealW = Math.min(
+            canvasW - w.x,
+            Math.max(w.w, 40 + memberCount * (cardW + gap))
+          );
           next.w = idealW;
-          next.h = Math.min(Math.max(180, w.h), Math.max(140, canvasH - w.y));
+          next.h = Math.min(Math.max(220, w.h), Math.max(180, canvasH - w.y));
         }
         const viewportScale = prev.viewport?.scale ?? DEFAULT_ZOOM;
         return clampWidget(next, canvasW, canvasH, viewportScale);
@@ -1336,12 +1341,13 @@ export function SessionPlayPage() {
             characterName={character.name}
             token={token}
             onPortraitChange={(data) => {
-              const sheetData = parseSheetJson(data.sheet_json);
-              const nextCharacter = applyEquipmentToCharacter(data, sheetData);
+              const nextCharacter = {
+                ...characterRef.current,
+                portrait_url: data.portrait_url,
+                portrait_photo_id: data.portrait_photo_id,
+              };
               setCharacter(nextCharacter);
-              setSheet(sheetData);
               characterRef.current = nextCharacter;
-              sheetRef.current = sheetData;
             }}
           />
         ) : (
@@ -1381,6 +1387,7 @@ export function SessionPlayPage() {
             characterId={character?.id}
             isOwner={sessionStatus?.is_owner}
             orientation={widget.partyOrientation}
+            portraitSyncKey={character?.portrait_photo_id ?? character?.portrait_url}
             onOrientationChange={(nextOrientation) =>
               setWidgetOrientation(widget.id, "partyOrientation", nextOrientation)
             }
