@@ -552,6 +552,13 @@ function findOpenSlot(widget, placed, effW, effH, startX, startY, gap = 12) {
   };
 }
 
+/** Clamp and nudge panes inside the canvas without re-slotting them to new positions. */
+export function fitWidgetsToCanvas(widgets, canvasW, canvasH, viewportScale = 1) {
+  return clampWidgets(widgets, canvasW, canvasH, viewportScale).map((widget) =>
+    nudgeWidgetIntoView(widget, canvasW, canvasH, viewportScale)
+  );
+}
+
 /** Recover panes after resize/zoom so none stay hidden outside the visible canvas. */
 export function pullWidgetsIntoView(widgets, canvasW, canvasH, viewportScale = 1) {
   const { width: effW, height: effH } = effectiveLayoutSize(canvasW, canvasH, viewportScale);
@@ -598,7 +605,7 @@ export function inferLayoutExtents(widgets) {
 /** Scale pane positions and sizes proportionally when the viewport changes, then clamp. */
 export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH, viewportScale = 1) {
   if (!prevW || !prevH || (prevW === nextW && prevH === nextH)) {
-    return pullWidgetsIntoView(clampWidgets(widgets, nextW, nextH, viewportScale), nextW, nextH, viewportScale);
+    return fitWidgetsToCanvas(widgets, nextW, nextH, viewportScale);
   }
 
   const scaleX = nextW / prevW;
@@ -618,7 +625,7 @@ export function reflowWidgetsOnResize(widgets, prevW, prevH, nextW, nextH, viewp
     return clampWidget(next, nextW, nextH, viewportScale);
   });
 
-  return pullWidgetsIntoView(scaled, nextW, nextH, viewportScale);
+  return fitWidgetsToCanvas(scaled, nextW, nextH, viewportScale);
 }
 
 export function vttZoneDefault(canvasW, canvasH) {

@@ -57,6 +57,7 @@ import {
   computeHorizontalInitiativeWidth,
   createWidget,
   defaultViewport,
+  fitWidgetsToCanvas,
   pullWidgetsIntoView,
   hydrateLayout,
   INITIATIVE_ORIENTATION_HORIZONTAL,
@@ -73,7 +74,6 @@ import {
 import {
   attachSessionCanvasResizeListeners,
   resolveCanvasResizeAction,
-  widgetsOverflowCanvas,
 } from "../lib/sessionCanvasResize";
 import { NotesArchiveModal } from "../components/notes/NotesArchiveModal";
 import {
@@ -753,7 +753,7 @@ export function SessionPlayPage() {
               height,
               viewportScale
             )
-          : pullWidgetsIntoView(
+          : fitWidgetsToCanvas(
               prevLayout.widgets,
               width,
               height,
@@ -785,57 +785,37 @@ export function SessionPlayPage() {
       if (!measured) return;
 
       canvasBoundsRef.current = { width: measured.width, height: measured.height };
-      const layoutSnapshot = layoutRef.current;
-      const viewportScale = layoutSnapshot?.viewport?.scale ?? DEFAULT_ZOOM;
 
-      if (!finalize) {
-        if (
-          widgetsOverflowCanvas(
-            layoutSnapshot?.widgets,
-            measured.width,
-            measured.height,
-            viewportScale
-          )
-        ) {
-          applyLayoutRecovery(measured.width, measured.height, {
-            reflow: false,
-            updateViewport: false,
-          });
-        }
-        return;
-      }
+      // Never move panes while the window is still being dragged — only after it settles.
+      if (!finalize) return;
 
       if (!lastReflowBoundsRef.current.width || !lastReflowBoundsRef.current.height) {
         lastReflowBoundsRef.current = { width: measured.width, height: measured.height };
+        setLayout((prevLayout) => {
+          const next = {
+            ...prevLayout,
+            viewport: withCanvasViewport(prevLayout.viewport, measured.width, measured.height),
+          };
+          layoutRef.current = next;
+          return next;
+        });
         return;
       }
 
       const action = resolveCanvasResizeAction(measured, lastReflowBoundsRef.current);
-      if (action?.reflow) {
-        lastReflowBoundsRef.current = { width: action.nextW, height: action.nextH };
-        applyLayoutRecovery(action.nextW, action.nextH, {
-          reflow: true,
-          prevW: action.prevW,
-          prevH: action.prevH,
-          updateViewport: true,
-        });
-        queueLayoutSave();
+      if (!action?.reflow) {
+        lastReflowBoundsRef.current = { width: measured.width, height: measured.height };
         return;
       }
 
-      if (
-        widgetsOverflowCanvas(
-          layoutSnapshot?.widgets,
-          measured.width,
-          measured.height,
-          viewportScale
-        )
-      ) {
-        applyLayoutRecovery(measured.width, measured.height, {
-          reflow: false,
-          updateViewport: true,
-        });
-      }
+      lastReflowBoundsRef.current = { width: action.nextW, height: action.nextH };
+      applyLayoutRecovery(action.nextW, action.nextH, {
+        reflow: true,
+        prevW: action.prevW,
+        prevH: action.prevH,
+        updateViewport: true,
+      });
+      queueLayoutSave();
     };
 
     return attachSessionCanvasResizeListeners({

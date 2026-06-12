@@ -3,8 +3,6 @@
  * ResizeObserver, visualViewport (zoom / mobile chrome), monitor moves, and DPI changes.
  */
 
-import { effectiveLayoutSize, inferLayoutExtents } from "./sheetLayout";
-
 const SIZE_EPSILON = 8;
 
 function sizesDiffer(a, b) {
@@ -42,14 +40,6 @@ export function resolveCanvasResizeAction(measured, lastReflowBounds) {
     prevH,
     reflow: true,
   };
-}
-
-/** True when any pane extends past the visible layout area. */
-export function widgetsOverflowCanvas(widgets, canvasW, canvasH, viewportScale = 1) {
-  if (!canvasW || !canvasH || !widgets?.length) return false;
-  const { width: effW, height: effH } = effectiveLayoutSize(canvasW, canvasH, viewportScale);
-  const { maxRight, maxBottom } = inferLayoutExtents(widgets);
-  return maxRight > effW + SIZE_EPSILON || maxBottom > effH + SIZE_EPSILON;
 }
 
 /**
