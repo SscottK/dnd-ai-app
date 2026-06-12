@@ -732,7 +732,11 @@ export function SessionPlayPage() {
     if (!sessionStatus?.session_active) return;
     if (!character && !(sessionStatus.is_owner && !sessionStatus.character_id)) return;
 
-    const applyLayoutRecovery = (width, height, { reflow = false, prevW, prevH } = {}) => {
+    const applyLayoutRecovery = (
+      width,
+      height,
+      { reflow = false, prevW, prevH, updateViewport = true } = {}
+    ) => {
       if (width <= 0 || height <= 0) return;
 
       setLayout((prevLayout) => {
@@ -755,7 +759,9 @@ export function SessionPlayPage() {
         const next = {
           ...prevLayout,
           widgets,
-          viewport: withCanvasViewport(prevLayout.viewport, width, height),
+          viewport: updateViewport
+            ? withCanvasViewport(prevLayout.viewport, width, height)
+            : prevLayout.viewport,
         };
         layoutRef.current = next;
         return next;
@@ -773,29 +779,31 @@ export function SessionPlayPage() {
       const measured = measureCanvas();
       if (!measured) return;
 
+      const layoutSnapshot = layoutRef.current;
       const action = resolveCanvasResizeAction(
-        canvasBoundsRef.current,
         measured,
-        layoutRef.current?.viewport
+        layoutSnapshot?.viewport,
+        layoutSnapshot?.widgets
       );
 
-      if (action) {
+      if (action?.reflow) {
         canvasBoundsRef.current = { width: action.nextW, height: action.nextH };
         applyLayoutRecovery(action.nextW, action.nextH, {
-          reflow: action.reflow,
+          reflow: true,
           prevW: action.prevW,
           prevH: action.prevH,
+          updateViewport: true,
         });
         queueLayoutSave();
         return;
       }
 
       if (finalize) {
-        const { width, height } = canvasBoundsRef.current;
-        if (width > 0 && height > 0) {
-          applyLayoutRecovery(width, height, { reflow: false });
-          queueLayoutSave();
-        }
+        canvasBoundsRef.current = { width: measured.width, height: measured.height };
+        applyLayoutRecovery(measured.width, measured.height, {
+          reflow: false,
+          updateViewport: false,
+        });
       }
     };
 
