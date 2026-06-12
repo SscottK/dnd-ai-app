@@ -13,6 +13,7 @@ import {
   Radio,
   Scroll,
   Sparkles,
+  Skull,
   Swords,
   Upload,
   UserMinus,
@@ -572,6 +573,14 @@ export function DashboardPage() {
             <Scroll className="mb-2 h-5 w-5 text-neon-cyan group-hover:text-starlight" />
             <h3 className="text-sm font-black uppercase text-starlight">SRD browser</h3>
             <p className="mt-1 text-xs text-ink-muted sm:text-sm">Browse spells, monsters, and magic items</p>
+          </Link>
+          <Link
+            to="/encounters"
+            className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-magenta/60 hover:bg-neon-magenta/5"
+          >
+            <Skull className="mb-2 h-5 w-5 text-neon-magenta group-hover:text-starlight" />
+            <h3 className="text-sm font-black uppercase text-starlight">Encounter library</h3>
+            <p className="mt-1 text-xs text-ink-muted sm:text-sm">Save monster groups for your campaigns</p>
           </Link>
           <div
             aria-disabled="true"

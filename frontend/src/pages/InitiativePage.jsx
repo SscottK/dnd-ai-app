@@ -43,6 +43,8 @@ import { TeamRosterRollModal } from "../components/initiative/TeamRosterRollModa
 import { PassCombatDialog } from "../components/initiative/PassCombatDialog";
 import { AllyControllerSelect } from "../components/initiative/AllyControllerSelect";
 import { ReadiedActionsPanel } from "../components/initiative/ReadiedActionsPanel";
+import { MonsterSrdSearch } from "../components/encounter/MonsterSrdSearch";
+import { SavedEncounterLoader } from "../components/encounter/SavedEncounterLoader";
 import {
   EncounterCombatLog,
   TurnActionsPanel,
@@ -92,10 +94,10 @@ export function InitiativePage() {
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [monsterName, setMonsterName] = useState("");
+  const [monsterLabel, setMonsterLabel] = useState("");
   const [monsterInit, setMonsterInit] = useState("10");
   const [monsterAlly, setMonsterAlly] = useState(false);
   const [monsterControllerId, setMonsterControllerId] = useState(null);
-  const [monsterSuggestions, setMonsterSuggestions] = useState([]);
   const [sessionActive, setSessionActive] = useState(false);
   const [movementBusy, setMovementBusy] = useState(false);
   const [activeResourceSheet, setActiveResourceSheet] = useState(null);
@@ -133,33 +135,6 @@ export function InitiativePage() {
       window.removeEventListener("pointerup", onPointerUp);
     };
   }, []);
-
-  useEffect(() => {
-    if (!token || !isOwner || monsterName.trim().length < 2) {
-      setMonsterSuggestions([]);
-      return undefined;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      void apiFetch(`/campaigns/srd-monsters/search?q=${encodeURIComponent(monsterName.trim())}`, {
-        token,
-      })
-        .then(async (res) => {
-          if (!res.ok) throw new Error("Search failed");
-          const data = await res.json();
-          if (!cancelled) setMonsterSuggestions(data.monsters || []);
-        })
-        .catch(() => {
-          if (!cancelled) setMonsterSuggestions([]);
-        });
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [token, isOwner, monsterName]);
 
   const saveEncounter = useCallback(
     async (next) => {
@@ -364,33 +339,66 @@ export function InitiativePage() {
     pushEncounter(next);
   };
 
-  const addMonster = (e) => {
+  const addMonster = async (e) => {
     e.preventDefault();
-    if (!monsterName.trim()) return;
-    const next = {
-      ...encounter,
-      combatants: [
-        ...encounter.combatants,
-        {
-          id: newId(),
-          name: monsterName.trim(),
-          initiative: parseInt(monsterInit, 10) || 0,
-          is_pc: false,
-          is_ally: monsterAlly,
-          controller_character_id:
-            monsterAlly && teamMode ? monsterControllerId : null,
-          character_id: null,
-          hp: null,
-          max_hp: null,
-          ac: null,
-          conditions: [],
-        },
-      ],
-    };
-    pushEncounter(next);
-    setMonsterName("");
-    setMonsterAlly(false);
-    setMonsterControllerId(null);
+    const srdName = monsterName.trim();
+    if (!srdName || !token || !campaignId || !isOwner) return;
+
+    const initiative = parseInt(monsterInit, 10) || 0;
+    const label = monsterLabel.trim();
+
+    if (monsterAlly) {
+      const next = {
+        ...encounter,
+        combatants: [
+          ...encounter.combatants,
+          {
+            id: newId(),
+            name: label || srdName,
+            srd_name: srdName,
+            initiative,
+            is_pc: false,
+            is_ally: true,
+            controller_character_id: teamMode ? monsterControllerId : null,
+            character_id: null,
+            hp: null,
+            max_hp: null,
+            ac: null,
+            conditions: [],
+          },
+        ],
+      };
+      pushEncounter(next);
+      setMonsterName("");
+      setMonsterLabel("");
+      setMonsterAlly(false);
+      setMonsterControllerId(null);
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      const enemy = { srd_name: srdName, name: srdName, initiative };
+      if (label) enemy.label = label;
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/add-enemies`, {
+        token,
+        method: "POST",
+        body: { enemies: [enemy] },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not add monster");
+      }
+      const parsed = parseEncounterPatchResponse(await res.json());
+      setEncounter(parsed.encounter);
+      setMonsterName("");
+      setMonsterLabel("");
+    } catch (err) {
+      setError(err.message || "Could not add monster.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateCombatant = (id, patch) => {
@@ -1140,6 +1148,15 @@ export function InitiativePage() {
 
             {isOwner && (
               <div className="mt-6 space-y-4">
+                <div className="p-4 border-2 border-starlight/40 bg-zinc-950">
+                  <SavedEncounterLoader
+                    campaignId={campaignId}
+                    token={token}
+                    onEncounterUpdate={setEncounter}
+                    onError={setError}
+                  />
+                </div>
+
                 {roster.length > 0 && (
                   <div className="p-4 border-2 border-neon-cyan/50 bg-zinc-950">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -1170,38 +1187,20 @@ export function InitiativePage() {
                 )}
 
                 <form onSubmit={addMonster} className="p-4 border-2 border-neon-magenta bg-black flex flex-wrap gap-2">
-                  <div className="relative flex-1 min-w-[160px]">
-                    <input
-                      type="text"
-                      value={monsterName}
-                      onChange={(e) => setMonsterName(e.target.value)}
-                      placeholder="SRD monster name (e.g. Goblin)"
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
-                      autoComplete="off"
-                    />
-                    {monsterSuggestions.length > 0 && (
-                      <ul className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto border border-zinc-700 bg-black shadow-lg">
-                        {monsterSuggestions.map((monster) => (
-                          <li key={monster.name}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMonsterName(monster.name);
-                                setMonsterSuggestions([]);
-                              }}
-                              className="flex w-full items-center justify-between px-3 py-2 text-left text-[11px] font-mono hover:bg-zinc-900"
-                            >
-                              <span className="font-black text-starlight">{monster.name}</span>
-                              <span className="text-zinc-500">
-                                CR {monster.cr}
-                                {monster.action_count ? ` · ${monster.action_count} actions` : ""}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <MonsterSrdSearch
+                    token={token}
+                    value={monsterName}
+                    onChange={setMonsterName}
+                    className="flex-1 min-w-[160px]"
+                    inputClassName="w-full px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
+                  />
+                  <input
+                    type="text"
+                    value={monsterLabel}
+                    onChange={(e) => setMonsterLabel(e.target.value)}
+                    placeholder="Label (optional)"
+                    className="min-w-[120px] flex-1 px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
+                  />
                   <input
                     type="number"
                     value={monsterInit}

@@ -219,11 +219,14 @@ def apply_monster_catalog_to_combatant(combatant: EncounterCombatant) -> Encount
     if combatant.is_pc or combatant.character_id:
         return combatant
 
-    monster = lookup_monster(combatant.name)
+    lookup_name = combatant.srd_name or combatant.name
+    monster = lookup_monster(lookup_name)
     if monster is None:
         return combatant
 
     updated = combatant.model_copy(deep=True)
+    if not updated.srd_name and monster.get("name"):
+        updated.srd_name = str(monster["name"])
     srd_actions = monster_to_combat_actions(monster)
     if srd_actions:
         updated.combat_actions = srd_actions

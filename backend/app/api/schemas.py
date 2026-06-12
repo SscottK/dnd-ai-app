@@ -373,6 +373,7 @@ class TeamInitiativeState(BaseModel):
 class EncounterCombatant(BaseModel):
     id: str
     name: str
+    srd_name: str | None = Field(default=None, max_length=120)
     initiative: int = 0
     is_pc: bool = False
     is_ally: bool = False
@@ -533,7 +534,9 @@ class LatestCombatLogResponse(BaseModel):
 
 
 class EncounterEnemyInput(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: str | None = Field(default=None, max_length=120)
+    srd_name: str | None = Field(default=None, max_length=120)
+    label: str | None = Field(default=None, max_length=120)
     count: int = Field(default=1, ge=1, le=12)
     initiative: int = 0
     hp: int | None = Field(default=None, ge=0)
@@ -651,3 +654,38 @@ class NoteCampaignOption(BaseModel):
 class UserNotesPageResponse(BaseModel):
     notes: list[UserNoteRead]
     campaigns: list[NoteCampaignOption]
+
+
+class SavedEncounterMonsterEntry(BaseModel):
+    srd_name: str = Field(min_length=1, max_length=120)
+    count: int = Field(default=1, ge=1, le=12)
+    label: str | None = Field(default=None, max_length=120)
+
+
+class SavedEncounterTemplateRead(BaseModel):
+    id: int
+    title: str
+    notes: str
+    monsters: list[SavedEncounterMonsterEntry]
+    created_at: datetime
+    updated_at: datetime
+
+
+class SavedEncounterTemplateListResponse(BaseModel):
+    templates: list[SavedEncounterTemplateRead]
+
+
+class SavedEncounterTemplateCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    notes: str = Field(default="", max_length=2000)
+    monsters: list[SavedEncounterMonsterEntry] = Field(min_length=1)
+
+
+class SavedEncounterTemplateUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    notes: str | None = Field(default=None, max_length=2000)
+    monsters: list[SavedEncounterMonsterEntry] | None = None
+
+
+class AddEncounterFromTemplateRequest(BaseModel):
+    template_id: int

@@ -6,6 +6,7 @@ from sqlmodel import select
 from app.api.deps import CurrentUser, SessionDep
 from app.api.schemas import (
     AddEncounterEnemiesRequest,
+    AddEncounterFromTemplateRequest,
     AddRosterRequest,
     AddRosterTeamRequest,
     FinishPartySliceRequest,
@@ -103,6 +104,11 @@ from app.services.encounter_sync import (
     enrich_encounter_pc_stats,
     enrich_encounter_portraits,
     sync_encounter_combatants_to_characters,
+)
+from app.services.saved_encounter_templates import (
+    SavedEncounterTemplateError,
+    get_template_for_user,
+    template_to_read,
 )
 from app.services.monster_catalog import (
     apply_monster_catalog_to_combatant,
@@ -1469,6 +1475,39 @@ def add_enemies_to_tracker(
     add_enemies_to_encounter(session, campaign, data.enemies)
     session.refresh(campaign)
     return build_encounter_response(session, campaign, is_owner=True)
+
+
+@router.post("/{campaign_id}/encounter/add-from-template", response_model=EncounterPatchResponse)
+def add_encounter_from_template(
+    campaign_id: int,
+    data: AddEncounterFromTemplateRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    campaign, is_owner = get_campaign_for_member_or_owner(campaign_id, current_user, session)
+    if not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the campaign owner can add saved encounters to the tracker",
+        )
+
+    try:
+        record = get_template_for_user(session, current_user.id, data.template_id)
+        monsters = template_to_read(record).monsters
+    except SavedEncounterTemplateError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    add_enemies_to_encounter(session, campaign, monsters)
+    session.refresh(campaign)
+
+    state = parse_encounter(campaign)
+    end_response = _combat_end_response_if_needed(session, campaign, state, is_owner=True)
+    if end_response:
+        return end_response
+
+    return EncounterPatchResponse(
+        encounter=build_encounter_response(session, campaign, is_owner=True),
+    )
 
 
 @router.get("/{campaign_id}/session", response_model=CampaignSessionStatus)

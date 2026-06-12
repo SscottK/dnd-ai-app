@@ -407,27 +407,13 @@ def roll_initiative_for_character(character: Character) -> tuple[int, int, int]:
 def add_enemies_to_encounter(
     session: Session, campaign: Campaign, enemies: list
 ) -> EncounterState:
+    from app.services.encounter_combatants import build_npc_combatant_from_enemy
+
     state = parse_encounter(campaign)
     for enemy in enemies:
         count = max(1, min(int(getattr(enemy, "count", 1) or 1), 12))
-        base_name = getattr(enemy, "name", "Creature")
         for index in range(count):
-            label = base_name if count == 1 else f"{base_name} {index + 1}"
-            raw_actions = getattr(enemy, "combat_actions", None) or []
-            combatant = EncounterCombatant(
-                id=new_combatant_id(),
-                name=label,
-                initiative=int(getattr(enemy, "initiative", 0) or 0),
-                is_pc=False,
-                is_ally=False,
-                character_id=None,
-                hp=getattr(enemy, "hp", None),
-                max_hp=getattr(enemy, "max_hp", None) or getattr(enemy, "hp", None),
-                ac=getattr(enemy, "ac", None),
-                conditions=sanitize_conditions_list(getattr(enemy, "conditions", None)),
-                combat_actions=list(raw_actions),
-            )
-            state.combatants.append(apply_monster_catalog_to_combatant(combatant))
+            state.combatants.append(build_npc_combatant_from_enemy(enemy, index=index, count=count))
     sync_initiative_order_after_setup_change(state)
     return persist_encounter(session, campaign, state)
 

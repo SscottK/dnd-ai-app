@@ -1,6 +1,18 @@
 from fastapi import APIRouter
 
-from app.api.v1.routes import admin, auth, campaigns, characters, chat, conversations, feedback, health, notes, rules
+from app.api.v1.routes import (
+    admin,
+    auth,
+    campaigns,
+    characters,
+    chat,
+    conversations,
+    encounter_templates,
+    feedback,
+    health,
+    notes,
+    rules,
+)
 
 api_router = APIRouter()
 
@@ -11,6 +23,7 @@ api_router.include_router(feedback.router, tags=["feedback"])
 api_router.include_router(chat.router, tags=["chat"])
 api_router.include_router(conversations.router, tags=["conversations"])
 api_router.include_router(campaigns.router, tags=["campaigns"])
+api_router.include_router(encounter_templates.router, tags=["encounter-templates"])
 api_router.include_router(characters.router, tags=["characters"])
 api_router.include_router(rules.router, tags=["rules"])
 api_router.include_router(notes.router, prefix="/notes", tags=["notes"])

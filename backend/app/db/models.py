@@ -19,6 +19,10 @@ class User(SQLModel, table=True):
     characters: list["Character"] = Relationship(back_populates="user")
     owned_campaigns: list["Campaign"] = Relationship(back_populates="owner")
     campaign_memberships: list["CampaignMember"] = Relationship(back_populates="user")
+    saved_encounter_templates: list["SavedEncounterTemplate"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
 
 class Conversation(SQLModel, table=True):
@@ -138,6 +142,18 @@ class CharacterPhoto(SQLModel, table=True):
             "primaryjoin": "CharacterPhoto.character_id==Character.id",
         },
     )
+
+
+class SavedEncounterTemplate(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    title: str = Field(max_length=200)
+    notes: str = Field(default="", max_length=2000)
+    monsters_json: str = Field(default="[]")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    user: Optional[User] = Relationship(back_populates="saved_encounter_templates")
 
 
 class HistoricalEncounter(SQLModel, table=True):

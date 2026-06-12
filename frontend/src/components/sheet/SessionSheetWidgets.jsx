@@ -1066,6 +1066,7 @@ function DmCombatantEditor({
 }) {
   const defeated = combatant.hp != null && combatant.hp <= 0;
   const isEnemy = !combatant.is_pc && !combatant.is_ally;
+  const isNpc = !combatant.is_pc && !combatant.character_id;
 
   const adjustHp = (delta) => {
     if (combatant.hp == null) return;
@@ -1083,10 +1084,29 @@ function DmCombatantEditor({
           <p className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-ink-faint">
             Health &amp; status
           </p>
-          <p className="truncate text-xs sm:text-sm font-black uppercase text-starlight">
-            {combatant.name}
-            {defeated && <span className="ml-1 text-danger">· Defeated</span>}
-          </p>
+          {isNpc ? (
+            <div className="min-w-0">
+              <input
+                type="text"
+                value={combatant.name}
+                disabled={saving}
+                onChange={(e) => onPatch({ name: e.target.value })}
+                className="w-full rounded-sm border border-border bg-black px-2 py-1 text-xs sm:text-sm font-black uppercase text-starlight"
+              />
+              {combatant.srd_name && (
+                <p className="mt-0.5 truncate text-[10px] font-mono text-ink-faint">
+                  SRD: {combatant.srd_name}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="truncate text-xs sm:text-sm font-black uppercase text-starlight">
+              {combatant.name}
+            </p>
+          )}
+          {defeated && (
+            <p className="text-[10px] font-black uppercase text-danger">Defeated</p>
+          )}
         </div>
         <button
           type="button"
