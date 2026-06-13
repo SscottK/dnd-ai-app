@@ -1,29 +1,47 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
 
 const AuthContext = createContext(null);
+const TOKEN_STORAGE_KEY = "token";
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY));
   const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!token);
-  const [isValidating, setIsValidating] = useState(!!token);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem(TOKEN_STORAGE_KEY));
+  const [isValidating, setIsValidating] = useState(!!localStorage.getItem(TOKEN_STORAGE_KEY));
+  const sessionEpochRef = useRef(0);
+
+  const beginSession = useCallback(() => {
+    sessionEpochRef.current += 1;
+    return sessionEpochRef.current;
+  }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("token");
+    beginSession();
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
-  }, []);
+    setIsValidating(false);
+  }, [beginSession]);
 
   const loadUser = useCallback(
-    async (authToken) => {
+    async (authToken, epoch) => {
+      if (!authToken) return null;
+
       const response = await apiFetch("/auth/me", { token: authToken });
+      if (epoch !== sessionEpochRef.current) return null;
+      if (localStorage.getItem(TOKEN_STORAGE_KEY) !== authToken) return null;
+
       if (!response.ok) {
         logout();
         return null;
       }
+
       const data = await response.json();
+      if (epoch !== sessionEpochRef.current) return null;
+      if (localStorage.getItem(TOKEN_STORAGE_KEY) !== authToken) return null;
+
       setUser(data.user);
       setIsAuthenticated(true);
       return data.user;
@@ -33,14 +51,24 @@ export function AuthProvider({ children }) {
 
   const verifyToken = useCallback(
     async (authToken) => {
+      if (!authToken) {
+        setIsValidating(false);
+        return;
+      }
+
+      const epoch = sessionEpochRef.current;
       setIsValidating(true);
       try {
-        await loadUser(authToken);
+        await loadUser(authToken, epoch);
       } catch (error) {
         console.error("Token verification failed:", error);
-        logout();
+        if (epoch === sessionEpochRef.current) {
+          logout();
+        }
       } finally {
-        setIsValidating(false);
+        if (epoch === sessionEpochRef.current) {
+          setIsValidating(false);
+        }
       }
     },
     [loadUser, logout]
@@ -54,13 +82,35 @@ export function AuthProvider({ children }) {
     }
   }, [token, verifyToken]);
 
-  const persistSession = async (accessToken) => {
-    localStorage.setItem("token", accessToken);
-    setToken(accessToken);
-    return loadUser(accessToken);
-  };
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key !== TOKEN_STORAGE_KEY) return;
+      const nextToken = event.newValue;
+      if (!nextToken) {
+        logout();
+        return;
+      }
+      beginSession();
+      setToken(nextToken);
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [beginSession, logout]);
+
+  const persistSession = useCallback(
+    async (accessToken) => {
+      const epoch = beginSession();
+      localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+      setToken(accessToken);
+      return loadUser(accessToken, epoch);
+    },
+    [beginSession, loadUser]
+  );
 
   const login = async (username, password) => {
+    beginSession();
+
     let response;
     try {
       response = await apiFetch("/auth/login", {
@@ -90,14 +140,16 @@ export function AuthProvider({ children }) {
     }
 
     const data = await response.json();
-    const user = await persistSession(data.access_token);
-    if (!user) {
+    const nextUser = await persistSession(data.access_token);
+    if (!nextUser) {
       throw new Error("Signed in, but the session could not be loaded. Try again.");
     }
-    return user;
+    return nextUser;
   };
 
   const register = async ({ username, password }) => {
+    beginSession();
+
     const response = await apiFetch("/auth/register", {
       method: "POST",
       body: { username, password },

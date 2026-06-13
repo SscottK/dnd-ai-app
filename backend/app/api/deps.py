@@ -39,6 +39,13 @@ def get_current_user(
             detail="User not found",
         )
 
+    token_username = payload.get("username")
+    if token_username is not None and str(token_username).lower() != user.username.lower():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token no longer valid for this account",
+        )
+
     return user
 
 
