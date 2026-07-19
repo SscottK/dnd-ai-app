@@ -4,7 +4,9 @@ export const SHEET_SECTION_HINTS = {
   abilities:
     "Ability scores drive checks, saves, and combat math. The big number is the modifier; the small one is the score.",
   saves:
-    "Saving throw bonuses. Filled dots mean proficiency. Passive senses sit under the saves list.",
+    "Saving throw bonuses. Filled dots mean proficiency.",
+  senses:
+    "Passive Perception, Investigation, and Insight — fixed scores, not proficiency trackers. Open Additional Sense Types for vision rules.",
   skills:
     "Skill bonuses. Cyan = proficient, magenta = expertise. Click a skill for a quick breakdown.",
   combat:
@@ -91,3 +93,53 @@ export const SENSE_HINTS = {
   Inv: "Passive Investigation — floor for noticing clues or inconsistencies without an active check.",
   Ins: "Passive Insight — floor for sensing motives without an active Insight check.",
 };
+
+/** Rules text for the Additional Sense Types side pane (5.5e / 2024). */
+export const SENSES_PANEL = {
+  passiveChecks:
+    "A passive check is a special kind of ability check that doesn't involve any die rolls. Use 10 + all modifiers that normally apply to the check. If the character has Advantage on the check, add 5; with Disadvantage, subtract 5. Passive Perception, Investigation, and Insight on the sheet are already calculated that way.",
+  specialSenses: [
+    {
+      name: "Blindsight",
+      text: "A creature with Blindsight can perceive its surroundings without relying on sight, within a specific radius. Creatures without eyes (such as oozes) typically have this sense, as do creatures with echolocation or other extraordinary senses.",
+    },
+    {
+      name: "Darkvision",
+      text: "A creature with Darkvision can see in Dim Light within a specific radius as if it were Bright Light, and in Darkness as if it were Dim Light. The creature can't discern color in Darkness, only shades of gray.",
+    },
+    {
+      name: "Tremorsense",
+      text: "A creature with Tremorsense can detect and pinpoint the origin of vibrations within a specific radius, provided the creature and the source of the vibrations are in contact with the same surface (such as the ground, a wall, or a ceiling) or the same liquid. Tremorsense can't detect flying or incorporeal creatures.",
+    },
+    {
+      name: "Truesight",
+      text: "A creature with Truesight can see in normal and magical Darkness, see Invisible creatures and objects, automatically detect visual illusions and succeed on saving throws against them, and perceive the original form of a shapechanger or a creature transformed by magic. Furthermore, the creature can see into the Ethereal Plane within the same range.",
+    },
+  ],
+};
+
+/** Pull special sense lines mentioned on the sheet (features / notes), if any. */
+export function collectCharacterSenseNotes(sheet) {
+  const textChunks = [];
+  for (const feat of sheet?.features || []) {
+    textChunks.push(`${feat.name || ""} ${feat.description || ""}`);
+  }
+  if (sheet?.senses) {
+    textChunks.push(String(sheet.senses));
+  }
+  const blob = textChunks.join("\n");
+  const found = [];
+  const patterns = [
+    { name: "Darkvision", re: /darkvision[^\n.]{0,40}/gi },
+    { name: "Blindsight", re: /blindsight[^\n.]{0,40}/gi },
+    { name: "Tremorsense", re: /tremorsense[^\n.]{0,40}/gi },
+    { name: "Truesight", re: /truesight[^\n.]{0,40}/gi },
+  ];
+  for (const { name, re } of patterns) {
+    const match = blob.match(re);
+    if (match?.[0]) {
+      found.push({ name, detail: match[0].replace(/\s+/g, " ").trim() });
+    }
+  }
+  return found;
+}

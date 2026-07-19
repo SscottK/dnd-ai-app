@@ -21,8 +21,10 @@ import {
 import {
   resourceHint,
   SENSE_HINTS,
+  SENSES_PANEL,
   SHEET_SECTION_HINTS,
   SHEET_STAT_HINTS,
+  collectCharacterSenseNotes,
 } from "../../lib/sheetHints";
 import { InfoTooltip } from "../ui/InfoTooltip";
 import { AbilityScoresGrid } from "./AbilityScoresGrid";
@@ -73,6 +75,35 @@ function DetailPanel({ detail, onClose }) {
           {typeof detail.body === "string" ? <p>{detail.body}</p> : detail.body}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Beyond-style right drawer for longer rules (e.g. Additional Sense Types). */
+function SheetSidePane({ open, title, onClose, children }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[320] flex justify-end">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/60"
+        aria-label={`Close ${title}`}
+        onClick={onClose}
+      />
+      <aside className="relative flex h-full w-full max-w-md flex-col border-l-2 border-neon-cyan bg-zinc-950 shadow-2xl">
+        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-neon-cyan/30 px-4 py-3">
+          <h3 className="text-sm font-black uppercase tracking-wide text-starlight">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-starlight"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+      </aside>
     </div>
   );
 }
@@ -148,14 +179,14 @@ function SavesList({ sheet, onShowDetail }) {
   );
 }
 
-function SensesList({ sheet }) {
+function SensesList({ sheet, onOpenSenseTypes }) {
   const senses = [
     { short: "PP", name: "Perception", value: resolvePassiveSkill(sheet, "Perception") },
     { short: "Inv", name: "Investigation", value: resolvePassiveSkill(sheet, "Investigation") },
     { short: "Ins", name: "Insight", value: resolvePassiveSkill(sheet, "Insight") },
   ];
   return (
-    <div className="space-y-1">
+    <div>
       {senses.map((sense) => (
         <div
           key={sense.short}
@@ -163,13 +194,79 @@ function SensesList({ sheet }) {
         >
           <span className="inline-flex min-w-0 items-center gap-1 text-xs text-zinc-400">
             <span className="truncate">Passive {sense.name}</span>
-            <InfoTooltip text={SENSE_HINTS[sense.short]} label={`About ${sense.name}`} />
+            <InfoTooltip text={SENSE_HINTS[sense.short]} label={`About Passive ${sense.name}`} />
           </span>
           <span className="text-xs font-black tabular-nums text-starlight">
             {sense.value ?? "—"}
           </span>
         </div>
       ))}
+      <button
+        type="button"
+        onClick={onOpenSenseTypes}
+        className="mt-1.5 text-left text-[10px] font-black uppercase tracking-wide text-neon-cyan hover:text-starlight"
+      >
+        Additional Sense Types
+      </button>
+    </div>
+  );
+}
+
+function SensesSidePaneBody({ sheet }) {
+  const passives = [
+    { label: "Passive Perception", value: resolvePassiveSkill(sheet, "Perception") },
+    { label: "Passive Investigation", value: resolvePassiveSkill(sheet, "Investigation") },
+    { label: "Passive Insight", value: resolvePassiveSkill(sheet, "Insight") },
+  ];
+  const characterSenses = collectCharacterSenseNotes(sheet);
+
+  return (
+    <div className="space-y-4 text-xs font-mono leading-relaxed text-zinc-300">
+      <div className="space-y-1 border-b border-zinc-800 pb-3">
+        {passives.map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-2">
+            <span className="text-zinc-400">{row.label}</span>
+            <span className="font-black tabular-nums text-starlight">{row.value ?? "—"}</span>
+          </div>
+        ))}
+      </div>
+
+      {characterSenses.length > 0 && (
+        <div>
+          <h4 className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-neon-cyan">
+            On this character
+          </h4>
+          <ul className="space-y-1.5">
+            {characterSenses.map((entry) => (
+              <li key={entry.name}>
+                <span className="font-black text-neon-magenta">{entry.name}. </span>
+                <span className="text-zinc-400">{entry.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <h4 className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-neon-cyan">
+          Passive Checks
+        </h4>
+        <p>{SENSES_PANEL.passiveChecks}</p>
+      </div>
+
+      <div>
+        <h4 className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-neon-cyan">
+          Special Senses
+        </h4>
+        <ul className="space-y-3">
+          {SENSES_PANEL.specialSenses.map((sense) => (
+            <li key={sense.name}>
+              <p className="font-black text-neon-magenta">{sense.name}</p>
+              <p className="mt-0.5 text-zinc-400">{sense.text}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
@@ -275,8 +372,8 @@ function CombatDashboard({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-[4.5rem_4.5rem_4.5rem_4.5rem_minmax(12rem,1fr)]">
-        <MetricTile label="Proficiency" hint={SHEET_STAT_HINTS.prof}>
+      <div className="flex flex-wrap items-stretch gap-1.5">
+        <MetricTile label="Proficiency" hint={SHEET_STAT_HINTS.prof} className="w-[4.75rem] shrink-0">
           {readOnly || !onSheetChange ? (
             <p className="text-lg font-black tabular-nums text-starlight">
               {prof != null ? `+${prof}` : "—"}
@@ -294,7 +391,7 @@ function CombatDashboard({
           )}
         </MetricTile>
 
-        <MetricTile label="Walking" hint={SHEET_STAT_HINTS.speed}>
+        <MetricTile label="Walking" hint={SHEET_STAT_HINTS.speed} className="w-[4.75rem] shrink-0">
           {readOnly || !onSheetChange ? (
             <p className="text-lg font-black tabular-nums text-starlight">
               {displaySpeed != null ? displaySpeed : "—"}
@@ -320,17 +417,17 @@ function CombatDashboard({
           onClick={() =>
             onShowDetail({ title: "Initiative", body: `Bonus ${formatModifier(init)}` })
           }
-          className="relative flex flex-col items-center justify-center border border-neon-cyan/30 bg-void-panel/70 px-2 py-1.5 hover:border-neon-cyan"
+          className="relative flex w-[4.75rem] shrink-0 flex-col items-center justify-center border border-neon-cyan/30 bg-void-panel/70 px-1.5 py-1.5 hover:border-neon-cyan"
           title="Open initiative details"
         >
           <div className="mb-0.5 flex items-center gap-0.5">
             <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
-              Initiative
+              Init
             </span>
             <InfoTooltip text={SHEET_STAT_HINTS.init} label="About Initiative" />
           </div>
           <span
-            className="flex h-11 w-11 items-center justify-center bg-zinc-950 text-lg font-black tabular-nums text-starlight"
+            className="flex h-10 w-10 items-center justify-center bg-zinc-950 text-base font-black tabular-nums text-starlight"
             style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" }}
           >
             {formatModifier(init)}
@@ -352,24 +449,25 @@ function CombatDashboard({
               ),
             })
           }
-          className="relative flex flex-col items-center justify-center border border-neon-magenta/40 bg-neon-magenta/5 px-2 py-1.5 hover:border-neon-magenta"
+          className="relative flex w-[4.75rem] shrink-0 flex-col items-center justify-center border border-neon-magenta/40 bg-neon-magenta/5 px-1.5 py-1.5 hover:border-neon-magenta"
           title="Open AC breakdown"
         >
           <div className="mb-0.5 flex items-center gap-0.5">
-            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
-              Armor Class
-            </span>
+            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">AC</span>
             <InfoTooltip text={SHEET_STAT_HINTS.ac} label="About Armor Class" />
           </div>
-          <span className="relative flex h-11 w-10 items-center justify-center">
-            <Shield className="absolute inset-0 h-full w-full text-neon-magenta/80" strokeWidth={1.25} />
-            <span className="relative z-10 text-lg font-black tabular-nums text-starlight">
+          <span className="relative flex h-10 w-9 items-center justify-center">
+            <Shield
+              className="absolute inset-0 h-full w-full text-neon-magenta/80"
+              strokeWidth={1.25}
+            />
+            <span className="relative z-10 text-base font-black tabular-nums text-starlight">
               {combat.ac ?? "—"}
             </span>
           </span>
         </button>
 
-        <div className="col-span-2 border border-neon-cyan/30 bg-void-panel/70 px-2.5 py-1.5 sm:col-span-4 lg:col-span-1">
+        <div className="min-w-[15rem] flex-1 border border-neon-cyan/30 bg-void-panel/70 px-2.5 py-1.5 sm:max-w-sm">
           <div className="mb-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <Heart className="h-3 w-3 text-danger" />
@@ -385,7 +483,7 @@ function CombatDashboard({
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!readOnly && onCombatChange ? (
               <div className="flex items-center gap-1.5">
                 <button
@@ -440,7 +538,7 @@ function CombatDashboard({
       </div>
 
       {resources.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border border-zinc-800/80 bg-zinc-950/40 px-2 py-1.5">
+        <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-sm border border-zinc-800/80 bg-zinc-950/40 px-2 py-1.5">
           <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase tracking-wider text-zinc-500">
             Resources
             <InfoTooltip text={SHEET_STAT_HINTS.resources} label="About resources" />
@@ -774,6 +872,7 @@ export function DigitalCharacterSheet({
   readOnly = false,
 }) {
   const [detail, setDetail] = useState(null);
+  const [sensesPaneOpen, setSensesPaneOpen] = useState(false);
   const [mainTab, setMainTab] = useState("actions");
   const [actionFilter, setActionFilter] = useState("all");
   const combat = resolveCombatStats(character, sheet);
@@ -798,7 +897,7 @@ export function DigitalCharacterSheet({
 
   return (
     <>
-      <div className="flex w-full flex-col gap-3 pb-2">
+      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2">
         {/* Identity */}
         <div className="flex flex-wrap items-end justify-between gap-2 border-b border-neon-cyan/25 pb-2">
           <div className="min-w-0">
@@ -810,49 +909,55 @@ export function DigitalCharacterSheet({
           <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · click rows for full text</p>
         </div>
 
-        {/* Top dashboard: abilities + combat metrics (Beyond-style) */}
-        <div className="space-y-3 border border-neon-cyan/30 bg-void-panel/40 p-2.5 sm:p-3">
-          <div className="flex items-center gap-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
-              Ability Scores
-            </p>
-            <InfoTooltip text={SHEET_SECTION_HINTS.abilities} label="About ability scores" />
-          </div>
-          <AbilityScoresGrid
-            sheet={sheet}
-            variant="dashboard"
-            readOnly={readOnly}
-            onShowDetail={setDetail}
-            onChange={readOnly ? undefined : onSheetChange}
-          />
-          <div className="h-2" aria-hidden />
-          <div className="border-t border-zinc-800/80 pt-3">
-            <div className="mb-1.5 flex items-center gap-1">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
-                Combat
-              </p>
-              <InfoTooltip text={SHEET_SECTION_HINTS.combat} label="About combat" />
+        {/* Top dashboard: abilities beside combat (Beyond-style, fixed-size tiles) */}
+        <div className="border border-neon-cyan/30 bg-void-panel/40 p-2.5 sm:p-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-4">
+            <div className="min-w-0 shrink-0 pb-2">
+              <div className="mb-2 flex items-center gap-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
+                  Ability Scores
+                </p>
+                <InfoTooltip text={SHEET_SECTION_HINTS.abilities} label="About ability scores" />
+              </div>
+              <AbilityScoresGrid
+                sheet={sheet}
+                variant="dashboard"
+                readOnly={readOnly}
+                onShowDetail={setDetail}
+                onChange={readOnly ? undefined : onSheetChange}
+              />
             </div>
-            <CombatDashboard
-              character={character}
-              sheet={sheet}
-              combat={combat}
-              onCombatChange={onCombatChange}
-              onShowDetail={setDetail}
-              onSheetChange={onSheetChange}
-              readOnly={readOnly}
-            />
+            <div className="min-w-0 flex-1 border-t border-zinc-800/80 pt-3 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+              <div className="mb-1.5 flex items-center gap-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
+                  Combat
+                </p>
+                <InfoTooltip text={SHEET_SECTION_HINTS.combat} label="About combat" />
+              </div>
+              <CombatDashboard
+                character={character}
+                sheet={sheet}
+                combat={combat}
+                onCombatChange={onCombatChange}
+                onShowDetail={setDetail}
+                onSheetChange={onSheetChange}
+                readOnly={readOnly}
+              />
+            </div>
           </div>
         </div>
 
         {/* Three-column body */}
-        <div className="grid min-h-[28rem] gap-2 lg:grid-cols-12 lg:items-stretch">
+        <div className="grid min-h-[24rem] gap-2 lg:grid-cols-12 lg:items-stretch">
           <div className="flex flex-col gap-2 lg:col-span-3">
             <ColumnPanel title="Saving Throws" hint={SHEET_SECTION_HINTS.saves}>
               <SavesList sheet={sheet} onShowDetail={setDetail} />
             </ColumnPanel>
-            <ColumnPanel title="Senses" hint={SHEET_SECTION_HINTS.saves}>
-              <SensesList sheet={sheet} />
+            <ColumnPanel title="Senses" hint={SHEET_SECTION_HINTS.senses}>
+              <SensesList
+                sheet={sheet}
+                onOpenSenseTypes={() => setSensesPaneOpen(true)}
+              />
             </ColumnPanel>
             <ColumnPanel
               title="Proficiencies & Languages"
@@ -867,13 +972,13 @@ export function DigitalCharacterSheet({
             <ColumnPanel
               title="Skills"
               hint={SHEET_SECTION_HINTS.skills}
-              className="h-full min-h-[20rem]"
+              className="h-full min-h-[18rem]"
             >
               <SkillsList sheet={sheet} onShowDetail={setDetail} />
             </ColumnPanel>
           </div>
 
-          <div className="flex min-h-[20rem] flex-col border border-neon-cyan/30 bg-void-panel/50 lg:col-span-6">
+          <div className="flex min-h-[18rem] flex-col border border-neon-cyan/30 bg-void-panel/50 lg:col-span-6">
             <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-neon-cyan/25 px-1">
               {mainTabs.map((tab) => (
                 <button
@@ -933,6 +1038,13 @@ export function DigitalCharacterSheet({
         </div>
       </div>
       <DetailPanel detail={detail} onClose={() => setDetail(null)} />
+      <SheetSidePane
+        open={sensesPaneOpen}
+        title="Senses"
+        onClose={() => setSensesPaneOpen(false)}
+      >
+        <SensesSidePaneBody sheet={sheet} />
+      </SheetSidePane>
     </>
   );
 }
