@@ -32,7 +32,9 @@ export function AbilityScoresGrid({
 
   if (isDashboard) {
     const scoreBadge =
-      "mt-1 flex h-6 w-7 shrink-0 items-center justify-center rounded-full border border-neon-cyan/45 bg-zinc-950 text-[10px] font-black tabular-nums text-starlight";
+      "mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-neon-cyan/45 bg-zinc-950 p-0 text-center text-[10px] font-black leading-none tabular-nums text-starlight";
+    const scoreInput =
+      `${scoreBadge} appearance-none border-neon-cyan/50 focus:border-neon-cyan focus:outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
     const shell =
       "flex w-full flex-col items-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1 pb-1.5 pt-1.5";
 
@@ -57,7 +59,7 @@ export function AbilityScoresGrid({
                   max={30}
                   value={score ?? ""}
                   onChange={(e) => handleScoreChange(key, e.target.value)}
-                  className={`${scoreBadge} border-neon-cyan/50 text-center focus:border-neon-cyan focus:outline-none`}
+                  className={scoreInput}
                   aria-label={`${ABILITY_LABELS[key]} score`}
                 />
               </label>

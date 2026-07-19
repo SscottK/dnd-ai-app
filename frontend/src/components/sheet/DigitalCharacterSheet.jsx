@@ -371,225 +371,227 @@ function CombatDashboard({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-stretch gap-1.5">
-        <MetricTile label="Proficiency" hint={SHEET_STAT_HINTS.prof} className="w-[4.75rem] shrink-0">
-          {readOnly || !onSheetChange ? (
-            <p className="text-lg font-black tabular-nums text-starlight">
-              {prof != null ? `+${prof}` : "—"}
-            </p>
-          ) : (
+    <div className="flex w-full flex-wrap items-stretch gap-1.5">
+      <MetricTile label="Proficiency" hint={SHEET_STAT_HINTS.prof} className="w-[4.75rem] shrink-0">
+        {readOnly || !onSheetChange ? (
+          <p className="text-lg font-black tabular-nums text-starlight">
+            {prof != null ? `+${prof}` : "—"}
+          </p>
+        ) : (
+          <input
+            type="number"
+            min={2}
+            max={12}
+            value={sheet.proficiency_bonus ?? prof ?? ""}
+            onChange={(e) => onSheetChange(setProficiencyBonus(sheet, e.target.value))}
+            className="w-12 border-0 bg-transparent text-center text-lg font-black tabular-nums text-starlight focus:outline-none"
+            aria-label="Proficiency bonus"
+          />
+        )}
+      </MetricTile>
+
+      <MetricTile label="Walking" hint={SHEET_STAT_HINTS.speed} className="w-[4.75rem] shrink-0">
+        {readOnly || !onSheetChange ? (
+          <p className="text-lg font-black tabular-nums text-starlight">
+            {displaySpeed != null ? displaySpeed : "—"}
+            <span className="ml-0.5 text-[9px] font-bold text-zinc-500">ft.</span>
+          </p>
+        ) : (
+          <div className="flex items-baseline justify-center gap-0.5">
             <input
               type="number"
-              min={2}
-              max={12}
-              value={sheet.proficiency_bonus ?? prof ?? ""}
-              onChange={(e) => onSheetChange(setProficiencyBonus(sheet, e.target.value))}
+              min={0}
+              value={sheet.speed ?? displaySpeed ?? ""}
+              onChange={(e) => onSheetChange(setSheetSpeed(sheet, e.target.value))}
               className="w-12 border-0 bg-transparent text-center text-lg font-black tabular-nums text-starlight focus:outline-none"
-              aria-label="Proficiency bonus"
+              aria-label="Speed"
             />
-          )}
-        </MetricTile>
+            <span className="text-[9px] font-bold text-zinc-500">ft.</span>
+          </div>
+        )}
+      </MetricTile>
 
-        <MetricTile label="Walking" hint={SHEET_STAT_HINTS.speed} className="w-[4.75rem] shrink-0">
-          {readOnly || !onSheetChange ? (
-            <p className="text-lg font-black tabular-nums text-starlight">
-              {displaySpeed != null ? displaySpeed : "—"}
-              <span className="ml-0.5 text-[9px] font-bold text-zinc-500">ft.</span>
-            </p>
-          ) : (
-            <div className="flex items-baseline justify-center gap-0.5">
+      <button
+        type="button"
+        onClick={() =>
+          onShowDetail({ title: "Initiative", body: `Bonus ${formatModifier(init)}` })
+        }
+        className="relative flex min-h-[4.5rem] w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1.5 hover:border-neon-cyan"
+        title="Open initiative details"
+      >
+        <div className="mb-0.5 flex items-center gap-0.5">
+          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
+            Init
+          </span>
+          <InfoTooltip text={SHEET_STAT_HINTS.init} label="About Initiative" />
+        </div>
+        <span
+          className="flex h-10 w-10 items-center justify-center bg-zinc-950 text-base font-black tabular-nums text-starlight"
+          style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" }}
+        >
+          {formatModifier(init)}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() =>
+          onShowDetail({
+            title: "Armor Class",
+            body: (
+              <div className="space-y-1">
+                {(combat.acLines || []).map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+                <p className="font-black text-starlight">Total: {combat.ac}</p>
+              </div>
+            ),
+          })
+        }
+        className="relative flex min-h-[4.5rem] w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1.5 hover:border-neon-cyan"
+        title="Open AC breakdown"
+      >
+        <div className="mb-0.5 flex items-center gap-0.5">
+          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">AC</span>
+          <InfoTooltip text={SHEET_STAT_HINTS.ac} label="About Armor Class" />
+        </div>
+        <span className="relative flex h-10 w-9 items-center justify-center">
+          <Shield
+            className="absolute inset-0 h-full w-full text-neon-magenta/80"
+            strokeWidth={1.25}
+          />
+          <span className="relative z-10 text-base font-black tabular-nums text-starlight">
+            {combat.ac ?? "—"}
+          </span>
+        </span>
+      </button>
+
+      <div className="flex min-h-[4.5rem] min-w-[14rem] flex-[1.4] flex-col justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            <Heart className="h-3 w-3 text-danger" />
+            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
+              Hit Points
+            </span>
+            <InfoTooltip text={SHEET_STAT_HINTS.hp} label="About Hit Points" />
+          </div>
+          {sheet.hit_dice && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-zinc-500">
+              HD {sheet.hit_dice}
+              <InfoTooltip text={SHEET_STAT_HINTS.hitDice} label="About Hit Dice" />
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {!readOnly && onCombatChange ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => bumpHp(-1)}
+                className="border border-danger/50 px-2 py-0.5 text-[9px] font-black uppercase text-danger hover:bg-danger/10"
+              >
+                Damage
+              </button>
               <input
                 type="number"
-                min={0}
-                value={sheet.speed ?? displaySpeed ?? ""}
-                onChange={(e) => onSheetChange(setSheetSpeed(sheet, e.target.value))}
-                className="w-12 border-0 bg-transparent text-center text-lg font-black tabular-nums text-starlight focus:outline-none"
-                aria-label="Speed"
+                min="0"
+                value={character.hp ?? ""}
+                onChange={(e) =>
+                  onCombatChange({
+                    hp: e.target.value === "" ? null : parseInt(e.target.value, 10),
+                  })
+                }
+                className="w-12 border border-zinc-700 bg-black text-center text-base font-black text-starlight"
+                aria-label="Current hit points"
               />
-              <span className="text-[9px] font-bold text-zinc-500">ft.</span>
+              <span className="text-zinc-600">/</span>
+              <input
+                type="number"
+                min="0"
+                value={character.max_hp ?? ""}
+                onChange={(e) =>
+                  onCombatChange({
+                    max_hp: e.target.value === "" ? null : parseInt(e.target.value, 10),
+                  })
+                }
+                className="w-12 border border-zinc-700 bg-black text-center text-base font-black text-zinc-400"
+                aria-label="Maximum hit points"
+              />
+              <button
+                type="button"
+                onClick={() => bumpHp(1)}
+                className="border border-neon-cyan/50 px-2 py-0.5 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
+              >
+                Heal
+              </button>
             </div>
+          ) : (
+            <p className="text-base font-black tabular-nums text-starlight">
+              {character.hp ?? "—"}
+              <span className="text-zinc-600"> / </span>
+              <span className="text-zinc-400">{character.max_hp ?? "—"}</span>
+            </p>
           )}
-        </MetricTile>
-
-        <button
-          type="button"
-          onClick={() =>
-            onShowDetail({ title: "Initiative", body: `Bonus ${formatModifier(init)}` })
-          }
-          className="relative flex min-h-[4.5rem] w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1.5 hover:border-neon-cyan"
-          title="Open initiative details"
-        >
-          <div className="mb-0.5 flex items-center gap-0.5">
-            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
-              Init
-            </span>
-            <InfoTooltip text={SHEET_STAT_HINTS.init} label="About Initiative" />
-          </div>
-          <span
-            className="flex h-10 w-10 items-center justify-center bg-zinc-950 text-base font-black tabular-nums text-starlight"
-            style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" }}
-          >
-            {formatModifier(init)}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            onShowDetail({
-              title: "Armor Class",
-              body: (
-                <div className="space-y-1">
-                  {(combat.acLines || []).map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                  <p className="font-black text-starlight">Total: {combat.ac}</p>
-                </div>
-              ),
-            })
-          }
-          className="relative flex min-h-[4.5rem] w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1.5 hover:border-neon-cyan"
-          title="Open AC breakdown"
-        >
-          <div className="mb-0.5 flex items-center gap-0.5">
-            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">AC</span>
-            <InfoTooltip text={SHEET_STAT_HINTS.ac} label="About Armor Class" />
-          </div>
-          <span className="relative flex h-10 w-9 items-center justify-center">
-            <Shield
-              className="absolute inset-0 h-full w-full text-neon-magenta/80"
-              strokeWidth={1.25}
-            />
-            <span className="relative z-10 text-base font-black tabular-nums text-starlight">
-              {combat.ac ?? "—"}
-            </span>
-          </span>
-        </button>
-
-        <div className="min-h-[4.5rem] min-w-[15rem] flex-1 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5 sm:max-w-sm">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
-              <Heart className="h-3 w-3 text-danger" />
-              <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
-                Hit Points
-              </span>
-              <InfoTooltip text={SHEET_STAT_HINTS.hp} label="About Hit Points" />
-            </div>
-            {sheet.hit_dice && (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-zinc-500">
-                HD {sheet.hit_dice}
-                <InfoTooltip text={SHEET_STAT_HINTS.hitDice} label="About Hit Dice" />
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {!readOnly && onCombatChange ? (
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => bumpHp(-1)}
-                  className="border border-danger/50 px-2 py-0.5 text-[9px] font-black uppercase text-danger hover:bg-danger/10"
-                >
-                  Damage
-                </button>
-                <input
-                  type="number"
-                  min="0"
-                  value={character.hp ?? ""}
-                  onChange={(e) =>
-                    onCombatChange({
-                      hp: e.target.value === "" ? null : parseInt(e.target.value, 10),
-                    })
-                  }
-                  className="w-12 border border-zinc-700 bg-black text-center text-base font-black text-starlight"
-                  aria-label="Current hit points"
-                />
-                <span className="text-zinc-600">/</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={character.max_hp ?? ""}
-                  onChange={(e) =>
-                    onCombatChange({
-                      max_hp: e.target.value === "" ? null : parseInt(e.target.value, 10),
-                    })
-                  }
-                  className="w-12 border border-zinc-700 bg-black text-center text-base font-black text-zinc-400"
-                  aria-label="Maximum hit points"
-                />
-                <button
-                  type="button"
-                  onClick={() => bumpHp(1)}
-                  className="border border-neon-cyan/50 px-2 py-0.5 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
-                >
-                  Heal
-                </button>
-              </div>
-            ) : (
-              <p className="text-base font-black tabular-nums text-starlight">
-                {character.hp ?? "—"}
-                <span className="text-zinc-600"> / </span>
-                <span className="text-zinc-400">{character.max_hp ?? "—"}</span>
-              </p>
-            )}
-          </div>
         </div>
       </div>
 
-      {resources.length > 0 && (
-        <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2 py-1.5">
-          <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase tracking-wider text-zinc-500">
-            Resources
+      {resources.length > 0 ? (
+        <div className="flex min-h-[4.5rem] min-w-[10rem] flex-1 flex-col justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5">
+          <div className="mb-1 flex items-center gap-0.5">
+            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
+              Resources
+            </span>
             <InfoTooltip text={SHEET_STAT_HINTS.resources} label="About resources" />
-          </span>
-          {resources.map((resource, index) => (
-            <div
-              key={resource.id || index}
-              className="inline-flex items-center gap-1 rounded-sm border border-zinc-800 px-1.5 py-0.5 text-[11px]"
-            >
-              <span className="inline-flex max-w-[7rem] items-center gap-0.5 truncate text-zinc-400">
-                <span className="truncate">{resource.name}</span>
-                <InfoTooltip text={resourceHint(resource)} label={`About ${resource.name}`} />
-              </span>
-              {readOnly ? (
-                <span className="font-black tabular-nums text-starlight">
-                  {resource.current ?? "—"}/{resource.max ?? "—"}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {resources.map((resource, index) => (
+              <div
+                key={resource.id || index}
+                className="inline-flex items-center gap-1 rounded-sm border border-zinc-800 px-1.5 py-0.5 text-[11px]"
+              >
+                <span className="inline-flex max-w-[7rem] items-center gap-0.5 truncate text-zinc-400">
+                  <span className="truncate">{resource.name}</span>
+                  <InfoTooltip text={resourceHint(resource)} label={`About ${resource.name}`} />
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateResource(index, Math.max(0, (resource.current ?? 0) - 1))
-                    }
-                    className="h-4 w-4 text-zinc-500 hover:text-starlight"
-                    aria-label={`Spend ${resource.name}`}
-                  >
-                    −
-                  </button>
-                  <span className="min-w-[2.25rem] text-center font-black tabular-nums text-starlight">
+                {readOnly ? (
+                  <span className="font-black tabular-nums text-starlight">
                     {resource.current ?? "—"}/{resource.max ?? "—"}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateResource(
-                        index,
-                        Math.min(resource.max ?? 99, (resource.current ?? 0) + 1)
-                      )
-                    }
-                    className="h-4 w-4 text-zinc-500 hover:text-starlight"
-                    aria-label={`Regain ${resource.name}`}
-                  >
-                    +
-                  </button>
-                </span>
-              )}
-            </div>
-          ))}
+                ) : (
+                  <span className="inline-flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateResource(index, Math.max(0, (resource.current ?? 0) - 1))
+                      }
+                      className="h-4 w-4 text-zinc-500 hover:text-starlight"
+                      aria-label={`Spend ${resource.name}`}
+                    >
+                      −
+                    </button>
+                    <span className="min-w-[2.25rem] text-center font-black tabular-nums text-starlight">
+                      {resource.current ?? "—"}/{resource.max ?? "—"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateResource(
+                          index,
+                          Math.min(resource.max ?? 99, (resource.current ?? 0) + 1)
+                        )
+                      }
+                      className="h-4 w-4 text-zinc-500 hover:text-starlight"
+                      aria-label={`Regain ${resource.name}`}
+                    >
+                      +
+                    </button>
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
