@@ -7,6 +7,7 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ChatPage } from "./pages/ChatPage";
 import { CharacterViewPage } from "./pages/CharacterViewPage";
+import { LevelUpPage } from "./pages/LevelUpPage";
 import { SessionPlayPage } from "./pages/SessionPlayPage";
 import { InitiativePage } from "./pages/InitiativePage";
 import { NotesPage } from "./pages/NotesPage";
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/srd" element={<SrdBrowsePage />} />
             <Route path="/character/:characterId" element={<CharacterViewPage />} />
+            <Route path="/character/:characterId/level-up" element={<LevelUpPage />} />
             <Route path="/session/:campaignId" element={<SessionPlayPage />} />
             <Route path="/initiative/:campaignId" element={<InitiativePage />} />
             <Route path="/notes" element={<NotesPage />} />

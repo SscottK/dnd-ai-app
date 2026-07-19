@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, FileText, Images, RefreshCw, Upload } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Images, RefreshCw, RotateCcw, TrendingUp, Upload } from "lucide-react";
 import { CharacterPhotoAlbum } from "../components/character/CharacterPhotoAlbum";
 import { AuthenticatedPdfFrame, openAuthenticatedPdfInTab } from "../components/sheet/AuthenticatedPdfFrame";
 import { DigitalSheetEditor } from "../components/sheet/DigitalSheetEditor";
@@ -9,6 +9,7 @@ import { useAuth } from "../hooks/useAuth";
 import { APP_MOBILE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 import { apiFetch, apiUpload } from "../lib/api";
 import { confirmPdfReplace } from "../lib/pdfReplace";
+import { fetchLevelUpHistory, revertLevelUp } from "../lib/levelUp";
 
 export function CharacterViewPage() {
   const { characterId } = useParams();
@@ -22,6 +23,9 @@ export function CharacterViewPage() {
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [reverting, setReverting] = useState(false);
+  const [canRevert, setCanRevert] = useState(false);
+  const [lastLevelUp, setLastLevelUp] = useState(null);
   const initialView = searchParams.get("view");
   const [view, setView] = useState(() =>
     initialView === "pdf" || initialView === "photos" ? initialView : "digital"
@@ -32,9 +36,20 @@ export function CharacterViewPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch(`/characters/${characterId}`, { token });
+      const [res, history] = await Promise.all([
+        apiFetch(`/characters/${characterId}`, { token }),
+        fetchLevelUpHistory(characterId, token).catch(() => null),
+      ]);
       if (!res.ok) throw new Error("Character not found");
       setCharacter(await res.json());
+      if (history) {
+        setCanRevert(Boolean(history.can_revert));
+        const entries = history.history || [];
+        setLastLevelUp(entries.length ? entries[entries.length - 1] : null);
+      } else {
+        setCanRevert(false);
+        setLastLevelUp(null);
+      }
     } catch (err) {
       console.error(err);
       setError("Could not load character.");
@@ -90,6 +105,36 @@ export function CharacterViewPage() {
       setError(err.message || "Could not re-sync from PDF.");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleRevertLevelUp = async () => {
+    if (!token || !characterId || !canRevert) return;
+    const label = lastLevelUp
+      ? `level ${lastLevelUp.from_level} → ${lastLevelUp.to_level}`
+      : "the last level-up";
+    if (!window.confirm(`Undo ${label}? This restores the sheet snapshot from before that save.`)) {
+      return;
+    }
+    setReverting(true);
+    setError("");
+    try {
+      const result = await revertLevelUp(characterId, token);
+      setCharacter(result.character);
+      const history = await fetchLevelUpHistory(characterId, token).catch(() => null);
+      if (history) {
+        setCanRevert(Boolean(history.can_revert));
+        const entries = history.history || [];
+        setLastLevelUp(entries.length ? entries[entries.length - 1] : null);
+      } else {
+        setCanRevert(false);
+        setLastLevelUp(null);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Could not undo level-up.");
+    } finally {
+      setReverting(false);
     }
   };
 
@@ -150,6 +195,33 @@ export function CharacterViewPage() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {(character.level == null || character.level < 20) && (
+            <Link
+              to={`/character/${characterId}/level-up`}
+              className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-neon-magenta hover:text-starlight"
+            >
+              <TrendingUp className="h-3 w-3 shrink-0" />
+              <span className="hidden sm:inline">Level Up</span>
+              <span className="sm:hidden">Lvl+</span>
+            </Link>
+          )}
+          {canRevert && (
+            <button
+              type="button"
+              disabled={reverting || uploading || syncing}
+              onClick={handleRevertLevelUp}
+              className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-zinc-400 hover:text-starlight disabled:opacity-40"
+              title={
+                lastLevelUp
+                  ? `Undo level ${lastLevelUp.from_level} → ${lastLevelUp.to_level}`
+                  : "Undo last level-up"
+              }
+            >
+              <RotateCcw className={`h-3 w-3 shrink-0 ${reverting ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{reverting ? "Undoing…" : "Undo level-up"}</span>
+              <span className="sm:hidden">{reverting ? "…" : "Undo"}</span>
+            </button>
+          )}
           {character.dnd_beyond_url && (
             <a
               href={character.dnd_beyond_url}

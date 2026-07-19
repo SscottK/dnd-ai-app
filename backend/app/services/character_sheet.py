@@ -405,12 +405,28 @@ def normalize_sheet(
     if isinstance(sheet.get("conditions"), list):
         base["conditions"] = list(sheet["conditions"])
 
+    if isinstance(sheet.get("weapon_mastery"), list):
+        base["weapon_mastery"] = [
+            str(name).strip() for name in sheet["weapon_mastery"] if str(name).strip()
+        ]
+
+    if isinstance(sheet.get("level_history"), list):
+        # Preserve reversible level-up snapshots (do not deep-normalize nested sheets).
+        base["level_history"] = [
+            entry for entry in sheet["level_history"] if isinstance(entry, dict)
+        ][-10:]
+
     equipped = apply_equipped_overrides(base)
     enriched = enrich_sheet_pipeline(
         equipped,
         class_name=str(top_class).strip() if top_class else None,
         level=int(top_level) if top_level is not None else None,
     )
+    # Enrichment builds a new dict; re-attach history / mastery so they survive save.
+    if "level_history" in base:
+        enriched["level_history"] = base["level_history"]
+    if "weapon_mastery" in base:
+        enriched["weapon_mastery"] = base["weapon_mastery"]
     return enriched
 
 

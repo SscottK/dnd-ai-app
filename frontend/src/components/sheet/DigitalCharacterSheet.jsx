@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Heart, Shield, X } from "lucide-react";
 import {
   collectSheetActionCatalog,
@@ -908,7 +909,16 @@ export function DigitalCharacterSheet({
             </h2>
             {subtitle && <p className="text-xs font-mono text-neon-cyan">{subtitle}</p>}
           </div>
-          <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · click rows for full text</p>
+          <div className="flex items-center gap-3">
+            {!readOnly && character?.id != null && (character?.level == null || character.level < 20) && (
+              <Link
+                to={`/character/${character.id}/level-up`}
+                className="text-[10px] font-black uppercase text-neon-magenta hover:text-starlight"
+              >
+                Level Up
+              </Link>
+            )}            <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · click rows for full text</p>
+          </div>
         </div>
 
         {/* Top dashboard: abilities across top, combat across bottom */}

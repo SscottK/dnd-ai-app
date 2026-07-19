@@ -317,6 +317,54 @@ class CharacterRead(BaseModel):
     parse_warning: str | None = None
 
 
+class LevelUpPreviewResponse(BaseModel):
+    current_level: int
+    new_level: int
+    class_name: str | None = None
+    hit_die: int
+    con_modifier: int
+    average_hp_gain: int
+    roll_hp_min: int
+    roll_hp_max: int
+    proficiency_bonus: dict[str, int]
+    hit_dice_next: str
+    unlocks: list[dict[str, str]] = []
+    required_choices: list[dict] = []
+    at_level_cap: bool = False
+    can_revert: bool = False
+    last_level_up: dict | None = None
+
+
+class LevelUpRequest(BaseModel):
+    hp_gain: int = Field(ge=1, le=40)
+    heal_current: bool = True
+    hp_method: str | None = Field(default=None, max_length=20)
+    choices: dict = Field(default_factory=dict)
+
+
+class LevelUpResponse(BaseModel):
+    character: CharacterRead
+    unlocks: list[dict[str, str]] = []
+    choices_applied: list[dict[str, str]] = []
+    hp_gain: int
+    new_level: int
+    history_entry_id: str | None = None
+
+
+class LevelUpHistoryResponse(BaseModel):
+    history: list[dict] = []
+    can_revert: bool = False
+
+
+class LevelUpRevertRequest(BaseModel):
+    snapshot_id: str | None = Field(default=None, max_length=64)
+
+
+class LevelUpRevertResponse(BaseModel):
+    character: CharacterRead
+    reverted: dict
+
+
 class CharacterPhotoRead(BaseModel):
     id: int
     character_id: int

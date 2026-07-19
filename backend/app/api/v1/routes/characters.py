@@ -15,6 +15,12 @@ from app.api.schemas import (
     CharacterPhotoRead,
     CharacterRead,
     CharacterUpdate,
+    LevelUpHistoryResponse,
+    LevelUpPreviewResponse,
+    LevelUpRequest,
+    LevelUpResponse,
+    LevelUpRevertRequest,
+    LevelUpRevertResponse,
     SetPortraitRequest,
 )
 from app.db.models import Campaign, Character, CharacterPhoto
@@ -40,6 +46,12 @@ from app.services.character_photos import (
     set_portrait_photo,
 )
 from app.services.encounter_sync import sync_character_combat_stats
+from app.services.level_progression import (
+    apply_level_up,
+    level_history_summary,
+    preview_level_up,
+    revert_level_up,
+)
 from app.services.uploads import get_uploads_dir
 
 router = APIRouter(prefix="/characters", tags=["characters"])
@@ -555,6 +567,179 @@ def create_character(data: CharacterCreate, current_user: CurrentUser, session: 
     session.commit()
     session.refresh(character)
     return to_character_read(character, session)
+
+
+@router.get("/{character_id}/level-up/preview", response_model=LevelUpPreviewResponse)
+def preview_character_level_up(
+    character_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    current_level = int(character.level or 1)
+    if current_level >= 20:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Character is already at level 20",
+        )
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=current_level,
+    )
+    preview = preview_level_up(
+        sheet=sheet,
+        class_name=character.class_name,
+        current_level=current_level,
+    )
+    return LevelUpPreviewResponse(**preview)
+
+
+@router.post("/{character_id}/level-up", response_model=LevelUpResponse)
+def level_up_character(
+    character_id: int,
+    data: LevelUpRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    current_level = int(character.level or 1)
+    if current_level >= 20:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Character is already at level 20",
+        )
+
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=current_level,
+    )
+    try:
+        result = apply_level_up(
+            sheet=sheet,
+            class_name=character.class_name,
+            current_level=current_level,
+            current_hp=character.hp,
+            current_max_hp=character.max_hp,
+            current_ac=character.ac,
+            current_skills=character.skills,
+            hp_gain=data.hp_gain,
+            heal_current=data.heal_current,
+            choices=data.choices or {},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    character.level = result["level"]
+    if result.get("class_name"):
+        character.class_name = result["class_name"]
+    character.hp = result["hp"]
+    character.max_hp = result["max_hp"]
+    character.sheet_json = sheet_to_json(result["sheet"])
+    character.skills = skills_summary(result["sheet"])
+    computed_ac = compute_sheet_ac(result["sheet"], result["sheet"].get("authoritative_ac"))
+    if computed_ac is not None:
+        character.ac = computed_ac
+
+    session.add(character)
+
+    if character.campaign_id:
+        sync_character_combat_stats(
+            session,
+            character.campaign_id,
+            character.id,
+            hp=character.hp,
+            max_hp=character.max_hp,
+            ac=character.ac,
+            conditions=result["sheet"].get("conditions"),
+        )
+
+    session.commit()
+    session.refresh(character)
+    return LevelUpResponse(
+        character=to_character_read(character, session),
+        unlocks=result.get("unlocks") or [],
+        choices_applied=result.get("choices_applied") or [],
+        hp_gain=data.hp_gain,
+        new_level=result["level"],
+        history_entry_id=result.get("history_entry_id"),
+    )
+
+
+@router.get("/{character_id}/level-up/history", response_model=LevelUpHistoryResponse)
+def get_level_up_history(
+    character_id: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+    history = level_history_summary(sheet)
+    return LevelUpHistoryResponse(history=history, can_revert=bool(history))
+
+
+@router.post("/{character_id}/level-up/revert", response_model=LevelUpRevertResponse)
+def revert_character_level_up(
+    character_id: int,
+    data: LevelUpRevertRequest,
+    current_user: CurrentUser,
+    session: SessionDep,
+):
+    character = get_owned_character(character_id, current_user, session)
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+    try:
+        result = revert_level_up(sheet=sheet, snapshot_id=data.snapshot_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if result.get("level") is not None:
+        character.level = result["level"]
+    if result.get("class_name") is not None:
+        character.class_name = result["class_name"]
+    if result.get("hp") is not None:
+        character.hp = result["hp"]
+    if result.get("max_hp") is not None:
+        character.max_hp = result["max_hp"]
+    if result.get("ac") is not None:
+        character.ac = result["ac"]
+    character.sheet_json = sheet_to_json(result["sheet"])
+    if result.get("skills") is not None:
+        character.skills = result["skills"]
+    else:
+        character.skills = skills_summary(result["sheet"])
+
+    computed_ac = compute_sheet_ac(result["sheet"], result["sheet"].get("authoritative_ac"))
+    if computed_ac is not None:
+        character.ac = computed_ac
+
+    session.add(character)
+
+    if character.campaign_id:
+        sync_character_combat_stats(
+            session,
+            character.campaign_id,
+            character.id,
+            hp=character.hp,
+            max_hp=character.max_hp,
+            ac=character.ac,
+            conditions=result["sheet"].get("conditions"),
+        )
+
+    session.commit()
+    session.refresh(character)
+    return LevelUpRevertResponse(
+        character=to_character_read(character, session),
+        reverted=result.get("reverted") or {},
+    )
 
 
 @router.patch("/{character_id}", response_model=CharacterRead)
