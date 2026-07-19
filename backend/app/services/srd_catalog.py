@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "srd-5.2.1"
+_DEFAULT_PRIVATE_DIR = Path(__file__).resolve().parents[2] / "data" / "private-2024"
+
+
+def _private_dir() -> Path:
+    override = os.environ.get("PRIVATE_2024_DIR", "").strip()
+    return Path(override) if override else _DEFAULT_PRIVATE_DIR
 
 
 def _load_json(filename: str) -> dict:
@@ -18,23 +25,69 @@ def _load_json(filename: str) -> dict:
         return json.load(handle)
 
 
+def _load_private_json(filename: str) -> dict:
+    path = _private_dir() / filename
+    if not path.is_file():
+        return {}
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def _index_by_name(rows: list[dict]) -> dict[str, dict]:
     return {row["name"].casefold(): row for row in rows if row.get("name")}
 
 
+def _merged_index(srd_key: str, private_key: str, filename: str) -> dict[str, dict]:
+    """Prefer private 2024 overlay entries when present; keep SRD for anything missing."""
+    merged = _index_by_name((_load_json(filename).get(srd_key) or []))
+    private_rows = _load_private_json(filename).get(private_key) or []
+    for row in private_rows:
+        name = row.get("name")
+        if not name:
+            continue
+        key = name.casefold()
+        existing = merged.get(key) or {}
+        merged[key] = {**existing, **row, "source": row.get("source") or existing.get("source") or "PHB 2024"}
+    return merged
+
+
+_JUNK_EQUIPMENT_NAMES = {
+    "armor",
+    "name",
+    "weapon",
+    "weapons",
+    "item",
+    "cost",
+    "damage",
+    "weight",
+    "properties",
+    "mastery",
+}
+
+
+def _is_valid_equipment_row(row: dict) -> bool:
+    name = str(row.get("name") or "").strip()
+    if not name or name.casefold() in _JUNK_EQUIPMENT_NAMES:
+        return False
+    cost = str(row.get("cost") or "").strip().casefold()
+    if cost in {"cost", "weight"}:
+        return False
+    return True
+
+
 @lru_cache(maxsize=1)
 def _species_index() -> dict[str, dict]:
-    return _index_by_name((_load_json("species.json").get("species") or []))
+    return _merged_index("species", "species", "species.json")
 
 
 @lru_cache(maxsize=1)
 def _backgrounds_index() -> dict[str, dict]:
-    return _index_by_name((_load_json("backgrounds.json").get("backgrounds") or []))
+    return _merged_index("backgrounds", "backgrounds", "backgrounds.json")
 
 
 @lru_cache(maxsize=1)
 def _feats_index() -> dict[str, dict]:
-    return _index_by_name((_load_json("feats.json").get("feats") or []))
+    return _merged_index("feats", "feats", "feats.json")
 
 
 @lru_cache(maxsize=1)
@@ -44,7 +97,7 @@ def _glossary_index() -> dict[str, dict]:
 
 @lru_cache(maxsize=1)
 def _spells_index() -> dict[str, dict]:
-    return _index_by_name((_load_json("spells.json").get("spells") or []))
+    return _merged_index("spells", "spells", "spells.json")
 
 
 @lru_cache(maxsize=1)
@@ -59,7 +112,7 @@ def _classes_index() -> dict[str, dict]:
 
 @lru_cache(maxsize=1)
 def _magic_items_index() -> dict[str, dict]:
-    return _index_by_name((_load_json("magic_items.json").get("magic_items") or []))
+    return _merged_index("magic_items", "magic_items", "magic_items.json")
 
 
 @lru_cache(maxsize=1)
@@ -69,7 +122,7 @@ def _animals_index() -> dict[str, dict]:
 
 @lru_cache(maxsize=1)
 def _monsters_index() -> dict[str, dict]:
-    return _index_by_name((_load_json("monsters.json").get("monsters") or []))
+    return _merged_index("monsters", "monsters", "monsters.json")
 
 
 @lru_cache(maxsize=1)
@@ -138,9 +191,17 @@ def list_entries(category: str) -> list[dict]:
             for row in _monsters_index().values()
         ]
     if category == "weapons":
-        return list(_equipment_data().get("weapons") or [])
+        return [
+            row
+            for row in (_equipment_data().get("weapons") or [])
+            if _is_valid_equipment_row(row)
+        ]
     if category == "armor":
-        return list(_equipment_data().get("armor") or [])
+        return [
+            row
+            for row in (_equipment_data().get("armor") or [])
+            if _is_valid_equipment_row(row)
+        ]
     if category == "gear":
         return list(_equipment_data().get("gear") or [])
     if category == "rules_sections":

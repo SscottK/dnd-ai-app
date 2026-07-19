@@ -130,6 +130,51 @@ class CharacterAcTests(unittest.TestCase):
 
         self.assertEqual(compute_sheet_ac(sheet), 17)
 
+    def test_unarmored_defense_monk(self) -> None:
+        sheet = {
+            "abilities": {"dex": 16, "wis": 14, "con": 12},
+            "inventory": [],
+            "features": [
+                {
+                    "name": "Unarmored Defense",
+                    "source": "Monk",
+                    "description": "While not wearing armor, your AC equals 10 + Dexterity modifier + Wisdom modifier.",
+                }
+            ],
+            "ac_bonuses": [],
+        }
+        self.assertEqual(compute_sheet_ac(sheet), 15)  # 10 + 3 + 2
+
+    def test_draconic_resilience(self) -> None:
+        sheet = {
+            "abilities": {"dex": 14},
+            "inventory": [],
+            "features": [
+                {
+                    "name": "Draconic Resilience",
+                    "source": "Sorcerer",
+                    "description": "Your AC is 13 + Dexterity modifier while not wearing armor.",
+                }
+            ],
+            "ac_bonuses": [],
+        }
+        self.assertEqual(compute_sheet_ac(sheet), 15)  # 13 + 2
+
+    def test_unarmored_defense_ignored_when_armored(self) -> None:
+        sheet = {
+            "abilities": {"dex": 16, "wis": 14},
+            "inventory": [{"name": "Leather Armor", "equipped": True, "id": "a1"}],
+            "features": [
+                {
+                    "name": "Unarmored Defense",
+                    "source": "Monk",
+                    "description": "While not wearing armor, your AC equals 10 + Dexterity modifier + Wisdom modifier.",
+                }
+            ],
+            "ac_bonuses": [],
+        }
+        self.assertEqual(compute_sheet_ac(sheet), 14)  # leather 11 + dex 3
+
 
 if __name__ == "__main__":
     unittest.main()

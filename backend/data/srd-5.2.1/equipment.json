@@ -21,8 +21,8 @@
         "slug": "blowgun",
         "category": "Martial Ranged Weapons",
         "cost": "10 GP",
-        "damage_dice": null,
-        "damage_type": null,
+        "damage_dice": "1",
+        "damage_type": "Piercing",
         "weight": "1 lb.",
         "properties": [
           "Ammunition (Range 25/100; Needle)",
@@ -336,19 +336,6 @@
         "mastery": "Slow"
       },
       {
-        "name": "Name",
-        "slug": "name",
-        "category": "Weapon",
-        "cost": "Cost",
-        "damage_dice": null,
-        "damage_type": null,
-        "weight": "Weight",
-        "properties": [
-          "Properties"
-        ],
-        "mastery": "Mastery"
-      },
-      {
         "name": "Pike",
         "slug": "pike",
         "category": "Martial Melee Weapons",
@@ -541,15 +528,6 @@
       }
     ],
     "armor": [
-      {
-        "name": "Armor",
-        "slug": "armor",
-        "category": "Armor",
-        "cost": "Cost",
-        "weight": "Weight",
-        "ac_text": "Armor Class (AC)",
-        "stealth_disadvantage": true
-      },
       {
         "name": "Breastplate",
         "slug": "breastplate",

@@ -23,4 +23,4 @@ Rebuild everything: `python scripts/build_srd_all.py` (from `backend/`).
 | `equipment.json` | Weapons, armor, gear, equipment chapters | downfallx `equipment.md` |
 | `rules_documents.json` | Playing the game, character creation, toolbox, monsters overview | downfallx markdown |
 
-All content is derived from the SRD 5.2 / 2024 rules text. The legacy Open5e `wotc-srd` (2014 PHB) feed is no longer used.
+All content is derived from the SRD 5.2 / 2024 rules text.

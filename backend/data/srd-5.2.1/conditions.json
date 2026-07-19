@@ -1,90 +1,95 @@
 {
-  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0.",
+  "_license": "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, licensed under CC-BY 4.0. Condition text taken from the Rules Glossary.",
   "conditions": [
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A blinded creature can't see and automatically fails any ability check that requires sight.\n* Attack rolls against the creature have advantage, and the creature's attack rolls have disadvantage.",
+      "description": "While you have the Blinded condition, you experience the following effects.\n\n_Can't See._ You can't see and automatically fail any ability check that requires sight.\n\n_Attacks Affected._ Attack rolls against you have Advantage, and your attack rolls have Disadvantage.",
       "key": "blinded",
       "name": "Blinded"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A charmed creature can't attack the charmer or target the charmer with harmful abilities or magical effects.\n* The charmer has advantage on any ability check to interact socially with the creature.",
+      "description": "While you have the Charmed condition, you experience the following effects.\n\n_Can't Harm the Charmer._ You can't attack the charmer or target the charmer with damaging abilities or magical effects.\n\n_Social Advantage._ The charmer has Advantage on any ability check to interact with you socially.",
       "key": "charmed",
       "name": "Charmed"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A deafened creature can't hear and automatically fails any ability check that requires hearing.",
+      "description": "While you have the Deafened condition, you experience the following effect.\n\n_Can't Hear._ You can't hear and automatically fail any ability check that requires hearing.",
       "key": "deafened",
       "name": "Deafened"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A frightened creature has disadvantage on ability checks and attack rolls while the source of its fear is within line of sight.\n* The creature can't willingly move closer to the source of its fear.",
+      "description": "While you have the Exhaustion condition, you experience the following effects.\n\n_Exhaustion Levels._ This condition is cumulative. Each time you receive it, you gain 1 Exhaustion level. You die if your Exhaustion level is 6.\n\n_D20 Tests Affected._ When you make a D20 Test, the roll is reduced by 2 times your Exhaustion level.\n\n_Speed Reduced._ Your Speed is reduced by a number of feet equal to 5 times your Exhaustion level.\n\n_Removing Exhaustion Levels._ Finishing a Long Rest removes 1 of your Exhaustion levels. When your Exhaustion level reaches 0, the condition ends.",
+      "key": "exhaustion",
+      "name": "Exhaustion"
+    },
+    {
+      "attribution": "SRD 5.2.1 / CC-BY 4.0",
+      "description": "While you have the Frightened condition, you experience the following effects.\n\n_Ability Checks and Attacks Affected._ You have Disadvantage on ability checks and attack rolls while the source of fear is within line of sight.\n\n_Can't Approach._ You can't willingly move closer to the source of fear.",
       "key": "frightened",
       "name": "Frightened"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A grappled creature's speed becomes 0, and it can't benefit from any bonus to its speed.\n* The condition ends if the grappler is incapacitated (see the condition).\n* The condition also ends if an effect removes the grappled creature from the reach of the grappler or grappling effect, such as when a creature is hurled away by the *thunder-wave* spell.",
+      "description": "While you have the Grappled condition, you experience the following effects.\n\n_Speed 0._ Your Speed is 0 and can't increase.\n\n_Attacks Affected._ You have Disadvantage on attack rolls against any target other than the grappler.\n\n_Movable._ The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot unless you are Tiny or two or more sizes smaller than it.",
       "key": "grappled",
       "name": "Grappled"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* An incapacitated creature can't take actions or reactions.",
+      "description": "While you have the Incapacitated condition, you experience the following effects.\n\n_Inactive._ You can't take any action, Bonus Action, or Reaction.\n\n_No Concentration._ Your Concentration is broken.\n\n_Speechless._ You can't speak.\n\n_Surprised._ If you're Incapacitated when you roll Initiative, you have Disadvantage on the roll.",
       "key": "incapacitated",
       "name": "Incapacitated"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* An invisible creature is impossible to see without the aid of magic or a special sense. For the purpose of hiding, the creature is heavily obscured. The creature's location can be detected by any noise it makes or any tracks it leaves.\n* Attack rolls against the creature have disadvantage, and the creature's attack rolls have advantage.",
+      "description": "While you have the Invisible condition, you experience the following effects.\n\n_Surprise._ If you're Invisible when you roll Initiative, you have Advantage on the roll.\n\n_Concealed._ You aren't affected by any effect that requires its target to be seen unless the effect's creator can somehow see you. Any equipment you are wearing or carrying is also concealed.\n\n_Attacks Affected._ Attack rolls against you have Disadvantage, and your attack rolls have Advantage. If a creature can somehow see you, you don't gain this benefit against that creature.",
       "key": "invisible",
       "name": "Invisible"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A paralyzed creature is incapacitated (see the condition) and can't move or speak.\n* The creature automatically fails Strength and Dexterity saving throws.\n* Attack rolls against the creature have advantage.\n* Any attack that hits the creature is a critical hit if the attacker is within 5 feet of the creature.",
+      "description": "While you have the Paralyzed condition, you experience the following effects.\n\n_Incapacitated._ You have the Incapacitated condition.\n\n_Speed 0._ Your Speed is 0 and can't increase.\n\n_Saving Throws Affected._ You automatically fail Strength and Dexterity saving throws.\n\n_Attacks Affected._ Attack rolls against you have Advantage.\n\n_Automatic Critical Hits._ Any attack roll that hits you is a Critical Hit if the attacker is within 5 feet of you.",
       "key": "paralyzed",
       "name": "Paralyzed"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A petrified creature is transformed, along with any nonmagical object it is wearing or carrying, into a solid inanimate substance (usually stone). Its weight increases by a factor of ten, and it ceases aging.\n* The creature is incapacitated (see the condition), can't move or speak, and is unaware of its surroundings.\n* Attack rolls against the creature have advantage.\n* The creature automatically fails Strength and Dexterity saving throws.\n* The creature has resistance to all damage.\n* The creature is immune to poison and disease, although a poison or disease already in its system is suspended, not neutralized.",
+      "description": "While you have the Petrified condition, you experience the following effects.\n\n_Turned to Inanimate Substance._ You are transformed, along with any nonmagical objects you are wearing and carrying, into a solid inanimate substance (usually stone). Your weight increases by a factor of ten, and you cease aging.\n\n_Incapacitated._ You have the Incapacitated condition.\n\n_Speed 0._ Your Speed is 0 and can't increase.\n\n_Attacks Affected._ Attack rolls against you have Advantage.\n\n_Saving Throws Affected._ You automatically fail Strength and Dexterity saving throws.\n\n_Resist Damage._ You have Resistance to all damage.\n\n_Poison Immunity._ You have Immunity to the Poisoned condition.",
       "key": "petrified",
       "name": "Petrified"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A poisoned creature has disadvantage on attack rolls and ability checks.",
+      "description": "While you have the Poisoned condition, you experience the following effect.\n\n_Ability Checks and Attacks Affected._ You have Disadvantage on attack rolls and ability checks.",
       "key": "poisoned",
       "name": "Poisoned"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A prone creature's only movement option is to crawl, unless it stands up and thereby ends the condition.\n* The creature has disadvantage on attack rolls.\n* An attack roll against the creature has advantage if the attacker is within 5 feet of the creature. Otherwise, the attack roll has disadvantage.",
+      "description": "While you have the Prone condition, you experience the following effects.\n\n_Restricted Movement._ Your only movement options are to crawl or to spend an amount of movement equal to half your Speed (round down) to right yourself and thereby end the condition. If your Speed is 0, you can't right yourself.\n\n_Attacks Affected._ You have Disadvantage on attack rolls. An attack roll against you has Advantage if the attacker is within 5 feet of you. Otherwise, that attack roll has Disadvantage.",
       "key": "prone",
       "name": "Prone"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A restrained creature's speed becomes 0, and it can't benefit from any bonus to its speed.\n* Attack rolls against the creature have advantage, and the creature's attack rolls have disadvantage.\n* The creature has disadvantage on Dexterity saving throws.",
+      "description": "While you have the Restrained condition, you experience the following effects.\n\n_Speed 0._ Your Speed is 0 and can't increase.\n\n_Attacks Affected._ Attack rolls against you have Advantage, and your attack rolls have Disadvantage.\n\n_Saving Throws Affected._ You have Disadvantage on Dexterity saving throws.",
       "key": "restrained",
       "name": "Restrained"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* A stunned creature is incapacitated (see the condition), can't move, and can speak only falteringly.\n* The creature automatically fails Strength and Dexterity saving throws.\n* Attack rolls against the creature have advantage.",
+      "description": "While you have the Stunned condition, you experience the following effects.\n\n_Incapacitated._ You have the Incapacitated condition.\n\n_Saving Throws Affected._ You automatically fail Strength and Dexterity saving throws.\n\n_Attacks Affected._ Attack rolls against you have Advantage.",
       "key": "stunned",
       "name": "Stunned"
     },
     {
       "attribution": "SRD 5.2.1 / CC-BY 4.0",
-      "description": "* An unconscious creature is incapacitated (see the condition), can't move or speak, and is unaware of its surroundings\n* The creature drops whatever it's holding and falls prone.\n* The creature automatically fails Strength and Dexterity saving throws.\n* Attack rolls against the creature have advantage.\n* Any attack that hits the creature is a critical hit if the attacker is within 5 feet of the creature.",
+      "description": "While you have the Unconscious condition, you experience the following effects.\n\n_Inert._ You have the Incapacitated and Prone conditions, and you drop whatever you're holding. When this condition ends, you remain Prone.\n\n_Speed 0._ Your Speed is 0 and can't increase.\n\n_Attacks Affected._ Attack rolls against you have Advantage.\n\n_Saving Throws Affected._ You automatically fail Strength and Dexterity saving throws.\n\n_Automatic Critical Hits._ Any attack roll that hits you is a Critical Hit if the attacker is within 5 feet of you.\n\n_Unaware._ You're unaware of your surroundings.",
       "key": "unconscious",
       "name": "Unconscious"
     }
-  ],
-  "_source_note": "cocoajamworld/srd-5.2.1"
+  ]
 }

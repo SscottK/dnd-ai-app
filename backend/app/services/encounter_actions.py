@@ -22,12 +22,9 @@ def initiative_bonus_from_character(character: Character) -> int:
         sheet = json.loads(character.sheet_json or "{}")
     except (json.JSONDecodeError, TypeError, ValueError):
         sheet = {}
-    bonus = sheet.get("initiative_bonus")
-    if bonus is not None:
-        return int(bonus)
-    abilities = sheet.get("abilities") or {}
-    return ability_modifier(abilities.get("dex"))
+    from app.services.character_sheet import computed_initiative_bonus
 
+    return computed_initiative_bonus(sheet)
 
 def new_combatant_id() -> str:
     return f"c-{uuid.uuid4().hex[:12]}"
@@ -407,10 +404,10 @@ def roll_initiative_for_character(character: Character) -> tuple[int, int, int]:
 
 
 def roll_npc_initiative(combatant: EncounterCombatant) -> tuple[int, int, int]:
-    from app.services.monster_catalog import lookup_monster
+    from app.services.monster_catalog import effective_initiative_modifier, lookup_monster
 
     monster = lookup_monster(combatant.srd_name or combatant.name)
-    bonus = int(monster.get("initiative_modifier") or 0) if monster else 0
+    bonus = effective_initiative_modifier(monster) if monster else 0
     d20 = random.randint(1, 20)
     return d20, bonus, d20 + bonus
 

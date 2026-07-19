@@ -1,4 +1,8 @@
-"""SRD 5.2.1 (2024 rules) monster lookup for initiative tracker combat actions."""
+"""SRD 5.2.1 (2024 rules) monster lookup for initiative tracker combat actions.
+
+Private overlay at data/private-2024/monsters.json overrides SRD entries by name
+when present (gitignored; local extracts only).
+"""
 
 from __future__ import annotations
 
@@ -10,6 +14,19 @@ from pathlib import Path
 from app.api.schemas import CombatActionEntry, EncounterCombatant
 
 _DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "srd-5.2.1" / "monsters.json"
+_DEFAULT_PRIVATE_PATH = (
+    Path(__file__).resolve().parents[2] / "data" / "private-2024" / "monsters.json"
+)
+
+
+def _private_monsters_path() -> Path:
+    import os
+
+    override = os.environ.get("PRIVATE_2024_DIR", "").strip()
+    if override:
+        return Path(override) / "monsters.json"
+    return _DEFAULT_PRIVATE_PATH
+
 
 _BONUS_ACTION_HINT = re.compile(r"bonus action", re.IGNORECASE)
 _NUMBER_SUFFIX = re.compile(r"^(?P<base>.+?)\s+\d+$")
@@ -27,30 +44,102 @@ def _slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
+def _cr_numeric(value) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().replace("½", "1/2").replace("¼", "1/4").replace("⅛", "1/8")
+    if "/" in text:
+        num, den = text.split("/", 1)
+        try:
+            return float(num) / float(den)
+        except ValueError:
+            return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def proficiency_bonus_for_cr(cr) -> int:
+    """2024 Monster Manual proficiency bonus by Challenge Rating."""
+    numeric = _cr_numeric(cr)
+    if numeric is None:
+        return 2
+    if numeric <= 4:
+        return 2
+    if numeric <= 8:
+        return 3
+    if numeric <= 12:
+        return 4
+    if numeric <= 16:
+        return 5
+    if numeric <= 20:
+        return 6
+    if numeric <= 24:
+        return 7
+    if numeric <= 28:
+        return 8
+    return 9
+
+
+def _dexterity_modifier(monster: dict) -> int | None:
+    scores = (monster.get("stat_block_json") or {}).get("ability_scores") or {}
+    dex = scores.get("dex")
+    if dex is None:
+        return None
+    return (int(dex) - 10) // 2
+
+
+def effective_initiative_modifier(monster: dict) -> int:
+    """2024 initiative: prefer printed Initiative line; else Dex mod + PB."""
+    if monster.get("initiative_printed") and monster.get("initiative_modifier") is not None:
+        return int(monster["initiative_modifier"])
+    dex = _dexterity_modifier(monster)
+    if dex is not None:
+        pb = monster.get("proficiency_bonus")
+        if pb is None:
+            pb = proficiency_bonus_for_cr(monster.get("cr") or monster.get("cr_numeric"))
+        return int(dex) + int(pb)
+    if monster.get("initiative_modifier") is not None:
+        return int(monster["initiative_modifier"])
+    return 0
+
+
 @lru_cache(maxsize=1)
 def _load_catalog() -> tuple[dict[str, dict], dict[str, dict]]:
-    if not _DATA_PATH.is_file():
-        return {}, {}
-
-    with _DATA_PATH.open(encoding="utf-8") as handle:
-        payload = json.load(handle)
-
     by_name: dict[str, dict] = {}
     by_slug: dict[str, dict] = {}
-    for monster in payload.get("monsters") or []:
-        if not isinstance(monster, dict) or not monster.get("name"):
-            continue
-        key = monster["name"].casefold()
-        by_name[key] = monster
-        monster_id = str(monster.get("id") or "")
-        if monster_id.startswith("srd:"):
-            by_slug[monster_id[4:]] = monster
-        by_slug[_slugify(monster["name"])] = monster
+
+    def _ingest(payload: dict) -> None:
+        for monster in payload.get("monsters") or []:
+            if not isinstance(monster, dict) or not monster.get("name"):
+                continue
+            key = monster["name"].casefold()
+            existing = by_name.get(key) or {}
+            merged = {**existing, **monster}
+            by_name[key] = merged
+            monster_id = str(merged.get("id") or "")
+            if monster_id.startswith("srd:"):
+                by_slug[monster_id[4:]] = merged
+            if monster_id.startswith("private:"):
+                by_slug[monster_id[8:]] = merged
+            by_slug[_slugify(merged["name"])] = merged
+
+    if _DATA_PATH.is_file():
+        with _DATA_PATH.open(encoding="utf-8") as handle:
+            _ingest(json.load(handle))
+    private_path = _private_monsters_path()
+    if private_path.is_file():
+        with private_path.open(encoding="utf-8") as handle:
+            _ingest(json.load(handle))
+
     return by_name, by_slug
 
 
 def lookup_monster(name: str) -> dict | None:
-    """Find an SRD monster by combatant label, display name, or slug."""
+    """Find a monster by combatant label, display name, or slug."""
     normalized = _normalize_lookup_name(name)
     if not normalized:
         return None
@@ -208,10 +297,7 @@ def monster_walk_speed(monster: dict) -> int | None:
 
 
 def monster_default_initiative(monster: dict) -> int:
-    modifier = monster.get("initiative_modifier")
-    if modifier is None:
-        return 10
-    return 10 + int(modifier)
+    return 10 + effective_initiative_modifier(monster)
 
 
 def apply_monster_catalog_to_combatant(combatant: EncounterCombatant) -> EncounterCombatant:

@@ -263,7 +263,7 @@ export function DmRulesChatWidget({ campaignId, campaignName, token }) {
       <div className="flex shrink-0 items-center justify-between gap-2">
         <div className="flex items-center gap-1 text-xs sm:text-sm font-black uppercase text-ink-faint">
           <MessageSquare className="h-3 w-3 text-neon-cyan" />
-          5e Rules
+          5.5e Rules
         </div>
         <button
           type="button"
@@ -552,7 +552,7 @@ export function DmGeneratorsWidget({
               },
             ]}
             buildPrompt={(form) =>
-              `You are a D&D 5e DM assistant. Create an NPC. Role: ${form.role || "tavern patron"}. Tone: ${form.tone}. Extra: ${form.detail || "none"}. Format in markdown: ## Name, ## Look & Voice, ## Personality, ## Secret, ## Combat (AC, HP, one attack if relevant), ## Dialogue Hook (one quoted line). Keep it concise.`
+              `You are a D&D 5.5e (2024) DM assistant. Create an NPC. Role: ${form.role || "tavern patron"}. Tone: ${form.tone}. Extra: ${form.detail || "none"}. Format in markdown: ## Name, ## Look & Voice, ## Personality, ## Secret, ## Combat (AC, HP, one attack if relevant), ## Dialogue Hook (one quoted line). Keep it concise.`
             }
           />
         )}

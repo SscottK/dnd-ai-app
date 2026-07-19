@@ -39,3 +39,7 @@ lerna-debug.log*
 *.sln
 *.sw?
 
+# Local copyrighted reference material
+reference/
+backend/data/private-2024/
+private-2024.tar.gz

@@ -111,7 +111,7 @@ function toOptionalInt(value) {
 export function buildEncounterPrompt(form) {
   const partySize = Math.max(1, parseInt(form.partySize, 10) || 4);
   const partyLevel = form.partyLevel || "5";
-  return `You are a D&D 5e DM assistant. Generate a combat encounter for a party of ${partySize} level ${partyLevel} characters. Difficulty: ${form.difficulty}. Setting: ${form.setting || "generic fantasy"}.
+  return `You are a D&D 5.5e (2024) DM assistant. Generate a combat encounter for a party of ${partySize} level ${partyLevel} characters. Difficulty: ${form.difficulty}. Setting: ${form.setting || "generic fantasy"}.
 
 Respond with ONLY valid JSON (no markdown prose outside the JSON). Schema:
 {

@@ -95,6 +95,24 @@ def _feature_text(feature: dict) -> str:
     return f"{feature.get('name') or ''} {feature.get('source') or ''} {feature.get('description') or ''}"
 
 
+def _unarmored_ac_from_features(sheet: dict) -> tuple[int, str] | None:
+    """2024 Unarmored Defense / Draconic Resilience while not wearing armor."""
+    abilities = sheet.get("abilities") or {}
+    dex = ability_modifier(abilities.get("dex")) or 0
+    for feature in sheet.get("features") or []:
+        text = _feature_text(feature)
+        if re.search(r"\bdraconic resilience\b", text, re.I):
+            return 13 + dex, "Draconic Resilience: 13 + DEX"
+        if re.search(r"\bunarmored defense\b", text, re.I):
+            con = ability_modifier(abilities.get("con")) or 0
+            wis = ability_modifier(abilities.get("wis")) or 0
+            source = str(feature.get("source") or "").lower()
+            if "monk" in source or re.search(r"wisdom|\+\s*wis\b", text, re.I):
+                return 10 + dex + wis, "Unarmored Defense: 10 + DEX + WIS"
+            return 10 + dex + con, "Unarmored Defense: 10 + DEX + CON"
+    return None
+
+
 def _is_defense_fighting_style(feature: dict) -> bool:
     name = str(feature.get("name") or "").strip().lower()
     source = str(feature.get("source") or "").strip().lower()
@@ -310,6 +328,20 @@ def estimate_equipment_ac(sheet: dict) -> int | None:
     return None
 
 
+def estimate_base_ac(sheet: dict) -> int:
+    """Best base AC before feature AC bonuses and misc magic item bonuses."""
+    equipment_ac = estimate_equipment_ac(sheet)
+    if equipment_ac is not None:
+        return equipment_ac
+    if not _has_equipped_armor(sheet):
+        unarmored = _unarmored_ac_from_features(sheet)
+        if unarmored is not None:
+            return unarmored[0]
+    abilities = sheet.get("abilities") or {}
+    dex = ability_modifier(abilities.get("dex")) or 0
+    return 10 + dex
+
+
 def enrich_sheet_ac(sheet: dict, parsed_ac: int | None = None) -> dict:
     enriched = dict(sheet)
     existing = list(enriched.get("ac_bonuses") or [])
@@ -329,10 +361,10 @@ def enrich_sheet_ac(sheet: dict, parsed_ac: int | None = None) -> dict:
         enriched["authoritative_ac"] = parsed_ac
 
     wearing_armor = _has_equipped_armor(enriched)
-    equipment_ac = estimate_equipment_ac(enriched)
-    if parsed_ac is not None and equipment_ac is not None and parsed_ac > equipment_ac:
+    base_ac = estimate_base_ac(enriched)
+    if parsed_ac is not None and parsed_ac > base_ac:
         covered = (
-            equipment_ac
+            base_ac
             + _sum_ac_bonuses(enriched, wearing_armor=wearing_armor)
             + _compute_misc_ac_bonuses(enriched, wearing_armor=wearing_armor)
         )
@@ -349,19 +381,14 @@ def enrich_sheet_ac(sheet: dict, parsed_ac: int | None = None) -> dict:
 def compute_sheet_ac(sheet: dict, parsed_ac: int | None = None) -> int | None:
     enriched = enrich_sheet_ac(sheet, parsed_ac)
     wearing_armor = _has_equipped_armor(enriched)
-    equipment_ac = estimate_equipment_ac(enriched)
+    base_ac = estimate_base_ac(enriched)
     bonus_total = _sum_ac_bonuses(enriched, wearing_armor=wearing_armor)
     misc_total = _compute_misc_ac_bonuses(enriched, wearing_armor=wearing_armor)
+    total = base_ac + bonus_total + misc_total
 
-    if equipment_ac is not None:
-        total = equipment_ac + bonus_total + misc_total
-        authoritative = enriched.get("authoritative_ac")
-        overrides = enriched.get("equipped_overrides") or {}
-        if authoritative is not None and wearing_armor and not overrides:
-            if authoritative > total or authoritative < total:
-                return int(authoritative)
-        return total
-
-    abilities = enriched.get("abilities") or {}
-    dex = ability_modifier(abilities.get("dex")) or 0
-    return 10 + dex
+    authoritative = enriched.get("authoritative_ac")
+    overrides = enriched.get("equipped_overrides") or {}
+    if authoritative is not None and wearing_armor and not overrides:
+        if authoritative > total or authoritative < total:
+            return int(authoritative)
+    return total

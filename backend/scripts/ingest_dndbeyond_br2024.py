@@ -82,7 +82,7 @@ _EMBEDDED_ACTIONS = {
     ],
 }
 
-# 2024 Free Rules overrides (shared inference module still has 2014 Wild Shape = action).
+# 2024 Free Rules overrides for features where Free Rules wording still needs clarification.
 _BR2024_OVERRIDES: dict[str, str] = {
     "wild shape": "bonus_action",
     "end wild shape": "bonus_action",

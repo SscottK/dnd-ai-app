@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
-"""Legacy partial SRD build from Open5e (2014 wotc-srd). Superseded by build_srd_all.py."""
+"""Helper utilities for SRD 5.2.1 / 2024 combat + spell metadata.
+
+Do not fetch Open5e wotc-srd (2014). Full dataset builds use build_srd_all.py.
+"""
 
 from __future__ import annotations
 
-import json
 import re
-import urllib.request
-from pathlib import Path
-
-OUT_DIR = Path(__file__).resolve().parents[1] / "data" / "srd-5.2.1"
-LICENSE = (
-    "Source: D&D System Reference Document v5.2.1, © Wizards of the Coast LLC, "
-    "licensed under CC-BY 4.0. Re-published via the Open5e API "
-    "(https://api.open5e.com/, document slug: wotc-srd), also under CC-BY 4.0."
-)
 
 STANDARD_ACTIONS = [
     {
@@ -87,25 +80,6 @@ STANDARD_ACTIONS = [
 ]
 
 
-def fetch_json(url: str) -> dict:
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "dnd-ai-app/1.0 (SRD data build script)"},
-    )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return json.load(response)
-
-
-def paginate(base_url: str) -> list[dict]:
-    results: list[dict] = []
-    url = base_url
-    while url:
-        payload = fetch_json(url)
-        results.extend(payload.get("results") or [])
-        url = payload.get("next")
-    return results
-
-
 def infer_action_type(text: str) -> str | None:
     from app.services.action_type_inference import infer_primary_action_type
 
@@ -173,111 +147,3 @@ def parse_healing_dice(text: str) -> str | None:
     if match:
         return re.sub(r"\s+", "", match.group(1).lower())
     return None
-
-
-def parse_class_features(class_entry: dict) -> list[dict]:
-    desc = str(class_entry.get("desc") or "")
-    class_name = str(class_entry.get("name") or "")
-    features: list[dict] = []
-    for chunk in re.split(r"\n###\s+", desc):
-        chunk = chunk.strip()
-        if not chunk:
-            continue
-        lines = chunk.split("\n", 1)
-        name = re.sub(r"^#+\s*", "", lines[0]).strip()
-        body = lines[1].strip() if len(lines) > 1 else ""
-        action_type = infer_action_type(body)
-        if action_type is None:
-            continue
-        entry = {
-            "name": name,
-            "action_type": action_type,
-            "targeting": infer_targeting(name, body, category="feature"),
-            "category": "class_feature",
-            "source_class": class_name,
-            "description": body[:500],
-        }
-        healing = parse_healing_dice(body)
-        if healing:
-            entry["healing_dice"] = healing
-        features.append(entry)
-
-    for archetype in class_entry.get("archetypes") or []:
-        if archetype.get("document__slug") != "wotc-srd":
-            continue
-        for feature in parse_class_features(
-            {
-                "name": f"{class_name} ({archetype.get('name')})",
-                "desc": archetype.get("desc") or "",
-            }
-        ):
-            feature["source_subclass"] = archetype.get("name")
-            features.append(feature)
-    return features
-
-
-def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    classes = paginate("https://api.open5e.com/v1/classes/?document__slug=wotc-srd&limit=50")
-    class_features: list[dict] = []
-    seen: set[str] = set()
-    for class_entry in classes:
-        for feature in parse_class_features(class_entry):
-            key = feature["name"].casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            class_features.append(feature)
-
-    combat_actions = {
-        "_license": LICENSE,
-        "standard_actions": STANDARD_ACTIONS,
-        "class_features": sorted(class_features, key=lambda row: row["name"].casefold()),
-    }
-    (OUT_DIR / "combat_actions.json").write_text(
-        json.dumps(combat_actions, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-
-    spells_raw = paginate("https://api.open5e.com/v1/spells/?document__slug=wotc-srd&limit=100")
-    spells = []
-    for spell in spells_raw:
-        name = spell.get("name")
-        if not name:
-            continue
-        spells.append(
-            {
-                "name": name,
-                "slug": spell.get("slug"),
-                "level": spell.get("spell_level"),
-                "school": spell.get("school"),
-                "action_type": infer_spell_action_type(spell),
-                "targeting": infer_spell_targeting(spell),
-                "range": spell.get("range"),
-                "casting_time": spell.get("casting_time"),
-                "description": spell.get("desc") or "",
-            }
-        )
-    spells_payload = {"_license": LICENSE, "spells": sorted(spells, key=lambda row: row["name"].casefold())}
-    (OUT_DIR / "spells.json").write_text(
-        json.dumps(spells_payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-
-    conditions = fetch_json(
-        "https://raw.githubusercontent.com/cocoajamworld/srd-5.2.1/main/data/conditions.json"
-    )
-    (OUT_DIR / "conditions.json").write_text(
-        json.dumps(conditions, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-
-    print(
-        f"Wrote {len(STANDARD_ACTIONS)} standard actions, "
-        f"{len(class_features)} class features, {len(spells)} spells"
-    )
-
-
-if __name__ == "__main__":
-    main()

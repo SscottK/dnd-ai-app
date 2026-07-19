@@ -24,7 +24,7 @@ _TRAILING_ECONOMY = re.compile(
     re.IGNORECASE,
 )
 
-# Authoritative names where SRD/Open5e text inference is unreliable.
+# Authoritative names where Free Rules / sheet text inference is unreliable.
 _ACTION_TYPE_OVERRIDES: dict[str, str] = {
     "wild shape": "bonus_action",
     "combat wild shape": "bonus_action",

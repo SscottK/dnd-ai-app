@@ -501,9 +501,82 @@ def roster_fields_from_character(character: Any) -> dict[str, Any]:
 def _proficiency_bonus(sheet: dict) -> int:
     raw = sheet.get("proficiency_bonus")
     try:
-        return int(raw) if raw is not None else 0
+        if raw is not None:
+            return int(raw)
     except (TypeError, ValueError):
+        pass
+    # Fall back from character level when PB missing (2024 table).
+    level = None
+    classes = sheet.get("classes") or []
+    if isinstance(classes, list) and classes:
+        try:
+            level = sum(int(entry.get("level") or 0) for entry in classes if isinstance(entry, dict))
+        except (TypeError, ValueError):
+            level = None
+    if not level:
+        try:
+            level = int(sheet.get("level") or 0) or None
+        except (TypeError, ValueError):
+            level = None
+    if not level:
         return 0
+    if level >= 17:
+        return 6
+    if level >= 13:
+        return 5
+    if level >= 9:
+        return 4
+    if level >= 5:
+        return 3
+    return 2
+
+
+def sheet_has_alert_feat(sheet: dict) -> bool:
+    """True when the 2024 Alert feat (Initiative Proficiency) is on the sheet."""
+    needles = ("alert",)
+    bags: list[str] = []
+    for feature in sheet.get("features") or []:
+        if isinstance(feature, dict):
+            bags.append(str(feature.get("name") or ""))
+            bags.append(str(feature.get("source") or ""))
+        else:
+            bags.append(str(feature))
+    for feat in sheet.get("feats") or []:
+        if isinstance(feat, dict):
+            bags.append(str(feat.get("name") or ""))
+        else:
+            bags.append(str(feat))
+    background = sheet.get("background")
+    if isinstance(background, dict):
+        bags.append(str(background.get("feat") or ""))
+        bags.append(str(background.get("name") or ""))
+    elif isinstance(background, str):
+        bags.append(background)
+    feat_field = sheet.get("feat") or sheet.get("origin_feat")
+    if feat_field:
+        bags.append(str(feat_field))
+    return any(any(n in text.casefold() for n in needles) for text in bags if text)
+
+
+def computed_initiative_bonus(sheet: dict) -> int:
+    """2024 initiative modifier: Dex mod, plus PB when Alert is present.
+
+    If the sheet stores a higher explicit bonus (magic items, etc.), keep the higher value.
+    """
+    abilities = sheet.get("abilities") or {}
+    dex_mod = ability_modifier(abilities.get("dex")) or 0
+    total = int(dex_mod)
+    if sheet_has_alert_feat(sheet):
+        total += _proficiency_bonus(sheet)
+    explicit = sheet.get("initiative_bonus")
+    if explicit is not None:
+        try:
+            explicit_i = int(explicit)
+            if explicit_i > total:
+                return explicit_i
+        except (TypeError, ValueError):
+            pass
+    return total
 
 
 def computed_skill_bonus(sheet: dict, skill_name: str) -> int:

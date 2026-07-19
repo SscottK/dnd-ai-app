@@ -5,3 +5,4 @@ bcrypt
 psycopg2-binary
 alembic
 pypdf
+pymupdf

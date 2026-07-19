@@ -635,7 +635,11 @@ def enrich_sheet_pipeline(
     next_sheet["features"] = tag_features_for_display(next_sheet, next_sheet["combat_actions"])
     next_sheet = attach_action_options(next_sheet)
     enriched = enrich_sheet_actions(next_sheet)
-    return _apply_catalog_options(enriched)
+    enriched = _apply_catalog_options(enriched)
+    from app.services.character_sheet import computed_initiative_bonus
+
+    enriched["initiative_bonus"] = computed_initiative_bonus(enriched)
+    return enriched
 
 
 def _apply_catalog_options(sheet: dict) -> dict:

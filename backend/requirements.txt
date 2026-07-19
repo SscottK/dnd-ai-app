@@ -103,6 +103,8 @@ pydantic-settings==2.14.1
     # via fastapi
 pygments==2.20.0
     # via rich
+pymupdf==1.28.0
+    # via -r requirements.in
 pypdf==6.13.0
     # via -r requirements.in
 python-dotenv==1.2.2
