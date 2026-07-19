@@ -326,7 +326,7 @@ function ProficienciesBlock({ sheet }) {
 function MetricTile({ label, hint, children, className = "" }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center border border-neon-cyan/30 bg-void-panel/70 px-2 py-1.5 ${className}`}
+      className={`flex min-h-[4.5rem] flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2 py-1.5 ${className}`}
     >
       <div className="mb-0.5 flex items-center gap-0.5">
         <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
@@ -417,7 +417,7 @@ function CombatDashboard({
           onClick={() =>
             onShowDetail({ title: "Initiative", body: `Bonus ${formatModifier(init)}` })
           }
-          className="relative flex w-[4.75rem] shrink-0 flex-col items-center justify-center border border-neon-cyan/30 bg-void-panel/70 px-1.5 py-1.5 hover:border-neon-cyan"
+          className="relative flex min-h-[4.5rem] w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1.5 hover:border-neon-cyan"
           title="Open initiative details"
         >
           <div className="mb-0.5 flex items-center gap-0.5">
@@ -449,7 +449,7 @@ function CombatDashboard({
               ),
             })
           }
-          className="relative flex w-[4.75rem] shrink-0 flex-col items-center justify-center border border-neon-magenta/40 bg-neon-magenta/5 px-1.5 py-1.5 hover:border-neon-magenta"
+          className="relative flex min-h-[4.5rem] w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1.5 hover:border-neon-cyan"
           title="Open AC breakdown"
         >
           <div className="mb-0.5 flex items-center gap-0.5">
@@ -467,7 +467,7 @@ function CombatDashboard({
           </span>
         </button>
 
-        <div className="min-w-[15rem] flex-1 border border-neon-cyan/30 bg-void-panel/70 px-2.5 py-1.5 sm:max-w-sm">
+        <div className="min-h-[4.5rem] min-w-[15rem] flex-1 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5 sm:max-w-sm">
           <div className="mb-1 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <Heart className="h-3 w-3 text-danger" />
@@ -538,7 +538,7 @@ function CombatDashboard({
       </div>
 
       {resources.length > 0 && (
-        <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-sm border border-zinc-800/80 bg-zinc-950/40 px-2 py-1.5">
+        <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2 py-1.5">
           <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase tracking-wider text-zinc-500">
             Resources
             <InfoTooltip text={SHEET_STAT_HINTS.resources} label="About resources" />
@@ -909,41 +909,40 @@ export function DigitalCharacterSheet({
           <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · click rows for full text</p>
         </div>
 
-        {/* Top dashboard: abilities beside combat (Beyond-style, fixed-size tiles) */}
-        <div className="border border-neon-cyan/30 bg-void-panel/40 p-2.5 sm:p-3">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-4">
-            <div className="min-w-0 shrink-0 pb-2">
-              <div className="mb-2 flex items-center gap-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
-                  Ability Scores
-                </p>
-                <InfoTooltip text={SHEET_SECTION_HINTS.abilities} label="About ability scores" />
-              </div>
-              <AbilityScoresGrid
-                sheet={sheet}
-                variant="dashboard"
-                readOnly={readOnly}
-                onShowDetail={setDetail}
-                onChange={readOnly ? undefined : onSheetChange}
-              />
+        {/* Top dashboard: abilities across top, combat across bottom */}
+        <div className="space-y-3 border border-neon-cyan/30 bg-void-panel/40 p-2.5 sm:p-3">
+          <div>
+            <div className="mb-2 flex items-center gap-1">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
+                Ability Scores
+              </p>
+              <InfoTooltip text={SHEET_SECTION_HINTS.abilities} label="About ability scores" />
             </div>
-            <div className="min-w-0 flex-1 border-t border-zinc-800/80 pt-3 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
-              <div className="mb-1.5 flex items-center gap-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
-                  Combat
-                </p>
-                <InfoTooltip text={SHEET_SECTION_HINTS.combat} label="About combat" />
-              </div>
-              <CombatDashboard
-                character={character}
-                sheet={sheet}
-                combat={combat}
-                onCombatChange={onCombatChange}
-                onShowDetail={setDetail}
-                onSheetChange={onSheetChange}
-                readOnly={readOnly}
-              />
+            <AbilityScoresGrid
+              sheet={sheet}
+              variant="dashboard"
+              readOnly={readOnly}
+              onShowDetail={setDetail}
+              onChange={readOnly ? undefined : onSheetChange}
+            />
+          </div>
+
+          <div className="border-t border-neon-cyan/20 pt-3">
+            <div className="mb-2 flex items-center gap-1">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
+                Combat
+              </p>
+              <InfoTooltip text={SHEET_SECTION_HINTS.combat} label="About combat" />
             </div>
+            <CombatDashboard
+              character={character}
+              sheet={sheet}
+              combat={combat}
+              onCombatChange={onCombatChange}
+              onShowDetail={setDetail}
+              onSheetChange={onSheetChange}
+              readOnly={readOnly}
+            />
           </div>
         </div>
 
