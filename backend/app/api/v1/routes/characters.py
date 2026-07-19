@@ -18,7 +18,6 @@ from app.api.schemas import (
     SetPortraitRequest,
 )
 from app.db.models import Campaign, Character, CharacterPhoto
-from app.db.session import BACKEND_DIR
 from app.services.campaign_membership import get_campaign_member_for_user
 from app.services.character_assets import portrait_download_url, portrait_media_type
 from app.services.character_ac import compute_sheet_ac, enrich_sheet_ac
@@ -41,11 +40,11 @@ from app.services.character_photos import (
     set_portrait_photo,
 )
 from app.services.encounter_sync import sync_character_combat_stats
+from app.services.uploads import get_uploads_dir
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 
-UPLOADS_DIR = BACKEND_DIR / "uploads"
-UPLOADS_DIR.mkdir(exist_ok=True)
+UPLOADS_DIR = get_uploads_dir()
 MAX_PDF_BYTES = 10 * 1024 * 1024
 
 
@@ -301,9 +300,17 @@ def download_character_pdf(user_id: int, filename: str, current_user: CurrentUse
 
     path = UPLOADS_DIR / str(user_id) / filename
     if not path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDF file is missing on the server. Use Replace PDF to upload it again.",
+        )
 
-    return FileResponse(path, media_type="application/pdf", filename=filename)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=filename,
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/{character_id}/photos", response_model=CharacterPhotoListResponse)
@@ -456,7 +463,7 @@ async def refresh_character_from_pdf(
     if not pdf_file.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Stored PDF not found. Please re-upload.",
+            detail="PDF file is missing on the server. Use Replace PDF to upload it again.",
         )
 
     warning = await parse_and_apply_pdf(character, pdf_file, session)

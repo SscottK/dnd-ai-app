@@ -9,11 +9,35 @@ function pdfApiPath(pdfUrl) {
   return pdfUrl;
 }
 
+async function fetchPdfBlob(pdfUrl, token) {
+  const path = pdfApiPath(pdfUrl);
+  const response = await apiFetch(path, { token });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const payload = await response.json();
+      detail = typeof payload.detail === "string" ? payload.detail : "";
+    } catch {
+      /* ignore */
+    }
+    if (response.status === 401) {
+      throw new Error("Not authenticated");
+    }
+    if (response.status === 404) {
+      throw new Error(
+        detail || "PDF file is missing on the server. Use Replace PDF to upload it again."
+      );
+    }
+    throw new Error(detail || "Could not load PDF");
+  }
+  const buffer = await response.arrayBuffer();
+  return new Blob([buffer], { type: "application/pdf" });
+}
+
 export function AuthenticatedPdfFrame({ pdfUrl, token, title = "Character sheet PDF", className = "" }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-
   const objectUrlRef = useRef(null);
 
   useEffect(() => {
@@ -38,14 +62,7 @@ export function AuthenticatedPdfFrame({ pdfUrl, token, title = "Character sheet 
       revokeCurrent();
       setBlobUrl(null);
       try {
-        const path = pdfApiPath(pdfUrl);
-        const response = await apiFetch(path, { token });
-        if (!response.ok) {
-          throw new Error(
-            response.status === 401 ? "Not authenticated" : "Could not load PDF"
-          );
-        }
-        const blob = await response.blob();
+        const blob = await fetchPdfBlob(pdfUrl, token);
         if (!active) return;
         const objectUrl = URL.createObjectURL(blob);
         objectUrlRef.current = objectUrl;
@@ -71,15 +88,19 @@ export function AuthenticatedPdfFrame({ pdfUrl, token, title = "Character sheet 
   if (loading) {
     return (
       <div className={`flex items-center justify-center bg-void text-xs font-mono text-zinc-500 ${className}`}>
-        Loading PDF...
+        Loading PDF…
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={`flex items-center justify-center bg-void p-6 text-center ${className}`}>
-        <p className="text-xs font-mono text-danger">{error}</p>
+      <div className={`flex flex-col items-center justify-center gap-2 bg-void p-6 text-center ${className}`}>
+        <p className="max-w-md text-xs font-mono text-danger">{error}</p>
+        <p className="max-w-md text-[10px] font-mono text-zinc-500">
+          If this character was imported before server storage was persistent, re-upload the PDF with
+          Replace PDF.
+        </p>
       </div>
     );
   }
@@ -87,20 +108,32 @@ export function AuthenticatedPdfFrame({ pdfUrl, token, title = "Character sheet 
   return (
     <iframe
       title={title}
-      src={blobUrl}
+      src={`${blobUrl}#view=FitH`}
       className={className}
     />
   );
 }
 
+/**
+ * Open PDF in a new tab. Opens a blank tab synchronously first so browsers
+ * do not block the popup after the authenticated fetch completes.
+ */
 export async function openAuthenticatedPdfInTab(pdfUrl, token) {
-  const path = pdfApiPath(pdfUrl);
-  const response = await apiFetch(path, { token });
-  if (!response.ok) {
-    throw new Error(response.status === 401 ? "Not authenticated" : "Could not open PDF");
+  const preview = window.open("about:blank", "_blank");
+  try {
+    const blob = await fetchPdfBlob(pdfUrl, token);
+    const url = URL.createObjectURL(blob);
+    if (preview && !preview.closed) {
+      preview.location.href = url;
+    } else {
+      // Popup blocked — fall back to same-tab navigation of the blob.
+      window.location.assign(url);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 120_000);
+  } catch (err) {
+    if (preview && !preview.closed) {
+      preview.close();
+    }
+    throw err;
   }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank", "noopener,noreferrer");
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

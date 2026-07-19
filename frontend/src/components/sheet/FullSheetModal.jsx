@@ -148,7 +148,7 @@ export function FullSheetModal({
               </div>
             </div>
           )}
-          <div className="h-full overflow-y-auto px-4 py-4 lg:px-8">
+          <div className="h-full overflow-y-auto px-3 py-2 lg:px-4">
             <DigitalCharacterSheet
               character={character}
               sheet={sheet}

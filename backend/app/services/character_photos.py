@@ -6,9 +6,9 @@ from fastapi import HTTPException, UploadFile, status
 from sqlmodel import Session, select
 
 from app.db.models import Character, CharacterPhoto
-from app.db.session import BACKEND_DIR
+from app.services.uploads import get_uploads_dir
 
-UPLOADS_DIR = BACKEND_DIR / "uploads"
+UPLOADS_DIR = get_uploads_dir()
 PORTRAIT_MAX_BYTES = 4 * 1024 * 1024
 PORTRAIT_EXTENSIONS = {
     "image/jpeg": ".jpg",

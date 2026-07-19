@@ -99,7 +99,7 @@ ls /var/data/private-2024
 
 Redeploys keep `/var/data/**`. Re-upload only when you regenerate the overlay.
 
-Optional: also store `uploads/` under `/var/data/uploads` later so character PDFs survive deploys.
+Optional: character PDFs/portraits auto-store under `/var/data/uploads` when the disk is mounted (see uploads note below).
 
 ## Frontend (Vercel)
 
@@ -109,4 +109,6 @@ VITE_API_URL=https://your-render-service.onrender.com
 
 ## Note on file uploads
 
-Character PDFs and portraits are stored on the server filesystem under `backend/uploads/`. Without a disk mount covering that path, uploads are lost on redeploy. PostgreSQL persists accounts and game data; put uploads on the same `/var/data` disk if you want them to stick.
+Character PDFs and portraits are stored under **`/var/data/uploads`** when a Render disk is mounted at `/var/data` (same disk as the private-2024 overlay). Locally they use `backend/uploads/`.
+
+Override with env `UPLOADS_DIR` if needed. Without a persistent disk, uploads are wiped on every redeploy — the digital sheet remains in Postgres, but **Open PDF / PDF tab** will 404 until you Replace PDF.
