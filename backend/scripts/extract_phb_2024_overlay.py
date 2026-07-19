@@ -92,15 +92,24 @@ def extract_species(doc: fitz.Document) -> list[dict]:
             body = traits.group(0).strip() if traits else ""
         if not body:
             continue
-        species.append(
-            {
-                "name": name,
-                "slug": slugify(name),
-                "source": "PHB 2024",
-                "edition": "2024",
-                "description": body[:12000],
-            }
-        )
+        fields = {}
+        for label in ("Creature Type", "Size", "Speed"):
+            match_field = re.search(
+                rf"(?ims)^{re.escape(label)}:\s*(.+?)(?=^(?:Creature Type|Size|Speed):|\nAs an?\b|\nYou\b|\Z)",
+                body,
+            )
+            if match_field:
+                fields[label] = re.sub(r"\s*\n\s*", " ", match_field.group(1)).strip()
+        entry = {
+            "name": name,
+            "slug": slugify(name),
+            "source": "PHB 2024",
+            "edition": "2024",
+            "description": body[:12000],
+        }
+        if fields:
+            entry["fields"] = fields
+        species.append(entry)
     return species
 
 
@@ -141,18 +150,39 @@ def extract_backgrounds(doc: fitz.Document) -> list[dict]:
             break
         match = blocks[index]
         tool = (match.group(4) or "").strip()
+        feat = re.sub(r"\s*\(see chapter 5\)", "", match.group(2), flags=re.I).strip()
+        ability = match.group(1).strip()
+        skills = match.group(3).strip()
+        # Stop before flavor prose ("You grew up…") that follows the equipment line.
+        raw_equipment = match.group(5)
+        equipment_match = re.match(
+            r"(.*?(?:\d+\s*GP|[Bb]\))\s*)(?=\nYou(?:r)?\b|\n[A-Z][a-z]+\s+[a-z]|\Z)",
+            raw_equipment,
+            re.S,
+        )
+        equipment = clean_spaces((equipment_match.group(1) if equipment_match else raw_equipment))[:500]
+        equipment = re.sub(r"\s+", " ", equipment).strip()
+        fields = {
+            "Ability Scores": ability,
+            "Feat": feat,
+            "Skill Proficiencies": skills,
+            "Equipment": equipment,
+        }
+        if tool:
+            fields["Tool Proficiency"] = clean_spaces(tool)
         backgrounds.append(
             {
                 "name": name,
                 "slug": slugify(name),
                 "source": "PHB 2024",
                 "edition": "2024",
-                "ability_scores": match.group(1).strip(),
-                "feat": re.sub(r"\s*\(see chapter 5\)", "", match.group(2), flags=re.I).strip(),
-                "skill_proficiencies": match.group(3).strip(),
+                "ability_scores": ability,
+                "feat": feat,
+                "skill_proficiencies": skills,
                 "tool_proficiency": tool or None,
-                "equipment": clean_spaces(match.group(5))[:2000],
-                "description": clean_spaces(match.group(0))[:6000],
+                "equipment": equipment,
+                "fields": fields,
+                "description": "",
             }
         )
     return backgrounds

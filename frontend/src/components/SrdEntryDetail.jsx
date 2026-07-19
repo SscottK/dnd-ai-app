@@ -116,11 +116,10 @@ function ArmorEntryMeta({ entry }) {
 
 function MagicItemEntryMeta({ entry }) {
   const { subtitle } = parseLeadingSubtitle(entry.description || "");
+  const header = subtitle || entry.type_line || entry.rarity || entry.type || null;
   return (
     <>
-      {subtitle && (
-        <MetaPanel header={subtitle} headerClassName="text-neon-magenta" />
-      )}
+      {header && <MetaPanel header={header} headerClassName="text-neon-magenta" />}
       <FieldsPanel fields={entry.fields} />
     </>
   );
@@ -128,11 +127,17 @@ function MagicItemEntryMeta({ entry }) {
 
 function FeatEntryMeta({ entry }) {
   const { subtitle } = parseLeadingSubtitle(entry.description || "");
-  if (!subtitle) return <FieldsPanel fields={entry.fields} header="Feat" />;
+  const header = subtitle || entry.fields?.Category || null;
   return (
     <>
-      <MetaPanel header={subtitle} headerClassName="text-accent" />
-      <FieldsPanel fields={entry.fields} />
+      {header && <MetaPanel header={header} headerClassName="text-accent" />}
+      <FieldsPanel
+        fields={
+          entry.fields
+            ? Object.fromEntries(Object.entries(entry.fields).filter(([key]) => key !== "Category"))
+            : null
+        }
+      />
     </>
   );
 }
@@ -160,7 +165,19 @@ function GearEntryMeta({ entry }) {
 }
 
 function BackgroundEntryMeta({ entry }) {
-  return <FieldsPanel fields={entry.fields} header="Background" />;
+  const fields =
+    entry.fields && Object.keys(entry.fields).length
+      ? entry.fields
+      : {
+          ...(entry.ability_scores ? { "Ability Scores": entry.ability_scores } : {}),
+          ...(entry.feat ? { Feat: entry.feat } : {}),
+          ...(entry.skill_proficiencies
+            ? { "Skill Proficiencies": entry.skill_proficiencies }
+            : {}),
+          ...(entry.tool_proficiency ? { "Tool Proficiency": entry.tool_proficiency } : {}),
+          ...(entry.equipment ? { Equipment: entry.equipment } : {}),
+        };
+  return <FieldsPanel fields={fields} header="Background" />;
 }
 
 function SpeciesEntryMeta({ entry }) {
@@ -191,9 +208,7 @@ function normalizeMarkdown(content) {
 
 function EntryProse({ entry }) {
   const prose = normalizeMarkdown(entryProse(entry));
-  if (!prose) {
-    return <p className="text-xs font-mono text-ink-faint">No additional description in SRD excerpt.</p>;
-  }
+  if (!prose) return null;
   return <MarkdownRenderer content={prose} />;
 }
 

@@ -12,6 +12,9 @@ _DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "srd-5.2.1"
 _DEFAULT_PRIVATE_DIR = Path(__file__).resolve().parents[2] / "data" / "private-2024"
 
 
+from app.services.rules_normalize import normalize_entry
+
+
 def _private_dir() -> Path:
     override = os.environ.get("PRIVATE_2024_DIR", "").strip()
     if override:
@@ -217,31 +220,32 @@ def _gear_index() -> dict[str, dict]:
 
 
 def list_entries(category: str) -> list[dict]:
+    rows: list[dict] = []
     if category == "species":
-        return list(_species_index().values())
-    if category == "backgrounds":
-        return list(_backgrounds_index().values())
-    if category == "feats":
-        return list(_feats_index().values())
-    if category == "glossary":
-        return list(_glossary_index().values())
-    if category == "spells":
-        return list(_spells_index().values())
-    if category == "conditions":
-        return list(_conditions_index().values())
-    if category == "classes":
-        return list(_classes_index().values())
-    if category == "magic_items":
-        return list(_magic_items_index().values())
-    if category == "animals":
-        return list(_animals_index().values())
-    if category == "monsters":
+        rows = list(_species_index().values())
+    elif category == "backgrounds":
+        rows = list(_backgrounds_index().values())
+    elif category == "feats":
+        rows = list(_feats_index().values())
+    elif category == "glossary":
+        rows = list(_glossary_index().values())
+    elif category == "spells":
+        rows = list(_spells_index().values())
+    elif category == "conditions":
+        rows = list(_conditions_index().values())
+    elif category == "classes":
+        rows = list(_classes_index().values())
+    elif category == "magic_items":
+        rows = list(_magic_items_index().values())
+    elif category == "animals":
+        rows = list(_animals_index().values())
+    elif category == "monsters":
         from app.services.monster_catalog import (
             effective_initiative_modifier,
             monster_default_initiative,
         )
 
-        return [
+        rows = [
             {
                 "name": row.get("name"),
                 "slug": row.get("id") or row.get("name", "").lower(),
@@ -254,23 +258,25 @@ def list_entries(category: str) -> list[dict]:
             }
             for row in _monsters_index().values()
         ]
-    if category == "weapons":
-        return [
+    elif category == "weapons":
+        rows = [
             row
             for row in (_equipment_data().get("weapons") or [])
             if _is_valid_equipment_row(row)
         ]
-    if category == "armor":
-        return [
+    elif category == "armor":
+        rows = [
             row
             for row in (_equipment_data().get("armor") or [])
             if _is_valid_equipment_row(row)
         ]
-    if category == "gear":
-        return list(_equipment_data().get("gear") or [])
-    if category == "rules_sections":
-        return _rules_sections_flat()
-    return []
+    elif category == "gear":
+        rows = list(_equipment_data().get("gear") or [])
+    elif category == "rules_sections":
+        rows = _rules_sections_flat()
+    else:
+        return []
+    return [normalize_entry(category, row) or row for row in rows]
 
 
 def lookup_entry(category: str, name: str) -> dict | None:
@@ -295,7 +301,7 @@ def lookup_entry(category: str, name: str) -> dict | None:
         if category == "conditions":
             glossary = _glossary_index().get(key)
             if glossary and glossary.get("description"):
-                return {
+                entry = {
                     **entry,
                     "description": glossary["description"],
                     "tag": glossary.get("tag") or entry.get("tag"),
@@ -306,12 +312,12 @@ def lookup_entry(category: str, name: str) -> dict | None:
                 monster_default_initiative,
             )
 
-            return {
+            entry = {
                 **entry,
                 "initiative_modifier": effective_initiative_modifier(entry),
                 "default_initiative": monster_default_initiative(entry),
             }
-        return entry
+        return normalize_entry(category, entry)
 
     if category == "weapons":
         for row in _equipment_data().get("weapons") or []:

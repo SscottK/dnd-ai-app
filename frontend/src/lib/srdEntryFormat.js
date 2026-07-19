@@ -41,15 +41,35 @@ export function parseLeadingSubtitle(text) {
 
 export function stripFieldLines(description, fields) {
   if (!description || !fields || typeof fields !== "object") return description || "";
-  const fieldKeys = new Set(Object.keys(fields));
-  return description
-    .split("\n")
-    .filter((line) => {
-      const match = line.trim().match(/^\*\*(.+?):\*\*/);
-      return !(match && fieldKeys.has(match[1]));
-    })
-    .join("\n")
-    .trim();
+  const fieldKeys = new Set(Object.keys(fields).map((key) => key.toLowerCase()));
+  const lines = String(description).split("\n");
+  const kept = [];
+  let skipping = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(/^([^:]+):\s*(.*)$/);
+    if (match && fieldKeys.has(match[1].trim().toLowerCase())) {
+      skipping = true;
+      continue;
+    }
+    if (skipping) {
+      if (!trimmed) {
+        skipping = false;
+        kept.push(line);
+        continue;
+      }
+      if (/^[A-Z][^.].*\.\s/.test(trimmed) || /^As an?\b/i.test(trimmed)) {
+        skipping = false;
+      } else {
+        continue;
+      }
+    }
+    // SRD markdown field lines: **Label:** value
+    const md = trimmed.match(/^\*\*(.+?):\*\*/);
+    if (md && fieldKeys.has(md[1].trim().toLowerCase())) continue;
+    kept.push(line);
+  }
+  return kept.join("\n").trim();
 }
 
 export function entryProse(entry) {
@@ -86,7 +106,7 @@ export function entrySummary(entry, category) {
   }
   if (category === "magic_items") {
     const { subtitle } = parseLeadingSubtitle(entry.description || "");
-    return subtitle || entry.rarity || entry.category || "";
+    return subtitle || entry.type_line || entry.rarity || entry.category || "";
   }
   if (category === "weapons") {
     return [entry.category, entry.damage_dice, entry.damage_type].filter(Boolean).join(" · ");
@@ -103,7 +123,7 @@ export function entrySummary(entry, category) {
   }
   if (category === "feats") {
     const { subtitle } = parseLeadingSubtitle(entry.description || "");
-    return subtitle || "";
+    return subtitle || entry.fields?.Category || entry.category || "";
   }
   if (category === "glossary") {
     return entry.tag || "";
@@ -111,11 +131,16 @@ export function entrySummary(entry, category) {
   if (category === "conditions") {
     return entry.key || "Condition";
   }
-  if (category === "backgrounds" && entry.fields?.["Skill Proficiencies"]) {
-    return entry.fields["Skill Proficiencies"];
+  if (category === "backgrounds") {
+    return (
+      entry.fields?.["Skill Proficiencies"] ||
+      entry.skill_proficiencies ||
+      entry.feat ||
+      ""
+    );
   }
-  if (category === "species" && entry.fields?.Size) {
-    return entry.fields.Size;
+  if (category === "species") {
+    return entry.fields?.Size || entry.fields?.["Creature Type"] || "";
   }
   if (category === "animals") {
     return "Animal stat block";
