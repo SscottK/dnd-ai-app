@@ -571,7 +571,7 @@ export function DashboardPage() {
             className="group rounded-md border border-border-bright bg-void-panel p-4 transition hover:border-neon-cyan/60 hover:bg-neon-cyan/5"
           >
             <Scroll className="mb-2 h-5 w-5 text-neon-cyan group-hover:text-starlight" />
-            <h3 className="text-sm font-black uppercase text-starlight">SRD browser</h3>
+            <h3 className="text-sm font-black uppercase text-starlight">Rules browser</h3>
             <p className="mt-1 text-xs text-ink-muted sm:text-sm">Browse spells, monsters, and magic items</p>
           </Link>
           <Link

@@ -217,13 +217,15 @@ function BrowseChrome({
   return (
     <>
       <header>
-        <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan">SRD 5.2.1</p>
+        <p className="text-xs font-black uppercase tracking-[0.25em] text-neon-cyan">
+          5.5e rules
+        </p>
         <h1 className="mt-1 flex items-center gap-2 text-xl font-black uppercase text-starlight sm:text-2xl">
           <BookOpen className="h-5 w-5 text-neon-magenta sm:h-6 sm:w-6" />
           Rules browser
         </h1>
         <p className="mt-1 text-xs text-ink-muted sm:mt-2 sm:text-sm">
-          Browse spells, monsters, magic items, and more from the official System Reference Document.
+          Browse SRD 5.2.1 plus your private 2024 campaign overlay (species, spells, monsters, items).
         </p>
       </header>
 
@@ -239,7 +241,7 @@ function BrowseChrome({
             type="search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search all SRD categories…"
+            placeholder="Search rules and overlay…"
             className="w-full rounded-sm border border-border bg-black py-2 pl-3 pr-9 text-sm font-mono text-starlight placeholder:text-ink-faint focus:border-neon-cyan focus:outline-none"
           />
           {searchQuery && (

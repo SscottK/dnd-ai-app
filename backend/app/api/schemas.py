@@ -472,6 +472,8 @@ class MonsterSearchEntry(BaseModel):
     type: str | None = None
     armor_class: int | None = None
     hp_max: int | None = None
+    initiative_modifier: int | None = None
+    default_initiative: int | None = None
     action_count: int = 0
 
 

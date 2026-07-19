@@ -91,9 +91,42 @@ export function resolvePassiveSkill(sheet, skillName) {
   return 10 + resolveSkillBonus(skill, sheet);
 }
 
+export function sheetHasAlertFeat(sheet) {
+  const bags = [];
+  for (const feature of sheet?.features || []) {
+    if (feature && typeof feature === "object") {
+      bags.push(feature.name, feature.source);
+    } else {
+      bags.push(feature);
+    }
+  }
+  for (const feat of sheet?.feats || []) {
+    if (feat && typeof feat === "object") bags.push(feat.name);
+    else bags.push(feat);
+  }
+  const background = sheet?.background;
+  if (background && typeof background === "object") {
+    bags.push(background.feat, background.name);
+  } else if (background) {
+    bags.push(background);
+  }
+  bags.push(sheet?.feat, sheet?.origin_feat);
+  return bags.some((text) => String(text || "").toLowerCase().includes("alert"));
+}
+
 export function getInitiativeBonus(sheet) {
-  if (sheet?.initiative_bonus != null) return sheet.initiative_bonus;
-  return abilityModifier(sheet?.abilities?.dex) ?? 0;
+  const dex = abilityModifier(sheet?.abilities?.dex) ?? 0;
+  let total = dex;
+  if (sheetHasAlertFeat(sheet)) {
+    const pb = Number(sheet?.proficiency_bonus);
+    total += Number.isFinite(pb) ? pb : 0;
+  }
+  const explicit = sheet?.initiative_bonus;
+  if (explicit != null) {
+    const explicitNum = Number(explicit);
+    if (Number.isFinite(explicitNum) && explicitNum > total) return explicitNum;
+  }
+  return total;
 }
 
 export function emptySheet() {
@@ -679,7 +712,7 @@ function collectAcBonuses(sheet, { wearingArmor = false } = {}) {
 
 function reconcileAuthoritativeAc(total, sheet, lines, { wearingArmor = false } = {}) {
   const authoritative = sheet.authoritative_ac;
-  if (authoritative == null || !wearingArmor || !trustAuthoritativeAc(sheet)) {
+  if (authoritative == null || !trustAuthoritativeAc(sheet)) {
     return { ac: total, lines };
   }
   if (authoritative < total) {
@@ -802,9 +835,9 @@ export function computeArmorClass(sheet, fallbackAc = null) {
     total = 10 + dex + miscBonus;
   }
 
-  if (wearingArmor && authoritative != null && trustAuthoritativeAc(enriched)) {
-    if (authoritative > total) return authoritative;
-    if (authoritative < total) return authoritative;
+  if (authoritative != null && trustAuthoritativeAc(enriched)) {
+    // Prefer server/PDF AC when equipment toggles haven't locally overridden it.
+    return authoritative;
   }
   return total;
 }

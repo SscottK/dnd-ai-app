@@ -185,6 +185,11 @@ def list_entries(category: str) -> list[dict]:
     if category == "animals":
         return list(_animals_index().values())
     if category == "monsters":
+        from app.services.monster_catalog import (
+            effective_initiative_modifier,
+            monster_default_initiative,
+        )
+
         return [
             {
                 "name": row.get("name"),
@@ -192,6 +197,9 @@ def list_entries(category: str) -> list[dict]:
                 "cr": row.get("cr"),
                 "type": row.get("type") or (row.get("stat_block_json") or {}).get("type"),
                 "size": row.get("size"),
+                "initiative_modifier": effective_initiative_modifier(row),
+                "default_initiative": monster_default_initiative(row),
+                "source": row.get("source"),
             }
             for row in _monsters_index().values()
         ]
@@ -241,6 +249,17 @@ def lookup_entry(category: str, name: str) -> dict | None:
                     "description": glossary["description"],
                     "tag": glossary.get("tag") or entry.get("tag"),
                 }
+        if category == "monsters":
+            from app.services.monster_catalog import (
+                effective_initiative_modifier,
+                monster_default_initiative,
+            )
+
+            return {
+                **entry,
+                "initiative_modifier": effective_initiative_modifier(entry),
+                "default_initiative": monster_default_initiative(entry),
+            }
         return entry
 
     if category == "weapons":

@@ -98,7 +98,7 @@ function AppHeader({ user, pendingCount, liveCampaigns, onLogout }) {
             </NavLink>
           )}
           <NavItem to="/chat" icon={MessageSquare} label={RULE_WIZARD_LABEL} />
-          <NavItem to="/srd" icon={BookOpen} label="SRD" />
+          <NavItem to="/srd" icon={BookOpen} label="Rules" />
           <NavItem to="/notes" icon={ScrollText} label="Notes" />
           {user?.is_admin && (
             <NavLink to="/admin/access" className={navLinkClass} title="Requests">

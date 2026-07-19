@@ -513,14 +513,14 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
             onShowDetail({
               title: "Initiative",
               subtitle: character.class_name,
-              body: `Initiative bonus: ${formatModifier(sheet.initiative_bonus ?? abilityModifier(sheet.abilities?.dex))}`,
+              body: `Initiative bonus: ${formatModifier(getInitiativeBonus(sheet))}`,
             })
           }
           className="border border-neon-cyan/50 p-2 hover:bg-neon-cyan/5"
         >
           <p className="text-xs sm:text-sm text-zinc-500 uppercase">Init</p>
           <p className="text-2xl font-black text-starlight">
-            {formatModifier(sheet.initiative_bonus ?? abilityModifier(sheet.abilities?.dex))}
+            {formatModifier(getInitiativeBonus(sheet))}
           </p>
         </button>
       </div>

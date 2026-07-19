@@ -99,7 +99,7 @@ export function InitiativePage() {
   const encounterSnapshotRef = useRef(encounter);
   const [monsterName, setMonsterName] = useState("");
   const [monsterLabel, setMonsterLabel] = useState("");
-  const [monsterInit, setMonsterInit] = useState("10");
+  const [monsterInit, setMonsterInit] = useState("");
   const [monsterAlly, setMonsterAlly] = useState(false);
   const [monsterHidden, setMonsterHidden] = useState(false);
   const [monsterControllerId, setMonsterControllerId] = useState(null);
@@ -443,7 +443,8 @@ export function InitiativePage() {
     const srdName = monsterName.trim();
     if (!srdName || !token || !campaignId || !isOwner) return;
 
-    const initiative = parseInt(monsterInit, 10) || 0;
+    const parsedInit = parseInt(monsterInit, 10);
+    const initiative = Number.isFinite(parsedInit) ? parsedInit : 0;
     const label = monsterLabel.trim();
 
     if (monsterAlly) {
@@ -470,6 +471,7 @@ export function InitiativePage() {
       pushEncounter(next);
       setMonsterName("");
       setMonsterLabel("");
+      setMonsterInit("");
       setMonsterAlly(false);
       setMonsterControllerId(null);
       return;
@@ -498,6 +500,7 @@ export function InitiativePage() {
       setEncounter(parsed.encounter);
       setMonsterName("");
       setMonsterLabel("");
+      setMonsterInit("");
       setMonsterHidden(false);
     } catch (err) {
       setError(err.message || "Could not add monster.");
@@ -1355,6 +1358,14 @@ export function InitiativePage() {
                     token={token}
                     value={monsterName}
                     onChange={setMonsterName}
+                    onSelect={(monster) => {
+                      const nextInit =
+                        monster?.default_initiative ??
+                        (monster?.initiative_modifier != null
+                          ? 10 + Number(monster.initiative_modifier)
+                          : null);
+                      if (nextInit != null) setMonsterInit(String(nextInit));
+                    }}
                     className="flex-1 min-w-[160px]"
                     inputClassName="w-full px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
                   />
@@ -1369,8 +1380,9 @@ export function InitiativePage() {
                     type="number"
                     value={monsterInit}
                     onChange={(e) => setMonsterInit(e.target.value)}
+                    placeholder="Init"
                     className="w-20 px-3 py-2 bg-black border border-zinc-700 text-sm font-mono"
-                    title="Initiative"
+                    title="Initiative (auto-filled from catalog; leave blank to use Dex+PB)"
                   />
                   <label className="flex items-center gap-1 px-2 text-[10px] font-mono uppercase text-zinc-500">
                     <input
@@ -1411,8 +1423,7 @@ export function InitiativePage() {
                     Add NPC
                   </button>
                   <p className="w-full text-[9px] font-mono text-zinc-500">
-                    SRD 5.2.1 monster names auto-fill stats and attacks (combat uses D&amp;D 5.5e
-                    action economy).
+                    Catalog monster names auto-fill stats, attacks, and 5.5e initiative (Dex + PB / printed).
                   </p>
                   <button
                     type="button"

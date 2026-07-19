@@ -1,5 +1,5 @@
 /**
- * SRD 5.2.1 action targeting — mirrors backend action_rules.py heuristics + catalog lookup.
+ * Action targeting — mirrors backend action_rules.py heuristics + merged catalog lookup.
  */
 
 import { apiFetch } from "./api";

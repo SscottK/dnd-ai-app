@@ -100,14 +100,10 @@ def _load_combat_catalog() -> dict[str, dict]:
 
 @lru_cache(maxsize=1)
 def _load_spell_catalog() -> dict[str, dict]:
-    path = _SRD_DIR / "spells.json"
-    if not path.is_file():
-        return {}
-    with path.open(encoding="utf-8") as handle:
-        payload = json.load(handle)
+    from app.services.srd_catalog import list_entries
 
     by_name: dict[str, dict] = {}
-    for entry in payload.get("spells") or []:
+    for entry in list_entries("spells"):
         if not isinstance(entry, dict) or not entry.get("name"):
             continue
         by_name[str(entry["name"]).casefold()] = entry

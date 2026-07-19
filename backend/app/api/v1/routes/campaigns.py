@@ -115,6 +115,8 @@ from app.services.saved_encounter_templates import (
 )
 from app.services.monster_catalog import (
     apply_monster_catalog_to_combatant,
+    effective_initiative_modifier,
+    monster_default_initiative,
     monster_to_combat_actions,
     search_monsters,
 )
@@ -554,6 +556,8 @@ def search_srd_monsters(
                 type=monster.get("type"),
                 armor_class=monster.get("armor_class"),
                 hp_max=monster.get("hp_max"),
+                initiative_modifier=effective_initiative_modifier(monster),
+                default_initiative=monster_default_initiative(monster),
                 action_count=len(monster_to_combat_actions(monster)),
             )
             for monster in matches

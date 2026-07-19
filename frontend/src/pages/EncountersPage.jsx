@@ -42,7 +42,7 @@ function MonsterRowEditor({ row, index, token, onChange, onRemove, canRemove }) 
           type="text"
           value={row.label}
           onChange={(e) => onChange(index, { ...row, label: e.target.value })}
-          placeholder={row.srd_name || "Uses SRD name"}
+          placeholder={row.srd_name || "Uses catalog name"}
           className="w-full rounded-sm border border-border bg-black px-2 py-1.5 text-xs font-mono text-starlight"
         />
       </label>
@@ -150,7 +150,7 @@ export function EncountersPage() {
       return;
     }
     if (!cleaned.length) {
-      setError("Add at least one monster with an SRD stat block name.");
+      setError("Add at least one monster with a catalog stat block name.");
       return;
     }
 

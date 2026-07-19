@@ -42,8 +42,8 @@ def _combat_action_index() -> dict[str, dict]:
 @router.get("/summary")
 def rules_summary():
     return {
-        "_edition": "5.2.1",
-        "_license": "CC-BY 4.0 — D&D System Reference Document v5.2.1",
+        "_edition": "5.5e / SRD 5.2.1 + private 2024 overlay",
+        "_license": "CC-BY 4.0 — D&D System Reference Document v5.2.1 (overlay not redistributed)",
         "counts": catalog_summary(),
     }
 
@@ -95,11 +95,7 @@ def list_conditions():
 
 @router.get("/magic-items")
 def list_magic_items():
-    path = _DATA_DIR / "magic_items.json"
-    if not path.is_file():
-        return {"magic_items": []}
-    with path.open(encoding="utf-8") as handle:
-        return json.load(handle)
+    return {"magic_items": list_entries("magic_items")}
 
 
 @router.get("/animals")
@@ -175,11 +171,7 @@ def list_combat_actions():
 
 @router.get("/spells")
 def list_spells():
-    path = _DATA_DIR / "spells.json"
-    if not path.is_file():
-        return {"_license": "", "spells": []}
-    with path.open(encoding="utf-8") as handle:
-        return json.load(handle)
+    return {"_edition": "merged", "spells": list_entries("spells")}
 
 
 @router.get("/search")
