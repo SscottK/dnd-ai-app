@@ -262,12 +262,12 @@ def extract_spells(doc: fitz.Document) -> list[dict]:
     # Pattern: NAME\nLevel N School (Classes)\nCasting Time: ...
     pattern = re.compile(
         r"(?:^|\n)([A-Z][A-Z0-9' \-]{2,50})\n"
-        r"(Cantrip|\w+ Level \d+|Level \d+)[^\n]*\n"
+        r"((?:Cantrip|[A-Za-z]+ Level \d+|Level [I\d]+)[^\n]*)\n"
         r"Casting Time:\s*([^\n]+)\n"
         r"Range:\s*([^\n]+)\n"
         r"Components:\s*([^\n]+)\n"
         r"Duration:\s*([^\n]+)\n"
-        r"(.*?)(?=\n[A-Z][A-Z0-9' \-]{2,50}\n(?:Cantrip|Level |\w+ Level )|\Z)",
+        r"(.*?)(?=\n[A-Z][A-Z0-9' \-]{2,50}\n(?:Cantrip|Level |[A-Za-z]+ Level )|\Z)",
         re.S,
     )
     spells: list[dict] = []
@@ -282,35 +282,126 @@ def extract_spells(doc: fitz.Document) -> list[dict]:
             continue
         seen.add(key)
         level_line = match.group(2).strip()
-        if level_line.lower().startswith("cantrip"):
-            level = 0
-        else:
-            level_match = re.search(r"(\d+)", level_line)
-            level = int(level_match.group(1)) if level_match else None
-        casting = match.group(3).strip()
+        level, school, classes = _parse_spell_level_line(level_line)
+        casting = _clean_ocr_text(match.group(3), spell_name=name)
         action_type = "action"
         casting_l = casting.lower()
         if "bonus action" in casting_l:
             action_type = "bonus_action"
         elif "reaction" in casting_l:
             action_type = "reaction"
-        spells.append(
-            {
-                "name": name,
-                "slug": slugify(name),
-                "source": "PHB 2024",
-                "edition": "2024",
-                "level": level,
-                "school": level_line,
-                "casting_time": casting,
-                "range": match.group(4).strip(),
-                "components": match.group(5).strip(),
-                "duration": match.group(6).strip(),
-                "action_type": action_type,
-                "description": clean_spaces(match.group(7))[:10000],
-            }
-        )
+        description = _clean_ocr_text(match.group(7), spell_name=name)
+        entry = {
+            "name": name,
+            "slug": slugify(name),
+            "source": "PHB 2024",
+            "edition": "2024",
+            "level": level,
+            "school": school or level_line,
+            "casting_time": casting,
+            "range": _clean_ocr_text(match.group(4), spell_name=name),
+            "components": _clean_ocr_text(match.group(5), spell_name=name),
+            "duration": _clean_ocr_text(match.group(6), spell_name=name),
+            "action_type": action_type,
+            "description": description[:10000],
+        }
+        if classes:
+            entry["classes"] = classes
+        spells.append(entry)
     return spells
+
+
+_OCR_REPLACEMENTS = (
+    ("\u00ad", ""),
+    ("1O-", "10-"),
+    ("2O-", "20-"),
+    ("3O-", "30-"),
+    ("4O-", "40-"),
+    ("5O-", "50-"),
+    ("6O-", "60-"),
+    ("1O ", "10 "),
+    ("2O ", "20 "),
+    ("ld4", "1d4"),
+    ("ld6", "1d6"),
+    ("ld8", "1d8"),
+    ("ld10", "1d10"),
+    ("ld12", "1d12"),
+    ("< reature", "creature"),
+    ("creuture", "creature"),
+    ("creotur", "creature"),
+    ("magir", "magic"),
+    ("il uminate", "illuminate"),
+    ("fu lly", "fully"),
+    ("Level I ", "Level 1 "),
+    (" l hour", " 1 hour"),
+    ("l minute", "1 minute"),
+    ("l hour", "1 hour"),
+    ("::,u", "you"),
+    ("::,", "you"),
+    (",u makes", "you makes"),
+)
+
+
+def _clean_ocr_text(text: str, *, spell_name: str | None = None) -> str:
+    cleaned = str(text or "")
+    cleaned = cleaned.replace("-\n", "")
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    for bad, good in _OCR_REPLACEMENTS:
+        cleaned = cleaned.replace(bad, good)
+    cleaned = re.sub(r"[·•~<>|]+", "", cleaned)
+    cleaned = re.sub(
+        r"originating from\s*[^\n]{0,24}?makes",
+        "originating from you makes",
+        cleaned,
+    )
+    cleaned = re.sub(r"On a failed[^,\n]{0,30},", "On a failed save,", cleaned)
+    cleaned = re.sub(
+        r"until the start[~.·•\s]{0,10}it[~.·•\s]{0,8}(?:next\s+)?turn",
+        "until the start of its next turn",
+        cleaned,
+        flags=re.I,
+    )
+    cleaned = re.sub(r"until the starts its turn", "until the start of its next turn", cleaned, flags=re.I)
+    if spell_name:
+        last = spell_name.strip().split()[-1]
+        if last and last[0].isupper():
+            cleaned = re.sub(
+                rf"(?i)(Invoking)\s+\S+,",
+                rf"\1 {last},",
+                cleaned,
+                count=1,
+            )
+    cleaned = re.sub(r"[^\S\n]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = re.sub(r"\s+,", ",", cleaned)
+    cleaned = re.sub(r",{2,}", ",", cleaned)
+    cleaned = re.sub(r"\.\s*,", ".", cleaned)
+    return cleaned.strip()
+
+
+def _parse_spell_level_line(level_line: str) -> tuple[int | None, str | None, str | None]:
+    line = _clean_ocr_text(level_line)
+    level: int | None
+    if re.search(r"(?i)^cantrip", line):
+        level = 0
+    else:
+        if re.search(r"(?i)Level\s+I\b", line) and not re.search(r"Level\s+\d", line):
+            level = 1
+        else:
+            level_match = re.search(r"(\d+)", line)
+            level = int(level_match.group(1)) if level_match else None
+    school = None
+    classes = None
+    school_match = re.search(
+        r"(?i)\b(Abjuration|Conjuration|Divination|Enchantment|Evocation|Illusion|Necromancy|Transmutation)\b",
+        line,
+    )
+    if school_match:
+        school = school_match.group(1).title()
+    classes_match = re.search(r"\(([^)]+)\)", line)
+    if classes_match:
+        classes = classes_match.group(1).strip()
+    return level, school, classes
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -345,17 +436,29 @@ def main() -> None:
         OUT_DIR / "spells.json",
         {"_license": LICENSE, "spells": spells},
     )
+    manifest = {}
+    manifest_path = OUT_DIR / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            manifest = {}
+    counts = dict(manifest.get("counts") or {})
+    counts.update(
+        {
+            "species": len(species),
+            "backgrounds": len(backgrounds),
+            "feats": len(feats),
+            "spells": len(spells),
+        }
+    )
     write_json(
         OUT_DIR / "manifest.json",
         {
+            **manifest,
             "_license": LICENSE,
             "source": "PHB 2024",
-            "counts": {
-                "species": len(species),
-                "backgrounds": len(backgrounds),
-                "feats": len(feats),
-                "spells": len(spells),
-            },
+            "counts": counts,
         },
     )
     print(

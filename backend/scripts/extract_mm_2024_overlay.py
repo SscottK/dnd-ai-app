@@ -65,6 +65,158 @@ def _parse_speed(raw: str) -> dict:
     return speed
 
 
+def _parse_abilities(text: str) -> tuple[dict[str, int], dict[str, int]]:
+    scores: dict[str, int] = {}
+    saves: dict[str, int] = {}
+    for ability in ("Str", "Dex", "Con", "Int", "Wis", "Cha"):
+        match = re.search(
+            rf"{ability}\s+(\d+)\s*\n\s*([+-]?\d+)\s*\n\s*([+-]?\d+)",
+            text,
+            re.I,
+        )
+        if not match:
+            continue
+        key = ability.lower()
+        score = int(match.group(1))
+        mod = int(match.group(2))
+        save = int(match.group(3))
+        scores[key] = score
+        if save != mod:
+            saves[key] = save
+    return scores, saves
+
+
+def _parse_skill_map(line: str) -> dict[str, int]:
+    skills: dict[str, int] = {}
+    for name, bonus in re.findall(r"([A-Za-z][A-Za-z '/]+?)\s+([+-]\d+)", line):
+        skills[name.strip().lower()] = int(bonus)
+    return skills
+
+
+def _parse_senses(line: str) -> dict:
+    senses: dict = {}
+    for mode in ("darkvision", "blindsight", "tremorsense", "truesight"):
+        match = re.search(rf"{mode}\s+(\d+)\s*ft", line, re.I)
+        if match:
+            senses[mode] = int(match.group(1))
+    passive = re.search(r"Passive Perception\s+(\d+)", line, re.I)
+    if passive:
+        senses["passive_perception"] = int(passive.group(1))
+    return senses
+
+
+def _parse_csv_line(line: str) -> list[str]:
+    return [part.strip() for part in re.split(r",|;", line) if part.strip()]
+
+
+def _parse_named_abilities(section: str) -> list[dict]:
+    if not section.strip():
+        return []
+    entries: list[dict] = []
+    pattern = re.compile(
+        r"(?m)^([A-Z][^.\n]{0,80})\.\s*(.*?)(?=^[A-Z][^.\n]{0,80}\.\s*|\Z)",
+        re.S,
+    )
+    for match in pattern.finditer(section.strip()):
+        name = re.sub(r"\s+", " ", match.group(1)).strip()
+        description = re.sub(r"\s*\n\s*", " ", match.group(2)).strip()
+        if not name or not description:
+            continue
+        if name.casefold() in {"traits", "actions", "bonus actions", "reactions"}:
+            continue
+        entries.append({"name": name, "description": description})
+    return entries
+
+
+def _section_body(text: str, header: str) -> str:
+    match = re.search(
+        rf"(?ims)^{re.escape(header)}\s*\n(.*?)(?=^(?:Traits|Actions|Bonus Actions|Reactions|Legendary Actions|Mythic Actions)\b|\Z)",
+        text,
+    )
+    return match.group(1).strip() if match else ""
+
+
+def _build_stat_block(body: str, speed_raw: str) -> dict:
+    scores, saves = _parse_abilities(body)
+    skills_match = re.search(r"(?im)^Skills\s+(.+)$", body)
+    senses_match = re.search(r"(?im)^Senses\s+(.+)$", body)
+    languages_match = re.search(r"(?im)^Languages\s+(.+)$", body)
+    immunities_match = re.search(r"(?im)^Immunities\s+(.+)$", body)
+    resistances_match = re.search(r"(?im)^Resistances\s+(.+)$", body)
+    vulnerabilities_match = re.search(r"(?im)^Vulnerabilities\s+(.+)$", body)
+    gear_match = re.search(r"(?im)^Gear\s+(.+)$", body)
+
+    damage_immunities: list[str] = []
+    condition_immunities: list[str] = []
+    if immunities_match:
+        chunks = [c.strip() for c in immunities_match.group(1).split(";") if c.strip()]
+        if len(chunks) >= 2:
+            damage_immunities = _parse_csv_line(chunks[0])
+            condition_immunities = _parse_csv_line(chunks[1])
+        elif chunks:
+            # Heuristic: condition-looking words vs damage types
+            items = _parse_csv_line(chunks[0])
+            for item in items:
+                if re.search(
+                    r"(?i)blinded|charmed|deafened|exhaustion|frightened|grappled|"
+                    r"incapacitated|invisible|paralyzed|petrified|poisoned|prone|"
+                    r"restrained|stunned|unconscious",
+                    item,
+                ):
+                    condition_immunities.append(item)
+                else:
+                    damage_immunities.append(item)
+
+    stat: dict = {
+        "schema_version": 1,
+        "speed": _parse_speed(speed_raw),
+        "raw_text": body[:12000],
+    }
+    if scores:
+        stat["ability_scores"] = scores
+    if saves:
+        stat["saving_throws"] = saves
+    if skills_match:
+        skills = _parse_skill_map(skills_match.group(1))
+        if skills:
+            stat["skills"] = skills
+    if senses_match:
+        senses = _parse_senses(senses_match.group(1))
+        if senses:
+            stat["senses"] = senses
+    if languages_match:
+        languages = _parse_csv_line(languages_match.group(1).replace(";", ","))
+        if languages:
+            stat["languages"] = languages
+    if damage_immunities:
+        stat["damage_immunities"] = damage_immunities
+    if condition_immunities:
+        stat["condition_immunities"] = condition_immunities
+    if resistances_match:
+        stat["damage_resistances"] = _parse_csv_line(resistances_match.group(1))
+    if vulnerabilities_match:
+        stat["damage_vulnerabilities"] = _parse_csv_line(vulnerabilities_match.group(1))
+    if gear_match:
+        stat["gear"] = gear_match.group(1).strip()
+
+    traits = _parse_named_abilities(_section_body(body, "Traits"))
+    actions = _parse_named_abilities(_section_body(body, "Actions"))
+    bonus = _parse_named_abilities(_section_body(body, "Bonus Actions"))
+    reactions = _parse_named_abilities(_section_body(body, "Reactions"))
+    legendary = _parse_named_abilities(_section_body(body, "Legendary Actions"))
+    if traits:
+        stat["traits"] = traits
+    if actions:
+        stat["actions"] = actions
+    if bonus:
+        stat["bonus_actions"] = bonus
+    if reactions:
+        stat["reactions"] = reactions
+    if legendary:
+        stat["legendary_actions"] = legendary
+    return stat
+
+
 def _parse_cr(text: str) -> tuple[str | None, float | None, int | None]:
     match = _CR.search(text)
     if not match:
@@ -152,11 +304,7 @@ def extract_monsters(doc: fitz.Document) -> list[dict]:
                     "cr_numeric": cr_numeric,
                     "proficiency_bonus": pb,
                     "xp": xp,
-                    "stat_block_json": {
-                        "schema_version": 1,
-                        "speed": _parse_speed(speed_raw),
-                        "raw_text": body[:12000],
-                    },
+                    "stat_block_json": _build_stat_block(body, speed_raw),
                     "page": page_index + 1,
                 }
             )

@@ -225,7 +225,7 @@ function BrowseChrome({
           Rules browser
         </h1>
         <p className="mt-1 text-xs text-ink-muted sm:mt-2 sm:text-sm">
-          Browse SRD 5.2.1 plus your private 2024 campaign overlay (species, spells, monsters, items).
+          Spells, monsters, species, and other 5.5e lookups.
         </p>
       </header>
 

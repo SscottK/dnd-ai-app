@@ -20,6 +20,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useMediaQuery, APP_MOBILE_QUERY } from "../hooks/useMediaQuery";
+import { RULE_WIZARD_LABEL } from "../constants/branding";
 
 export function ChatPage() {
   const { token } = useAuth();
@@ -374,7 +375,7 @@ export function ChatPage() {
                     }`}
                   >
                     <div className={`text-[9px] font-black tracking-widest mb-1.5 uppercase ${m.role === "user" ? "text-zinc-800" : "text-starlight"}`}>
-                      {m.role === "user" ? "You" : "Rule Wizard"}
+                      {m.role === "user" ? "You" : RULE_WIZARD_LABEL}
                     </div>
                     {m.role === "user" ? (
                       m.content
@@ -421,7 +422,7 @@ export function ChatPage() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center bg-void p-6 text-center sm:p-8">
             <BookOpen className="w-16 h-16 text-neon-magenta mb-4 animate-pulse" />
-            <h3 className="text-xl font-black text-starlight uppercase tracking-wider">Rule Wizard</h3>
+            <h3 className="text-xl font-black text-starlight uppercase tracking-wider">{RULE_WIZARD_LABEL}</h3>
             <p className="text-xs text-neon-cyan mt-2 max-w-xs font-mono">
               Select a thread or create a new one to look up D&amp;D 5.5e rules.
             </p>

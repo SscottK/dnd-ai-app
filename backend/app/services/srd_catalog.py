@@ -42,6 +42,50 @@ def _index_by_name(rows: list[dict]) -> dict[str, dict]:
     return {row["name"].casefold(): row for row in rows if row.get("name")}
 
 
+def _ocr_garbage_score(text: str | None) -> float:
+    """Higher = worse OCR / less usable prose."""
+    if not text:
+        return 1.0
+    sample = str(text)
+    if not sample.strip():
+        return 1.0
+    weird = sum(1 for ch in sample if ch in "·•~<>□�|" or (ord(ch) > 127 and ch not in "—–’‘“”éà"))
+    weird += len(re.findall(r"[A-Za-z][!?][A-Za-z]", sample))
+    weird += len(re.findall(r"\.\s+\d+\s*,", sample))
+    weird += sample.count(" ,")
+    weird += len(re.findall(r"\b[Il1O0]{2,}[a-z]{0,2}[!?][A-Za-z]", sample))
+    return weird / max(len(sample), 1)
+
+
+def _merge_spell_rows(existing: dict, private_row: dict) -> dict:
+    """Keep clean SRD prose when private OCR is garbled; otherwise prefer private."""
+    private_desc = private_row.get("description") or private_row.get("desc")
+    srd_desc = existing.get("description") or existing.get("desc")
+    private_score = _ocr_garbage_score(private_desc)
+    srd_score = _ocr_garbage_score(srd_desc)
+
+    if private_score > 0.01 and srd_desc and private_score >= srd_score:
+        # Private OCR is noisy — keep SRD body/school/classes for consistency.
+        merged = {
+            **private_row,
+            **existing,
+            "source": existing.get("source") or private_row.get("source") or "srd-5.2.1",
+            "edition": private_row.get("edition") or existing.get("edition") or "2024",
+        }
+        return merged
+
+    merged = {**existing, **private_row}
+    school = str(merged.get("school") or "")
+    if re.match(r"(?i)^(cantrip|level\s*\d+)$", school.strip()) and existing.get("school"):
+        merged["school"] = existing["school"]
+    if not merged.get("classes") and existing.get("classes"):
+        merged["classes"] = existing["classes"]
+    if (not private_desc or private_score > 0.01) and srd_desc:
+        merged["description"] = srd_desc
+    merged["source"] = private_row.get("source") or existing.get("source") or "PHB 2024"
+    return merged
+
+
 def _merged_index(srd_key: str, private_key: str, filename: str) -> dict[str, dict]:
     """Prefer private 2024 overlay entries when present; keep SRD for anything missing."""
     merged = _index_by_name((_load_json(filename).get(srd_key) or []))
@@ -52,7 +96,14 @@ def _merged_index(srd_key: str, private_key: str, filename: str) -> dict[str, di
             continue
         key = name.casefold()
         existing = merged.get(key) or {}
-        merged[key] = {**existing, **row, "source": row.get("source") or existing.get("source") or "PHB 2024"}
+        if srd_key == "spells" and existing:
+            merged[key] = _merge_spell_rows(existing, row)
+        else:
+            merged[key] = {
+                **existing,
+                **row,
+                "source": row.get("source") or existing.get("source") or "PHB 2024",
+            }
     return merged
 
 

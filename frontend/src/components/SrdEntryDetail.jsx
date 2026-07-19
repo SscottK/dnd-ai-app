@@ -43,9 +43,13 @@ function FieldsPanel({ fields, header = "Details" }) {
 }
 
 function SpellEntryMeta({ entry }) {
+  const school =
+    entry.school && !/^(cantrip|level\s*\d+)$/i.test(String(entry.school).trim())
+      ? entry.school
+      : null;
   const header = [
     formatSpellLevel(entry.level) || (entry.level != null ? `Level ${entry.level}` : null),
-    entry.school,
+    school,
     entry.classes ? `(${entry.classes})` : null,
   ]
     .filter(Boolean)
@@ -57,8 +61,10 @@ function SpellEntryMeta({ entry }) {
     ["Components", entry.components],
     ["Duration", entry.duration],
   ];
-  if (entry.ritual === "yes") rows.push(["Ritual", "Yes"]);
-  if (entry.concentration === "yes") rows.push(["Concentration", "Yes"]);
+  if (entry.ritual === "yes" || entry.ritual === true) rows.push(["Ritual", "Yes"]);
+  if (entry.concentration === "yes" || entry.concentration === true) {
+    rows.push(["Concentration", "Yes"]);
+  }
 
   return <MetaPanel header={header} rows={rows} />;
 }

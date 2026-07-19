@@ -225,6 +225,7 @@ export function MonsterStatBlock({ monster }) {
         <MetaRow label="Condition Immunities" value={formatList(stat.condition_immunities)} />
         <MetaRow label="Senses" value={formatSenses(stat.senses)} />
         <MetaRow label="Languages" value={formatList(stat.languages)} />
+        <MetaRow label="Gear" value={stat.gear ? String(stat.gear) : null} />
       </div>
 
       <NamedAbilities title="Traits" items={stat.traits} />
@@ -232,6 +233,22 @@ export function MonsterStatBlock({ monster }) {
       <NamedAbilities title="Bonus Actions" items={stat.bonus_actions} />
       <NamedAbilities title="Reactions" items={stat.reactions} titleClassName="text-plasma" />
       <LegendaryActions legendary={stat.legendary_actions} />
+
+      {!stat.traits?.length &&
+        !stat.actions?.length &&
+        !stat.bonus_actions?.length &&
+        !stat.reactions?.length &&
+        !stat.legendary_actions &&
+        stat.raw_text && (
+          <section className="space-y-2">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-neon-cyan">
+              Stat block
+            </h4>
+            <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-ink-muted">
+              {stat.raw_text}
+            </pre>
+          </section>
+        )}
     </div>
   );
 }
