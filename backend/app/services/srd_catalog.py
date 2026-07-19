@@ -14,7 +14,12 @@ _DEFAULT_PRIVATE_DIR = Path(__file__).resolve().parents[2] / "data" / "private-2
 
 def _private_dir() -> Path:
     override = os.environ.get("PRIVATE_2024_DIR", "").strip()
-    return Path(override) if override else _DEFAULT_PRIVATE_DIR
+    if override:
+        return Path(override)
+    render_disk = Path("/var/data/private-2024")
+    if render_disk.is_dir():
+        return render_disk
+    return _DEFAULT_PRIVATE_DIR
 
 
 def _load_json(filename: str) -> dict:

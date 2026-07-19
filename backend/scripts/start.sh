@@ -3,7 +3,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-PRIVATE_DIR="${PRIVATE_2024_DIR:-data/private-2024}"
+if [[ -n "${PRIVATE_2024_DIR:-}" ]]; then
+  PRIVATE_DIR="$PRIVATE_2024_DIR"
+elif [[ -d /var/data/private-2024 ]]; then
+  PRIVATE_DIR=/var/data/private-2024
+  export PRIVATE_2024_DIR="$PRIVATE_DIR"
+else
+  PRIVATE_DIR=data/private-2024
+fi
+
 if [[ -d "$PRIVATE_DIR" ]]; then
   echo "Private 2024 overlay found at $PRIVATE_DIR"
   if [[ -f "$PRIVATE_DIR/manifest.json" ]]; then

@@ -25,6 +25,9 @@ def _private_monsters_path() -> Path:
     override = os.environ.get("PRIVATE_2024_DIR", "").strip()
     if override:
         return Path(override) / "monsters.json"
+    render_disk = Path("/var/data/private-2024/monsters.json")
+    if render_disk.is_file():
+        return render_disk
     return _DEFAULT_PRIVATE_PATH
 
 
