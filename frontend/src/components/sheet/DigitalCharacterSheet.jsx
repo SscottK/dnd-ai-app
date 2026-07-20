@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Heart, Shield, X } from "lucide-react";
+import { Heart, Moon, Shield, X } from "lucide-react";
 import {
   collectSheetActionCatalog,
   resolveStandardActions,
@@ -347,6 +347,7 @@ function CombatDashboard({
   onCombatChange,
   onShowDetail,
   onSheetChange,
+  onLongRest,
   readOnly = false,
 }) {
   const prof = resolveProficiencyBonus(sheet, character?.level);
@@ -373,6 +374,17 @@ function CombatDashboard({
 
   return (
     <div className="flex w-full flex-wrap items-stretch gap-1.5">
+      {!readOnly && onLongRest && (
+        <button
+          type="button"
+          onClick={() => void onLongRest()}
+          className="flex min-h-[4.5rem] w-[4.75rem] shrink-0 flex-col items-center justify-center gap-1 rounded-sm border border-neon-magenta/50 bg-void-panel/80 px-1.5 py-1.5 text-neon-magenta hover:border-neon-magenta hover:bg-neon-magenta/10"
+          title="Long Rest: restore HP, refresh resources, reduce Exhaustion"
+        >
+          <Moon className="h-4 w-4" />
+          <span className="text-[8px] font-black uppercase tracking-wider">Long Rest</span>
+        </button>
+      )}
       <MetricTile label="Proficiency" hint={SHEET_STAT_HINTS.prof} className="w-[4.75rem] shrink-0">
         {readOnly || !onSheetChange ? (
           <p className="text-lg font-black tabular-nums text-starlight">
@@ -872,6 +884,7 @@ export function DigitalCharacterSheet({
   sheet,
   onSheetChange,
   onCombatChange,
+  onLongRest,
   readOnly = false,
 }) {
   const [detail, setDetail] = useState(null);
@@ -953,6 +966,7 @@ export function DigitalCharacterSheet({
               onCombatChange={onCombatChange}
               onShowDetail={setDetail}
               onSheetChange={onSheetChange}
+              onLongRest={onLongRest}
               readOnly={readOnly}
             />
           </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Moon, Save } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import {
   applyEquipmentToCharacter,
@@ -7,6 +7,7 @@ import {
   resolveCombatStats,
   sheetToJson,
 } from "../../lib/characterSheet";
+import { applyLongRest } from "../../lib/longRest";
 import { DigitalCharacterSheet } from "./DigitalCharacterSheet";
 
 export function DigitalSheetEditor({ character, token, onSaved }) {
@@ -26,10 +27,11 @@ export function DigitalSheetEditor({ character, token, onSaved }) {
   const combat = resolveCombatStats(localCharacter, sheet);
 
   const handleSave = useCallback(
-    async (sheetOverride) => {
-      if (!token || !character?.id) return;
+    async (sheetOverride, characterOverride) => {
+      if (!token || !character?.id) return null;
       const workingSheet = sheetOverride ?? sheet;
-      const nextCharacter = applyEquipmentToCharacter(localCharacter, workingSheet);
+      const workingCharacter = characterOverride ?? localCharacter;
+      const nextCharacter = applyEquipmentToCharacter(workingCharacter, workingSheet);
       setSaving(true);
       setMessage("");
       try {
@@ -54,9 +56,11 @@ export function DigitalSheetEditor({ character, token, onSaved }) {
         setDirty(false);
         setMessage("Saved to digital sheet.");
         onSaved?.(data);
+        return data;
       } catch (err) {
         console.error(err);
         setMessage(err.message || "Could not save.");
+        return null;
       } finally {
         setSaving(false);
       }
@@ -76,17 +80,35 @@ export function DigitalSheetEditor({ character, token, onSaved }) {
     [handleSave]
   );
 
-  const onCombatChange = useCallback(
-    (patch) => {
-      setLocalCharacter((prev) => {
-        const next = { ...prev, ...patch };
-        setDirty(true);
-        setMessage("");
-        return next;
-      });
-    },
-    []
-  );
+  const onCombatChange = useCallback((patch) => {
+    setLocalCharacter((prev) => {
+      const next = { ...prev, ...patch };
+      setDirty(true);
+      setMessage("");
+      return next;
+    });
+  }, []);
+
+  const handleLongRest = useCallback(async () => {
+    if (saving) return;
+    if (
+      !window.confirm(
+        "Take a Long Rest? This restores HP, refreshes short/long-rest resources, and reduces Exhaustion by 1 (5.5e)."
+      )
+    ) {
+      return;
+    }
+    const { character: nextCharacter, sheet: nextSheet, summary } = applyLongRest({
+      character: localCharacter,
+      sheet,
+    });
+    setSheet(nextSheet);
+    setLocalCharacter(nextCharacter);
+    const saved = await handleSave(nextSheet, nextCharacter);
+    if (saved) {
+      setMessage(`Long rest: ${summary.join(" · ")}`);
+    }
+  }, [saving, localCharacter, sheet, handleSave]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-void">
@@ -101,6 +123,16 @@ export function DigitalSheetEditor({ character, token, onSaved }) {
             </span>
             <button
               type="button"
+              disabled={saving}
+              onClick={() => void handleLongRest()}
+              className="inline-flex items-center gap-1 border border-neon-magenta/60 px-3 py-1 text-[10px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10 disabled:opacity-40"
+              title="Restore HP, refresh rest resources, reduce Exhaustion"
+            >
+              <Moon className="h-3.5 w-3.5" />
+              Long Rest
+            </button>
+            <button
+              type="button"
               disabled={saving || !dirty}
               onClick={() => handleSave()}
               className="inline-flex items-center gap-1 border border-neon-cyan px-3 py-1 text-[10px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
@@ -111,7 +143,9 @@ export function DigitalSheetEditor({ character, token, onSaved }) {
             {message && (
               <p
                 className={`text-[10px] font-mono ${
-                  message.startsWith("Saved") ? "text-neon-cyan" : "text-danger"
+                  message.startsWith("Saved") || message.startsWith("Long rest")
+                    ? "text-neon-cyan"
+                    : "text-danger"
                 }`}
               >
                 {message}
@@ -126,6 +160,7 @@ export function DigitalSheetEditor({ character, token, onSaved }) {
           sheet={sheet}
           onSheetChange={onSheetChange}
           onCombatChange={onCombatChange}
+          onLongRest={handleLongRest}
         />
       </div>
     </div>

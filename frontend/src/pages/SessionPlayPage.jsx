@@ -906,9 +906,10 @@ export function SessionPlayPage() {
   ]);
 
   const onCombatChange = (patch) => {
-    const next = { ...character, ...patch };
+    const next = { ...characterRef.current, ...patch };
+    characterRef.current = next;
     setCharacter(next);
-    scheduleSave(buildPatch(next, sheet, layout));
+    scheduleSave(buildPatch(next, sheetRef.current, layoutRef.current));
   };
 
   const onSheetChange = useCallback(

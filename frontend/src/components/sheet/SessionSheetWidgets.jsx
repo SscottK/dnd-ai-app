@@ -4,6 +4,7 @@ import { CharacterPhotoAlbum } from "../character/CharacterPhotoAlbum";
 import { apiFetch, apiUpload } from "../../lib/api";
 import { AuthenticatedImage } from "./AuthenticatedImage";
 import { formatConditionsList } from "../../lib/conditions";
+import { applyLongRest } from "../../lib/longRest";
 import {
   combatantAcText,
   combatantHpText,
@@ -480,8 +481,35 @@ export function CombatWidget({ character, sheet, onCombatChange, onShowDetail, o
     onSheetChange({ ...sheet, resources: next }, { immediate: true });
   };
 
+  const handleLongRest = () => {
+    if (!onCombatChange && !onSheetChange) return;
+    if (
+      !window.confirm(
+        "Take a Long Rest? This restores HP, refreshes short/long-rest resources, and reduces Exhaustion by 1 (5.5e)."
+      )
+    ) {
+      return;
+    }
+    const { character: nextCharacter, sheet: nextSheet } = applyLongRest({ character, sheet });
+    if (onCombatChange) {
+      onCombatChange({ hp: nextCharacter.hp });
+    }
+    if (onSheetChange) {
+      onSheetChange(nextSheet, { immediate: true });
+    }
+  };
+
   return (
     <div className="space-y-3">
+      {onSheetChange && (
+        <button
+          type="button"
+          onClick={handleLongRest}
+          className="inline-flex w-full items-center justify-center gap-1.5 border border-neon-magenta/50 px-3 py-2 text-[10px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/10"
+        >
+          Long Rest
+        </button>
+      )}
       <div className="grid grid-cols-2 gap-2 text-center">
         <button
           type="button"

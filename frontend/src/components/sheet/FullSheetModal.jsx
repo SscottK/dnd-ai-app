@@ -3,6 +3,7 @@ import { ExternalLink, FileText, RefreshCw, Upload, X } from "lucide-react";
 import { openAuthenticatedPdfInTab } from "./AuthenticatedPdfFrame";
 import { DigitalCharacterSheet } from "./DigitalCharacterSheet";
 import { resolveCombatStats } from "../../lib/characterSheet";
+import { applyLongRest } from "../../lib/longRest";
 import { confirmPdfReplace } from "../../lib/pdfReplace";
 
 export function FullSheetModal({
@@ -23,6 +24,21 @@ export function FullSheetModal({
 
   const hasPdf = !!character.pdf_url;
   const combat = resolveCombatStats(character, sheet);
+
+  const handleLongRest = () => {
+    if (!onSheetChange && !onCombatChange) return;
+    if (
+      !window.confirm(
+        "Take a Long Rest? This restores HP, refreshes short/long-rest resources, and reduces Exhaustion by 1 (5.5e)."
+      )
+    ) {
+      return;
+    }
+    const { character: nextCharacter, sheet: nextSheet } = applyLongRest({ character, sheet });
+    // Update HP on the character first so immediate sheet save picks it up from refs.
+    if (onCombatChange) onCombatChange({ hp: nextCharacter.hp });
+    if (onSheetChange) onSheetChange(nextSheet, { immediate: true });
+  };
 
   const handleOpenPdfTab = async () => {
     if (!hasPdf || !token) return;
@@ -154,6 +170,7 @@ export function FullSheetModal({
               sheet={sheet}
               onSheetChange={onSheetChange}
               onCombatChange={onCombatChange}
+              onLongRest={handleLongRest}
             />
           </div>
         </div>
