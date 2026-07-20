@@ -594,7 +594,8 @@ function combatActionCategory(action) {
   if (action?.category === "class_feature") return "feature";
 
   const id = String(action?.id || "");
-  if (/^(action|bonus|reaction|legendary|npc|attack)-/.test(id)) return "attack";
+  if (/^legendary-/.test(id) || /legendary/i.test(String(action.name || ""))) return "legendary";
+  if (/^(action|bonus|reaction|npc|attack)-/.test(id)) return "attack";
   if (action?.attack_bonus != null || action?.attackBonus != null || action?.damage_dice) {
     return "attack";
   }
@@ -896,6 +897,7 @@ export function resourceCostLabel(action) {
 const PICKER_CATEGORY_ORDER = [
   "attack",
   "weapon",
+  "legendary",
   "feature",
   "spell",
   "equipment",
@@ -907,6 +909,7 @@ const PICKER_CATEGORY_ORDER = [
 const PICKER_CATEGORY_LABELS = {
   attack: "Attacks",
   weapon: "Weapons",
+  legendary: "Legendary",
   feature: "Features",
   class_feature: "Features",
   spell: "Spells",

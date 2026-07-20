@@ -441,6 +441,9 @@ class EncounterCombatant(BaseModel):
     death_save_successes: int = Field(default=0, ge=0, le=3)
     death_save_stable: bool = False
     legendary_actions_max: int | None = Field(default=None, ge=0, le=10)
+    damage_resistances: list[str] = Field(default_factory=list)
+    damage_immunities: list[str] = Field(default_factory=list)
+    damage_vulnerabilities: list[str] = Field(default_factory=list)
     hidden_from_players: bool = False
 
     @field_validator("conditions", mode="before")

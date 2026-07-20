@@ -13,6 +13,36 @@ from app.services.conditions import normalize_conditions, sanitize_conditions_li
 logger = logging.getLogger("app.encounter_sync")
 
 
+def apply_sheet_defenses_to_combatant(session: Session, combatant: EncounterCombatant) -> None:
+    """Copy damage R/V/I from the linked character sheet onto the combatant."""
+    if not combatant.character_id:
+        return
+    character = session.get(Character, combatant.character_id)
+    if character is None:
+        return
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+    combatant.damage_resistances = list(sheet.get("damage_resistances") or [])
+    combatant.damage_immunities = list(sheet.get("damage_immunities") or [])
+    combatant.damage_vulnerabilities = list(sheet.get("damage_vulnerabilities") or [])
+
+
+def defenses_from_character(character: Character) -> dict[str, list[str]]:
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+    return {
+        "damage_resistances": list(sheet.get("damage_resistances") or []),
+        "damage_immunities": list(sheet.get("damage_immunities") or []),
+        "damage_vulnerabilities": list(sheet.get("damage_vulnerabilities") or []),
+    }
+
+
 def parse_encounter(campaign: Campaign) -> EncounterState:
     try:
         raw = json.loads(campaign.encounter_json or "{}")

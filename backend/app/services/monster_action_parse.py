@@ -73,10 +73,11 @@ def normalize_action_key(name: str) -> str:
 class ParsedAttackStats:
     attack_bonus: int | None = None
     damage_dice: str | None = None
+    damage_packets: list[dict] | None = None
 
 
 def parse_attack_stats_from_text(text: str | None) -> ParsedAttackStats:
-    """Extract attack bonus and primary Hit damage dice from action prose."""
+    """Extract attack bonus and Hit damage dice (including multi-type packets)."""
     if not text:
         return ParsedAttackStats()
     attack_bonus = None
@@ -84,19 +85,33 @@ def parse_attack_stats_from_text(text: str | None) -> ParsedAttackStats:
     if match:
         attack_bonus = int(match.group(1) or match.group(2))
 
-    damage_dice = None
-    hit = _HIT_DICE_RE.search(text)
-    if hit:
-        damage_dice = re.sub(r"\s+", "", hit.group(1))
-    else:
-        # Avoid grabbing recharge dice like (5–6); prefer first XdY[+N] after "Hit"
-        hit_idx = text.casefold().find("hit:")
-        search_from = text[hit_idx:] if hit_idx >= 0 else text
-        fallback = _FALLBACK_DICE_RE.search(search_from)
-        if fallback:
-            damage_dice = re.sub(r"\s+", "", fallback.group(1))
+    from app.services.combat_damage import parse_damage_packets
 
-    return ParsedAttackStats(attack_bonus=attack_bonus, damage_dice=damage_dice)
+    packets = parse_damage_packets(text)
+    damage_packets = (
+        [{"dice": p.dice, "type": p.damage_type} for p in packets] if packets else None
+    )
+
+    damage_dice = None
+    if damage_packets:
+        damage_dice = damage_packets[0]["dice"]
+    else:
+        hit = _HIT_DICE_RE.search(text)
+        if hit:
+            damage_dice = re.sub(r"\s+", "", hit.group(1))
+        else:
+            # Avoid grabbing recharge dice like (5–6); prefer first XdY[+N] after "Hit"
+            hit_idx = text.casefold().find("hit:")
+            search_from = text[hit_idx:] if hit_idx >= 0 else text
+            fallback = _FALLBACK_DICE_RE.search(search_from)
+            if fallback:
+                damage_dice = re.sub(r"\s+", "", fallback.group(1))
+
+    return ParsedAttackStats(
+        attack_bonus=attack_bonus,
+        damage_dice=damage_dice,
+        damage_packets=damage_packets,
+    )
 
 
 def enrich_action_row(row: dict) -> dict:
@@ -117,8 +132,13 @@ def enrich_action_row(row: dict) -> dict:
         and isinstance(damage_rows[0], dict)
         and damage_rows[0].get("dice")
     )
-    if not has_dice and parsed.damage_dice:
+    if not has_dice and parsed.damage_packets:
+        next_row["damage"] = list(parsed.damage_packets)
+    elif not has_dice and parsed.damage_dice:
         next_row["damage"] = [{"dice": parsed.damage_dice, "type": None}]
+    elif has_dice and parsed.damage_packets and len(parsed.damage_packets) > len(damage_rows):
+        # Prefer richer prose packets over a single collapsed SRD row.
+        next_row["damage"] = list(parsed.damage_packets)
 
     return next_row
 

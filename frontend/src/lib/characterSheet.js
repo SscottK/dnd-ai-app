@@ -164,6 +164,12 @@ export function emptySheet() {
     ac_bonuses: [],
     ac_breakdown: [],
     authoritative_ac: null,
+    damage_resistances: [],
+    damage_immunities: [],
+    damage_vulnerabilities: [],
+    spellcasting_ability: null,
+    spell_save_dc: null,
+    spell_attack_bonus: null,
     conditions: [],
     notes: "",
   };
@@ -184,8 +190,25 @@ export function parseSheetJson(text) {
       "race",
       "species",
       "notes",
+      "spellcasting_ability",
+      "spell_save_dc",
+      "spell_attack_bonus",
     ]) {
       if (raw[key] != null) base[key] = raw[key];
+    }
+    for (const key of [
+      "damage_resistances",
+      "damage_immunities",
+      "damage_vulnerabilities",
+    ]) {
+      if (Array.isArray(raw[key])) {
+        base[key] = raw[key].map((entry) => String(entry).trim()).filter(Boolean);
+      } else if (typeof raw[key] === "string" && raw[key].trim()) {
+        base[key] = raw[key]
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean);
+      }
     }
     if (Array.isArray(raw.saving_throws) && raw.saving_throws.length) {
       const byAbility = Object.fromEntries(raw.saving_throws.map((s) => [s.ability, s]));

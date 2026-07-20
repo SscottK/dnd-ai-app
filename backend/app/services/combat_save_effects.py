@@ -86,10 +86,29 @@ def parse_save_effect(text: str | None) -> SaveEffect | None:
     )
 
 
-def _ability_mod_for_target(target: EncounterCombatant, ability: str) -> int:
+def _ability_mod_for_target(
+    target: EncounterCombatant,
+    ability: str,
+    *,
+    session=None,
+) -> int:
     key = _ABILITY_KEYS.get(ability.casefold())
     if not key:
         return 0
+
+    if (target.is_pc or target.character_id) and session is not None and target.character_id:
+        from app.db.models import Character
+        from app.services.character_sheet import computed_save_bonus, parse_sheet_json
+
+        character = session.get(Character, target.character_id)
+        if character is not None:
+            sheet = parse_sheet_json(
+                character.sheet_json,
+                class_name=character.class_name,
+                level=character.level,
+            )
+            return computed_save_bonus(sheet, key)
+
     # Prefer monster printed save if available
     from app.services.monster_catalog import lookup_monster
 
@@ -117,8 +136,10 @@ def resolve_save_effect(
     actor: EncounterCombatant,
     data: UseActionRequest,
     description: str | None = None,
+    session=None,
 ) -> list[str]:
     from app.services.combat_resolution import _apply_damage, _find_combatant
+    from app.services.encounter_sync import apply_sheet_defenses_to_combatant
 
     text = " ".join(part for part in (data.detail, description, data.action_name) if part)
     effect = parse_save_effect(text)
@@ -137,7 +158,9 @@ def resolve_save_effect(
         return messages
 
     for target in targets:
-        save_mod = _ability_mod_for_target(target, effect.ability)
+        if session is not None:
+            apply_sheet_defenses_to_combatant(session, target)
+        save_mod = _ability_mod_for_target(target, effect.ability, session=session)
         exhaustion = get_exhaustion_level(target.conditions)
         save_mod -= 2 * exhaustion
         roll, _ = roll_d20_check()

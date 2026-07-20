@@ -1093,6 +1093,7 @@ def use_encounter_action(
                     actor=actor,
                     data=resolved_data,
                     description=actor_action.description if actor_action else None,
+                    session=session,
                 )
             except ValueError as exc:
                 raise HTTPException(

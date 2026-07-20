@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.api.schemas import EncounterCombatant
 from app.services.monster_catalog import lookup_monster
@@ -24,15 +24,27 @@ _DAMAGE_TYPES = (
     "thunder",
 )
 
+_TYPE_ALT = "|".join(_DAMAGE_TYPES)
+
 _HIT_TYPE_RE = re.compile(
     r"hit:\s*[^.]*?\(\s*\d+d\d+(?:\s*[+-]\s*\d+)?\s*\)\s*"
-    r"(" + "|".join(_DAMAGE_TYPES) + r")\s+damage",
+    r"(" + _TYPE_ALT + r")\s+damage",
     re.IGNORECASE,
 )
-_TYPE_WORD_RE = re.compile(
-    r"\b(" + "|".join(_DAMAGE_TYPES) + r")\b",
+_TYPE_WORD_RE = re.compile(r"\b(" + _TYPE_ALT + r")\b", re.IGNORECASE)
+
+# "5 (1d4 + 3) Slashing damage" / "4 (1d8) acid"
+_PACKET_RE = re.compile(
+    r"(?:(?:\d+)\s*)?\(\s*(?P<dice>\d+d\d+(?:\s*[+-]\s*\d+)?)\s*\)\s*"
+    r"(?P<dtype>" + _TYPE_ALT + r")\s+damage",
     re.IGNORECASE,
 )
+
+
+@dataclass
+class DamagePacket:
+    dice: str
+    damage_type: str | None = None
 
 
 @dataclass
@@ -43,16 +55,23 @@ class DamageApplication:
     note: str | None = None
 
 
+@dataclass
+class MultiDamageApplication:
+    amount: int
+    original: int
+    packets: list[DamageApplication] = field(default_factory=list)
+    note: str | None = None
+
+
 def parse_damage_type(text: str | None) -> str | None:
     if not text:
         return None
     hit = _HIT_TYPE_RE.search(text)
     if hit:
         return hit.group(1).casefold()
-    # Failure: 54 (12d8) Cold damage
     fail = re.search(
         r"(?:failure|hit):\s*[^.]*?\(\s*\d+d\d+[^.]*?\)\s*"
-        r"(" + "|".join(_DAMAGE_TYPES) + r")\s+damage",
+        r"(" + _TYPE_ALT + r")\s+damage",
         text,
         re.IGNORECASE,
     )
@@ -60,6 +79,18 @@ def parse_damage_type(text: str | None) -> str | None:
         return fail.group(1).casefold()
     match = _TYPE_WORD_RE.search(text)
     return match.group(1).casefold() if match else None
+
+
+def parse_damage_packets(text: str | None) -> list[DamagePacket]:
+    """Parse one or more typed dice packets from Hit/Failure prose."""
+    if not text:
+        return []
+    packets: list[DamagePacket] = []
+    for match in _PACKET_RE.finditer(text):
+        dice = re.sub(r"\s+", "", match.group("dice"))
+        dtype = match.group("dtype").casefold()
+        packets.append(DamagePacket(dice=dice, damage_type=dtype))
+    return packets
 
 
 def _normalize_type_list(values) -> set[str]:
@@ -71,7 +102,6 @@ def _normalize_type_list(values) -> set[str]:
         text = str(entry or "").strip()
         if not text:
             continue
-        # "Bludgeoning, Piercing, and Slashing from nonmagical attacks"
         for dtype in _DAMAGE_TYPES:
             if re.search(rf"\b{dtype}\b", text, re.IGNORECASE):
                 out.add(dtype)
@@ -97,7 +127,25 @@ def monster_damage_modifiers(monster: dict | None) -> dict[str, set[str]]:
     }
 
 
+def sheet_damage_modifiers(sheet: dict | None) -> dict[str, set[str]]:
+    if not sheet:
+        return {"resistances": set(), "immunities": set(), "vulnerabilities": set()}
+    return {
+        "resistances": _normalize_type_list(sheet.get("damage_resistances")),
+        "immunities": _normalize_type_list(sheet.get("damage_immunities")),
+        "vulnerabilities": _normalize_type_list(sheet.get("damage_vulnerabilities")),
+    }
+
+
 def combatant_damage_modifiers(combatant: EncounterCombatant) -> dict[str, set[str]]:
+    # Prefer values mirrored onto the combatant (PC sheet sync / explicit overrides).
+    listed = {
+        "resistances": _normalize_type_list(getattr(combatant, "damage_resistances", None)),
+        "immunities": _normalize_type_list(getattr(combatant, "damage_immunities", None)),
+        "vulnerabilities": _normalize_type_list(getattr(combatant, "damage_vulnerabilities", None)),
+    }
+    if any(listed.values()):
+        return listed
     if combatant.is_pc or combatant.character_id:
         return {"resistances": set(), "immunities": set(), "vulnerabilities": set()}
     monster = lookup_monster(combatant.srd_name or combatant.name)
@@ -136,4 +184,30 @@ def apply_damage_modifiers(
         original=original,
         damage_type=dtype,
         note=note,
+    )
+
+
+def apply_damage_packets(
+    packets: list[tuple[int, str | None]],
+    *,
+    combatant: EncounterCombatant,
+) -> MultiDamageApplication:
+    """Apply resist/vuln/immune per typed packet, then sum."""
+    applied_rows: list[DamageApplication] = []
+    total = 0
+    original = 0
+    notes: list[str] = []
+    for amount, dtype in packets:
+        row = apply_damage_modifiers(amount, damage_type=dtype, combatant=combatant)
+        applied_rows.append(row)
+        total += row.amount
+        original += row.original
+        if row.note:
+            label = dtype or "damage"
+            notes.append(f"{label}: {row.note}")
+    return MultiDamageApplication(
+        amount=total,
+        original=original,
+        packets=applied_rows,
+        note="; ".join(notes) if notes else None,
     )

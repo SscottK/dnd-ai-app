@@ -117,7 +117,7 @@ export function formatCombatResources(sheet, { limit = 4 } = {}) {
   return parts.join(" · ");
 }
 
-export function turnStatusLabels(economy, combatants = []) {
+export function turnStatusLabels(economy, combatants = [], combatant = null) {
   if (!economy) return [];
   const labels = [];
   if (economy.dodging) labels.push("Dodging");
@@ -134,5 +134,23 @@ export function turnStatusLabels(economy, combatants = []) {
         : `Ready: ${economy.readied_action}`
     );
   }
+  if (economy.legendary_uses_remaining != null || combatant?.legendary_actions_max != null) {
+    const max = combatant?.legendary_actions_max;
+    const remaining =
+      economy.legendary_uses_remaining ?? max ?? 0;
+    labels.push(max != null ? `Legendary ${remaining}/${max}` : `Legendary ${remaining}`);
+  }
+  const spent = economy.spent_recharge_action_ids;
+  if (Array.isArray(spent) && spent.length > 0) {
+    labels.push(`Recharge spent (${spent.length})`);
+  }
   return labels;
+}
+
+/** Label for a combatant's legendary budget from encounter economy. */
+export function legendaryBudgetLabel(combatant, economy) {
+  if (!combatant || combatant.legendary_actions_max == null) return null;
+  const remaining =
+    economy?.legendary_uses_remaining ?? combatant.legendary_actions_max;
+  return `Legendary ${remaining}/${combatant.legendary_actions_max}`;
 }

@@ -340,6 +340,9 @@ def ensure_active_combatant(state: EncounterState) -> bool:
 
 
 def upsert_pc_combatant(state: EncounterState, character: Character, initiative: int) -> None:
+    from app.services.encounter_sync import defenses_from_character
+
+    defenses = defenses_from_character(character)
     for combatant in state.combatants:
         if combatant.character_id == character.id:
             combatant.initiative = initiative
@@ -354,6 +357,9 @@ def upsert_pc_combatant(state: EncounterState, character: Character, initiative:
             if character.ac is not None:
                 combatant.ac = character.ac
             combatant.speed = speed_from_character(character)
+            combatant.damage_resistances = defenses["damage_resistances"]
+            combatant.damage_immunities = defenses["damage_immunities"]
+            combatant.damage_vulnerabilities = defenses["damage_vulnerabilities"]
             return
 
     state.combatants.append(
@@ -368,6 +374,9 @@ def upsert_pc_combatant(state: EncounterState, character: Character, initiative:
             ac=character.ac,
             speed=speed_from_character(character),
             conditions=[],
+            damage_resistances=defenses["damage_resistances"],
+            damage_immunities=defenses["damage_immunities"],
+            damage_vulnerabilities=defenses["damage_vulnerabilities"],
         )
     )
 

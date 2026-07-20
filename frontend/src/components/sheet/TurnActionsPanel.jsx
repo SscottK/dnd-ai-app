@@ -61,6 +61,8 @@ function economyForCombatant(encounter, combatantId) {
       dodging: false,
       disengaged: false,
       hiding: false,
+      legendary_uses_remaining: null,
+      spent_recharge_action_ids: [],
     }
   );
 }
@@ -148,7 +150,7 @@ export function TurnActionsPanel({
     return byType;
   }, [catalogSheet, actionCatalogMode, rulesReady, onInventoryEquip]);
   const economy = economyForCombatant(encounter, actorCombatant?.id);
-  const turnStatuses = turnStatusLabels(economy, encounter?.combatants);
+  const turnStatuses = turnStatusLabels(economy, encounter?.combatants, actorCombatant);
   const incapacitated = impliesIncapacitated(actorCombatant?.conditions);
   const dying = isDyingPc(actorCombatant);
 
@@ -231,7 +233,7 @@ export function TurnActionsPanel({
         targeting: action.targeting,
         target_ids: targets,
         detail:
-          rawDetail && rawDetail.length > 200 ? rawDetail.slice(0, 200) : rawDetail,
+          rawDetail && rawDetail.length > 2000 ? rawDetail.slice(0, 2000) : rawDetail,
         trigger:
           rawTrigger && rawTrigger.length > 200 ? rawTrigger.slice(0, 200) : rawTrigger,
       };
@@ -520,6 +522,13 @@ export function TurnActionsPanel({
           </span>
         )}
         <span className="font-black text-neon-cyan">Move {movementLabel}</span>
+        {actorCombatant?.legendary_actions_max != null && (
+          <span className="font-black text-neon-magenta">
+            Legend{" "}
+            {economy.legendary_uses_remaining ?? actorCombatant.legendary_actions_max}/
+            {actorCombatant.legendary_actions_max}
+          </span>
+        )}
       </div>
 
       {turnStatuses.length > 0 && (
@@ -605,11 +614,18 @@ export function TurnActionsPanel({
                   {group.actions.map((action) => {
                     const affordable = canAffordResourceCost(catalogSheet, action);
                     const costLabel = resourceCostLabel(action);
+                    const spentRecharge = (economy.spent_recharge_action_ids || []).includes(
+                      action.id
+                    );
+                    const legendaryBlocked =
+                      group.category === "legendary" &&
+                      economy.legendary_uses_remaining === 0;
+                    const disabled = busy || !affordable || spentRecharge || legendaryBlocked;
                     return (
                       <button
                         key={action.id}
                         type="button"
-                        disabled={busy || !affordable}
+                        disabled={disabled}
                         onClick={() => handlePickAction(action)}
                         className="flex w-full flex-col rounded-sm border border-border/60 bg-void-deep/40 px-2 py-1 text-left hover:border-neon-cyan/50 disabled:opacity-40"
                       >
@@ -619,6 +635,8 @@ export function TurnActionsPanel({
                         <span className="text-[11px] sm:text-xs font-mono text-ink-faint">
                           {targetLabel(action.targeting)}
                           {costLabel ? ` · ${costLabel}` : ""}
+                          {spentRecharge ? " · spent (recharge)" : ""}
+                          {legendaryBlocked ? " · no legendary uses" : ""}
                         </span>
                         {(action.detail || action.description) && (
                           <span className="text-[11px] sm:text-xs font-mono text-ink-muted line-clamp-2">

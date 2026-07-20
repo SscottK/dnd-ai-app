@@ -81,6 +81,12 @@ def empty_sheet() -> dict[str, Any]:
         "ac_bonuses": [],
         "ac_breakdown": [],
         "authoritative_ac": None,
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "damage_vulnerabilities": [],
+        "spellcasting_ability": None,
+        "spell_save_dc": None,
+        "spell_attack_bonus": None,
         "conditions": [],
         "notes": "",
     }
@@ -259,9 +265,23 @@ def normalize_sheet(
         "race",
         "species",
         "notes",
+        "spellcasting_ability",
+        "spell_save_dc",
+        "spell_attack_bonus",
     ):
         if sheet.get(field) is not None:
             base[field] = sheet[field]
+
+    for field in (
+        "damage_resistances",
+        "damage_immunities",
+        "damage_vulnerabilities",
+    ):
+        vals = sheet.get(field)
+        if isinstance(vals, list):
+            base[field] = [str(entry).strip() for entry in vals if str(entry).strip()]
+        elif isinstance(vals, str) and vals.strip():
+            base[field] = [part.strip() for part in vals.split(",") if part.strip()]
 
     if isinstance(sheet.get("saving_throws"), list):
         by_ability = {row.get("ability"): row for row in sheet["saving_throws"]}

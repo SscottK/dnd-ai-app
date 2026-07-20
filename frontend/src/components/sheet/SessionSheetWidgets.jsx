@@ -11,6 +11,8 @@ import {
   combatantMoveText,
   formatCombatResources,
   turnStatusLabels,
+  legendaryBudgetLabel,
+  parseCombatEndPayload,
   isDefeatedEnemy,
   isWaitingForPcInitiative,
   parseEncounterPatchResponse,
@@ -1099,8 +1101,12 @@ function InitiativeCombatantStats({
 
   const showStats = shouldShowCombatantTrackerStats(combatant, isDmView);
   const conditions = showStats ? formatConditionsList(combatant.conditions) : null;
-  const economy = isActive ? turnEconomy?.[combatant.id] : null;
-  const turnStatuses = showStats ? turnStatusLabels(economy, combatants) : [];
+  const economy = turnEconomy?.[combatant.id] || null;
+  const turnStatuses = showStats ? turnStatusLabels(isActive ? economy : null, combatants, combatant) : [];
+  const legendLabel =
+    showStats && combatant.legendary_actions_max != null
+      ? legendaryBudgetLabel(combatant, economy)
+      : null;
   const resourceSummary =
     showStats && resourceSheet ? formatCombatResources(resourceSheet) : null;
   const initValue =
@@ -1114,7 +1120,14 @@ function InitiativeCombatantStats({
         <>
           <InitiativeLabeledStat label="HP" value={combatantHpText(combatant)} />
           <InitiativeLabeledStat label="AC" value={combatantAcText(combatant, isDmView)} />
-          <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant, economy)} />
+          <InitiativeLabeledStat label="Move" value={combatantMoveText(combatant, isActive ? economy : null)} />
+          {legendLabel ? (
+            <InitiativeLabeledStat
+              label="Legend"
+              value={legendLabel.replace(/^Legendary\s+/i, "")}
+              valueClassName="text-neon-magenta"
+            />
+          ) : null}
           {resourceSummary ? (
             <InitiativeLabeledStat
               label="Uses"
@@ -1478,6 +1491,142 @@ function InitiativeCombatantRow({
         </div>
       </div>
     </li>
+  );
+}
+
+function LegendaryActionsStrip({
+  campaignId,
+  token,
+  encounter,
+  activeCombatantId,
+  onEncounterUpdate,
+  onCombatEnded,
+  onError,
+}) {
+  const [busyId, setBusyId] = useState(null);
+  const [targetByAction, setTargetByAction] = useState({});
+
+  const legendaryActors = (encounter?.combatants || []).filter((combatant) => {
+    if (combatant.legendary_actions_max == null) return false;
+    if (combatant.id === activeCombatantId) return false;
+    if (isDefeatedEnemy(combatant)) return false;
+    const economy = encounter?.turn_economy?.[combatant.id];
+    const remaining = economy?.legendary_uses_remaining ?? combatant.legendary_actions_max;
+    return remaining > 0;
+  });
+
+  if (legendaryActors.length === 0) return null;
+
+  const submitLegendary = async (combatant, action, targetId) => {
+    if (!token || !campaignId) return;
+    setBusyId(`${combatant.id}:${action.id}`);
+    onError?.("");
+    try {
+      const body = {
+        combatant_id: combatant.id,
+        action_id: action.id,
+        action_name: String(action.name || "").replace(/\s*★\s*$/, "").split("(")[0].trim(),
+        action_type: action.action_type || action.actionType || "action",
+        targeting: action.targeting || "one_enemy",
+        target_ids: targetId ? [targetId] : [],
+        detail: action.description || action.detail || null,
+      };
+      const res = await apiFetch(`/campaigns/${campaignId}/encounter/use-action`, {
+        token,
+        method: "POST",
+        body,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof err.detail === "string" ? err.detail : "Could not use legendary action"
+        );
+      }
+      const payload = await res.json();
+      const parsed = parseCombatEndPayload(payload);
+      onEncounterUpdate?.(parsed.encounter);
+      if (parsed.combatEnded) {
+        onCombatEnded?.(parsed.combatLogText, parsed.reason);
+      }
+    } catch (err) {
+      onError?.(err.message || "Could not use legendary action.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const enemies = (encounter?.combatants || []).filter(
+    (c) => !c.is_pc && !c.is_ally && !isDefeatedEnemy(c)
+  );
+  const allies = (encounter?.combatants || []).filter((c) => c.is_pc || c.is_ally);
+
+  return (
+    <div className="session-ui space-y-2 rounded-sm border border-neon-magenta/40 bg-neon-magenta/5 p-2.5">
+      <p className="text-[11px] font-black uppercase tracking-widest text-neon-magenta">
+        Legendary (after another creature&apos;s turn)
+      </p>
+      {legendaryActors.map((combatant) => {
+        const economy = encounter?.turn_economy?.[combatant.id];
+        const remaining =
+          economy?.legendary_uses_remaining ?? combatant.legendary_actions_max;
+        const actions = (combatant.combat_actions || []).filter(
+          (row) =>
+            String(row.id || "").startsWith("legendary-") ||
+            /legendary/i.test(String(row.name || ""))
+        );
+        return (
+          <div key={combatant.id} className="space-y-1">
+            <p className="text-xs font-black uppercase text-starlight">
+              {combatant.name}{" "}
+              <span className="font-mono text-neon-magenta">
+                {remaining}/{combatant.legendary_actions_max}
+              </span>
+            </p>
+            {actions.length === 0 ? (
+              <p className="text-[11px] font-mono text-ink-faint">No legendary actions listed.</p>
+            ) : (
+              actions.map((action) => {
+                const needsTarget = action.targeting && action.targeting !== "self";
+                const pool =
+                  action.targeting === "one_ally" || action.targeting === "one_ally_or_self"
+                    ? allies
+                    : enemies;
+                const selected = targetByAction[action.id] || "";
+                const key = `${combatant.id}:${action.id}`;
+                return (
+                  <div key={action.id} className="flex flex-wrap items-center gap-1">
+                    {needsTarget && (
+                      <select
+                        value={selected}
+                        onChange={(e) =>
+                          setTargetByAction((prev) => ({ ...prev, [action.id]: e.target.value }))
+                        }
+                        className="rounded-sm border border-border bg-void-deep px-1 py-0.5 text-[11px] font-mono text-starlight"
+                      >
+                        <option value="">Target…</option>
+                        {pool.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      disabled={Boolean(busyId) || (needsTarget && !selected)}
+                      onClick={() => submitLegendary(combatant, action, selected)}
+                      className="rounded-sm border border-neon-magenta/50 bg-neon-magenta/10 px-2 py-0.5 text-[11px] font-black uppercase text-neon-magenta hover:bg-neon-magenta/20 disabled:opacity-40"
+                    >
+                      {busyId === key ? "…" : action.name}
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2569,6 +2718,18 @@ export function InitiativeWidget({
           onEncounterUpdate={setEncounter}
           onError={setActionError}
           compact
+        />
+      )}
+
+      {isOwner && hasTurnOrder(viewEncounter) && (
+        <LegendaryActionsStrip
+          campaignId={campaignId}
+          token={token}
+          encounter={viewEncounter}
+          activeCombatantId={activeCombatant?.id}
+          onEncounterUpdate={setEncounter}
+          onCombatEnded={notifyCombatEnded}
+          onError={setActionError}
         />
       )}
 

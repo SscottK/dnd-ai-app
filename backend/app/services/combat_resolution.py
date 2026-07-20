@@ -58,16 +58,35 @@ class AttackProfile:
     attack_bonus: int | None = None
     damage_dice: str | None = None
     damage_type: str | None = None
+    damage_packets: list[dict] | None = None
+
+
+def _packets_from_rows(rows) -> list[dict] | None:
+    if not isinstance(rows, list) or not rows:
+        return None
+    packets: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("dice"):
+            continue
+        packets.append(
+            {
+                "dice": str(row["dice"]).replace(" ", ""),
+                "type": (str(row["type"]).casefold() if row.get("type") else None),
+            }
+        )
+    return packets or None
 
 
 def _parse_detail_stats(detail: str | None) -> AttackProfile:
     from app.services.combat_damage import parse_damage_type
 
     parsed = parse_attack_stats_from_text(detail)
+    packets = parsed.damage_packets
     return AttackProfile(
         attack_bonus=parsed.attack_bonus,
         damage_dice=parsed.damage_dice,
-        damage_type=parse_damage_type(detail),
+        damage_type=(packets[0].get("type") if packets else parse_damage_type(detail)),
+        damage_packets=packets,
     )
 
 
@@ -85,21 +104,20 @@ def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
             row_name = str(row["name"])
             if normalize_action_key(row_name) != clean_key:
                 continue
-            damage_dice = None
-            damage_rows = row.get("damage") or []
-            if isinstance(damage_rows, list) and damage_rows:
-                first = damage_rows[0]
-                if isinstance(first, dict) and first.get("dice"):
-                    damage_dice = str(first["dice"]).replace(" ", "")
+            packets = _packets_from_rows(row.get("damage") or [])
+            damage_dice = packets[0]["dice"] if packets else None
             description = str(row.get("description") or row.get("desc") or "")
             from app.services.combat_damage import parse_damage_type
 
             profile = AttackProfile(
                 attack_bonus=row.get("attack_bonus"),
                 damage_dice=damage_dice,
-                damage_type=parse_damage_type(description),
+                damage_type=(
+                    packets[0].get("type") if packets else parse_damage_type(description)
+                ),
+                damage_packets=packets,
             )
-            if profile.attack_bonus is None or profile.damage_dice is None:
+            if profile.attack_bonus is None or profile.damage_dice is None or not profile.damage_packets:
                 parsed = _parse_detail_stats(description)
                 if profile.attack_bonus is None:
                     profile.attack_bonus = parsed.attack_bonus
@@ -107,6 +125,8 @@ def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
                     profile.damage_dice = parsed.damage_dice
                 if profile.damage_type is None:
                     profile.damage_type = parsed.damage_type
+                if not profile.damage_packets:
+                    profile.damage_packets = parsed.damage_packets
             return profile
     return AttackProfile()
 
@@ -366,6 +386,25 @@ def resolve_attack_profile(
             else:
                 profile = _sheet_action_profile(sheet, action_id, clean_name)
 
+    if (
+        action_id.startswith(_SPELL_ATTACK_PREFIX)
+        and actor.character_id
+        and profile.attack_bonus is None
+    ):
+        character = session.get(Character, actor.character_id)
+        if character is not None:
+            sheet = parse_sheet_json(
+                character.sheet_json,
+                class_name=character.class_name,
+                level=character.level,
+            )
+            sab = sheet.get("spell_attack_bonus")
+            if sab is not None:
+                try:
+                    profile.attack_bonus = int(sab)
+                except (TypeError, ValueError):
+                    pass
+
     if profile.attack_bonus is None and profile.damage_dice is None:
         profile = _parse_detail_stats(detail)
 
@@ -588,6 +627,11 @@ def resolve_attack(
     data: UseActionRequest,
 ) -> list[str]:
     messages: list[str] = []
+    if session is not None:
+        from app.services.encounter_sync import apply_sheet_defenses_to_combatant
+
+        for combatant in state.combatants:
+            apply_sheet_defenses_to_combatant(session, combatant)
     target_ids = list(data.target_ids or [])
     if not target_ids:
         return messages
@@ -617,6 +661,7 @@ def resolve_attack(
                 profile=strike_profile,
                 strike_index=strike_index,
                 strike_count=len(strikes),
+                detail=data.detail,
             )
             messages.extend(strike_messages)
             if strike_index == 0 and _helped_by_advantage(state, actor.id):
@@ -670,6 +715,7 @@ def resolve_attack(
                     profile=profile,
                     strike_index=index,
                     strike_count=len(target_ids),
+                    detail=data.detail,
                 )
             )
             if index == 0 and _helped_by_advantage(state, actor.id):
@@ -699,6 +745,7 @@ def resolve_attack(
             profile=profile,
             strike_index=strike_index,
             strike_count=strike_count,
+            detail=data.detail,
         )
         messages.extend(strike_messages)
         if strike_index == 0 and _helped_by_advantage(state, actor.id):
@@ -715,6 +762,7 @@ def _resolve_attack_strike(
     profile: AttackProfile,
     strike_index: int,
     strike_count: int,
+    detail: str | None = None,
 ) -> list[str]:
     messages: list[str] = []
     strike_label = (
@@ -723,8 +771,23 @@ def _resolve_attack_strike(
         else f"{clean_name} ({strike_index + 1}/{strike_count})"
     )
 
+    from app.services.condition_attack_mods import (
+        attack_advantage_flags,
+        is_auto_crit_melee,
+    )
+
     advantage = _helped_by_advantage(state, actor.id)
     disadvantage = _target_is_dodging(state, target.id)
+    cond_adv, cond_dis, cond_tags = attack_advantage_flags(
+        actor_conditions=actor.conditions,
+        target_conditions=target.conditions,
+        action_name=clean_name,
+        detail=detail,
+    )
+    if cond_adv:
+        advantage = True
+    if cond_dis:
+        disadvantage = True
     attack_roll, d20_rolls = roll_d20_check(
         advantage=advantage,
         disadvantage=disadvantage,
@@ -741,6 +804,7 @@ def _resolve_attack_strike(
         roll_tags.append("advantage")
     elif disadvantage and not advantage:
         roll_tags.append("disadvantage")
+    roll_tags.extend(cond_tags)
     if exhaustion_penalty:
         roll_tags.append(f"exhaustion -{exhaustion_penalty}")
     tag_text = f" ({', '.join(roll_tags)})" if roll_tags else ""
@@ -772,6 +836,12 @@ def _resolve_attack_strike(
     )
 
     critical = attack_roll == 20
+    if not critical and is_auto_crit_melee(
+        target_conditions=target.conditions,
+        action_name=clean_name,
+        detail=detail,
+    ):
+        critical = True
     auto_miss = attack_roll == 1
     hit = not auto_miss and (critical or target_ac is None or attack_total >= target_ac)
 
@@ -797,7 +867,10 @@ def _resolve_attack_strike(
         )
         return messages
 
-    if not profile.damage_dice:
+    packets = list(profile.damage_packets or [])
+    if not packets and profile.damage_dice:
+        packets = [{"dice": profile.damage_dice, "type": profile.damage_type}]
+    if not packets:
         message = f"Hit! No damage dice on file for {strike_label}."
         messages.append(message)
         append_log(
@@ -808,27 +881,34 @@ def _resolve_attack_strike(
         )
         return messages
 
-    damage_total, damage_rolls, damage_mod, normalized = roll_dice_expression(
-        profile.damage_dice,
-        double_dice=critical,
-    )
-    from app.services.combat_damage import apply_damage_modifiers
+    from app.services.combat_damage import apply_damage_packets
 
-    applied = apply_damage_modifiers(
-        damage_total,
-        damage_type=profile.damage_type,
-        combatant=target,
-    )
-    damage_detail = format_roll_detail(
-        dice_label="Damage",
-        rolls=damage_rolls,
-        modifier=damage_mod,
-        total=damage_total,
-    )
+    rolled_packets: list[tuple[int, str | None]] = []
+    packet_details: list[str] = []
+    for packet in packets:
+        dice = str(packet.get("dice") or "")
+        dtype = packet.get("type") or profile.damage_type
+        damage_total, damage_rolls, damage_mod, normalized = roll_dice_expression(
+            dice,
+            double_dice=critical,
+        )
+        rolled_packets.append((damage_total, dtype))
+        part = format_roll_detail(
+            dice_label=f"{(dtype or 'damage').title()}",
+            rolls=damage_rolls,
+            modifier=damage_mod,
+            total=damage_total,
+        )
+        packet_details.append(f"{part} [{normalized}]")
+
+    applied = apply_damage_packets(rolled_packets, combatant=target)
+    damage_detail = " + ".join(packet_details)
     if critical:
         damage_detail = f"Critical hit! {damage_detail}"
     if applied.note:
         damage_detail = f"{damage_detail} → {applied.amount} ({applied.note})"
+    elif len(packets) > 1:
+        damage_detail = f"{damage_detail} → {applied.amount} total"
     messages.append(damage_detail)
     append_log(
         state,
@@ -836,9 +916,9 @@ def _resolve_attack_strike(
         kind="roll",
         actor=actor.name,
         roller_name=actor.name,
-        dice=normalized,
-        result=sum(damage_rolls),
-        bonus=damage_mod,
+        dice="+".join(str(p.get("dice") or "") for p in packets),
+        result=applied.original,
+        bonus=0,
         total=applied.amount,
     )
 

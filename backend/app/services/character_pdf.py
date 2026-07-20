@@ -73,6 +73,12 @@ Return ONLY valid JSON (no markdown, no commentary) with this shape:
     "ac_bonuses": [
       { "name": "Armored Bonus (Defense)", "bonus": 1, "requires_armor": true }
     ],
+    "damage_resistances": ["Fire"],
+    "damage_immunities": [],
+    "damage_vulnerabilities": [],
+    "spellcasting_ability": "wis",
+    "spell_save_dc": 13,
+    "spell_attack_bonus": 5,
     "conditions": [],
     "notes": ""
   }
@@ -101,6 +107,8 @@ Rules:
 - wild_shapes: every beast form listed on the sheet for Wild Shape (or similar transform features) with name, cr if shown, and notes.
 - combat_actions: any ability that uses Action, Bonus Action, Reaction, or Magic action in combat. Use the PRIMARY activation cost (2024: Wild Shape = bonus_action). Include resource_cost when the sheet shows a point cost. Do not duplicate Wild Shape in features if it is already here.
 - For features whose description says Bonus Action or Reaction, also add a matching combat_actions entry.
+- damage_resistances / damage_immunities / damage_vulnerabilities: typed damage lists from species traits, class features, or the defenses section (e.g. Dragonborn fire resistance → ["Fire"]). Use empty arrays when none.
+- spellcasting_ability / spell_save_dc / spell_attack_bonus: when the sheet shows spellcasting stats, fill them (ability as str|dex|con|int|wis|cha).
 - Use null only when a value truly cannot be found.
 - ability keys must be lowercase: str, dex, con, int, wis, cha.
 """

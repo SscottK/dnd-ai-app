@@ -175,6 +175,12 @@ class CharacterSheet(TypedDict, total=False):
     ac_bonuses: list[dict[str, Any]]
     ac_breakdown: list[dict[str, Any]]
     authoritative_ac: int | None
+    damage_resistances: list[str]
+    damage_immunities: list[str]
+    damage_vulnerabilities: list[str]
+    spellcasting_ability: str | None
+    spell_save_dc: int | None
+    spell_attack_bonus: int | None
     conditions: list[str]
     notes: str
 
