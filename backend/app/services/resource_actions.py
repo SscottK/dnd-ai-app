@@ -149,4 +149,8 @@ def spend_action_resource(
     session.add(character)
     label = str(entry.get("name") or resource_id)
     remaining = entry["current"]
-    return [f"{actor.name} spends {amount} {label} ({remaining} remaining)."]
+    messages = [f"{actor.name} spends {amount} {label} ({remaining} remaining)."]
+    if resource_id == "rage" or label.casefold() == "rage":
+        actor.raging = True
+        messages.append(f"{actor.name} enters Rage (resistant to Bludgeoning, Piercing, and Slashing).")
+    return messages

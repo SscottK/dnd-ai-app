@@ -1153,6 +1153,27 @@ def use_encounter_action(
             append_log(state, message, kind="action", actor=actor.name)
         if resource_messages:
             action_messages = [*resource_messages, *action_messages]
+
+        # Concentration for non-save concentration spells (e.g. Bless, Hunter's Mark)
+        if not will_resolve_save:
+            from app.services.concentration import (
+                looks_like_concentration,
+                start_concentration,
+            )
+
+            if looks_like_concentration(
+                action_name=resolved_data.action_name,
+                detail=resolved_data.detail,
+                description=actor_action.description if actor_action else None,
+            ):
+                start_concentration(
+                    actor,
+                    spell_name=resolved_data.action_name,
+                    spell_id=resolved_data.action_id,
+                )
+                conc_msg = f"{actor.name} concentrates on {resolved_data.action_name}."
+                append_log(state, conc_msg, kind="action", actor=actor.name)
+                action_messages = [*action_messages, conc_msg]
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

@@ -77,7 +77,7 @@ export function inferTargeting(name = "", description = "", { category = "action
     return "one_ally_or_self";
   }
   if (ALLY_HINTS.test(text)) return "one_ally";
-  if (AREA_HINTS.test(text)) return "one_creature";
+  if (AREA_HINTS.test(text)) return "many_creatures";
   if (ATTACK_HINTS.test(text)) return "one_enemy";
   if (/\+\d+\s+to\s+hit|to hit/i.test(text)) return "one_enemy";
 

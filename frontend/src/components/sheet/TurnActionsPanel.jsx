@@ -21,6 +21,7 @@ import {
   formatApiErrorDetail,
   resourceCostLabel,
   targetLabel,
+  isMultiTarget,
   unequipItemAction,
   validateTargetSelection,
 } from "../../lib/combatActions";
@@ -120,7 +121,7 @@ export function TurnActionsPanel({
   const [step, setStep] = useState("pick_type");
   const [pickedType, setPickedType] = useState(null);
   const [pickedAction, setPickedAction] = useState(null);
-  const [targetId, setTargetId] = useState("");
+  const [targetIds, setTargetIds] = useState([]);
   const [readyDetail, setReadyDetail] = useState("");
   const [readyTrigger, setReadyTrigger] = useState("");
   const [busy, setBusy] = useState(false);
@@ -159,7 +160,7 @@ export function TurnActionsPanel({
     setStep("pick_type");
     setPickedType(null);
     setPickedAction(null);
-    setTargetId("");
+    setTargetIds([]);
     setReadyDetail("");
     setReadyTrigger("");
   }, [actorCombatant?.id, canTakeTurn]);
@@ -168,7 +169,7 @@ export function TurnActionsPanel({
     setStep("pick_type");
     setPickedType(null);
     setPickedAction(null);
-    setTargetId("");
+    setTargetIds([]);
     setReadyDetail("");
     setReadyTrigger("");
   };
@@ -312,7 +313,7 @@ export function TurnActionsPanel({
         return;
       }
       setStep("pick_target");
-      setTargetId("");
+      setTargetIds([]);
       return;
     }
     void submitAction(action, []);
@@ -323,7 +324,7 @@ export function TurnActionsPanel({
     const check = validateTargetSelection(
       pickedAction,
       actorCombatant.id,
-      targetId ? [targetId] : [],
+      targetIds,
       encounter.combatants,
       actorCombatant
     );
@@ -331,7 +332,17 @@ export function TurnActionsPanel({
       onError?.(check.reason);
       return;
     }
-    void submitAction(pickedAction, [targetId]);
+    void submitAction(pickedAction, targetIds);
+  };
+
+  const toggleTargetId = (id) => {
+    if (!pickedAction || !isMultiTarget(pickedAction.targeting)) {
+      setTargetIds([id]);
+      return;
+    }
+    setTargetIds((prev) =>
+      prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id]
+    );
   };
 
   const handlePickEquipItem = async (item) => {
@@ -376,7 +387,7 @@ export function TurnActionsPanel({
       }
       setPickedAction(resolved);
       setStep("pick_target");
-      setTargetId("");
+      setTargetIds([]);
       return;
     }
     void submitAction(resolved, []);
@@ -788,6 +799,9 @@ export function TurnActionsPanel({
             <span className="font-black text-starlight">{pickedAction.name}</span>
             {" — "}
             {targetLabel(pickedAction.targeting)}
+            {isMultiTarget(pickedAction.targeting)
+              ? ` (${targetIds.length} selected)`
+              : ""}
           </p>
           <div className="max-h-28 space-y-1 overflow-y-auto">
             {targetCandidates.length === 0 ? (
@@ -795,27 +809,30 @@ export function TurnActionsPanel({
                 No valid targets ({targetLabel(pickedAction.targeting)}).
               </p>
             ) : (
-              targetCandidates.map((combatant) => (
-                <button
-                  key={combatant.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setTargetId(combatant.id)}
-                  className={`w-full rounded-sm border px-2 py-1 text-left text-xs sm:text-sm font-black uppercase ${
-                    targetId === combatant.id
-                      ? "border-starlight bg-starlight/10 text-starlight"
-                      : "border-border/60 text-ink hover:border-neon-cyan/40"
-                  }`}
-                >
-                  {combatant.name}
-                </button>
-              ))
+              targetCandidates.map((combatant) => {
+                const selected = targetIds.includes(combatant.id);
+                return (
+                  <button
+                    key={combatant.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => toggleTargetId(combatant.id)}
+                    className={`w-full rounded-sm border px-2 py-1 text-left text-xs sm:text-sm font-black uppercase ${
+                      selected
+                        ? "border-starlight bg-starlight/10 text-starlight"
+                        : "border-border/60 text-ink hover:border-neon-cyan/40"
+                    }`}
+                  >
+                    {combatant.name}
+                  </button>
+                );
+              })
             )}
           </div>
           <div className="flex gap-1">
             <button
               type="button"
-              disabled={!targetId || busy}
+              disabled={targetIds.length === 0 || busy}
               onClick={handleConfirmTarget}
               className="flex-1 rounded-sm border border-neon-cyan px-2 py-1 text-xs sm:text-sm font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 disabled:opacity-40"
             >

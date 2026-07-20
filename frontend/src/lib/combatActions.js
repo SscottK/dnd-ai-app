@@ -21,6 +21,8 @@ export const TARGETING = {
   one_ally: "one_ally",
   one_creature: "one_creature",
   one_ally_or_self: "one_ally_or_self",
+  many_enemies: "many_enemies",
+  many_creatures: "many_creatures",
 };
 
 
@@ -775,9 +777,17 @@ export function targetLabel(mode) {
       return "One ally or yourself";
     case TARGETING.one_creature:
       return "One creature";
+    case TARGETING.many_enemies:
+      return "Enemies in area";
+    case TARGETING.many_creatures:
+      return "Creatures in area";
     default:
       return "Target";
   }
+}
+
+export function isMultiTarget(targeting) {
+  return targeting === TARGETING.many_enemies || targeting === TARGETING.many_creatures;
 }
 
 export function isAllyCombatant(combatant) {
@@ -844,6 +854,13 @@ export function filterTargetCandidates(
     case TARGETING.one_creature:
       candidates = living.filter((c) => c.id !== actorCombatantId);
       break;
+    case TARGETING.many_enemies:
+      if (!actor) return [];
+      candidates = living.filter((c) => c.id !== actorCombatantId && isOpponent(actor, c));
+      break;
+    case TARGETING.many_creatures:
+      candidates = living.filter((c) => c.id !== actorCombatantId);
+      break;
     default:
       return [];
   }
@@ -862,7 +879,12 @@ export function validateTargetSelection(
   if (!actionNeedsTarget(action)) {
     return targetIds.length === 0 ? { ok: true } : { ok: false, reason: "This action does not use a target." };
   }
-  if (targetIds.length !== 1) {
+  const multi = isMultiTarget(action.targeting);
+  if (multi) {
+    if (targetIds.length < 1) {
+      return { ok: false, reason: `Select at least one target (${targetLabel(action.targeting)}).` };
+    }
+  } else if (targetIds.length !== 1) {
     return { ok: false, reason: `Select exactly one target (${targetLabel(action.targeting)}).` };
   }
   const allowed = filterTargetCandidates(
@@ -873,8 +895,10 @@ export function validateTargetSelection(
     action
   );
   const allowedIds = new Set(allowed.map((c) => c.id));
-  if (!allowedIds.has(targetIds[0])) {
-    return { ok: false, reason: "That target is not valid for this action." };
+  for (const id of targetIds) {
+    if (!allowedIds.has(id)) {
+      return { ok: false, reason: "That target is not valid for this action." };
+    }
   }
   return { ok: true };
 }

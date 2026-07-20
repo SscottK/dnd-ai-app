@@ -444,6 +444,9 @@ class EncounterCombatant(BaseModel):
     damage_resistances: list[str] = Field(default_factory=list)
     damage_immunities: list[str] = Field(default_factory=list)
     damage_vulnerabilities: list[str] = Field(default_factory=list)
+    raging: bool = False
+    concentrating_on: str | None = Field(default=None, max_length=120)
+    concentrating_spell_id: str | None = Field(default=None, max_length=120)
     hidden_from_players: bool = False
 
     @field_validator("conditions", mode="before")

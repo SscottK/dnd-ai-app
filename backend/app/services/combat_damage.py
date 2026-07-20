@@ -144,12 +144,17 @@ def combatant_damage_modifiers(combatant: EncounterCombatant) -> dict[str, set[s
         "immunities": _normalize_type_list(getattr(combatant, "damage_immunities", None)),
         "vulnerabilities": _normalize_type_list(getattr(combatant, "damage_vulnerabilities", None)),
     }
+    if combatant.raging:
+        listed["resistances"] |= {"bludgeoning", "piercing", "slashing"}
     if any(listed.values()):
         return listed
     if combatant.is_pc or combatant.character_id:
-        return {"resistances": set(), "immunities": set(), "vulnerabilities": set()}
+        return listed
     monster = lookup_monster(combatant.srd_name or combatant.name)
-    return monster_damage_modifiers(monster)
+    mods = monster_damage_modifiers(monster)
+    if combatant.raging:
+        mods["resistances"] |= {"bludgeoning", "piercing", "slashing"}
+    return mods
 
 
 def apply_damage_modifiers(

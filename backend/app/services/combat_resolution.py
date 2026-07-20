@@ -451,7 +451,13 @@ def _ensure_hp_initialized(combatant: EncounterCombatant) -> None:
         combatant.hp = combatant.max_hp
 
 
-def _apply_damage(combatant: EncounterCombatant, amount: int) -> int | None:
+def _apply_damage(
+    combatant: EncounterCombatant,
+    amount: int,
+    *,
+    state: EncounterState | None = None,
+    session=None,
+) -> int | None:
     from app.services.death_saves import mark_unstable_on_damage_at_zero, reset_death_saves_on_revive
 
     _ensure_hp_initialized(combatant)
@@ -468,6 +474,15 @@ def _apply_damage(combatant: EncounterCombatant, amount: int) -> int | None:
             combatant.death_save_failures = min(3, combatant.death_save_failures + 1)
     if combatant.hp > 0:
         reset_death_saves_on_revive(combatant)
+    if state is not None and amount > 0:
+        from app.services.concentration import check_concentration_after_damage
+
+        check_concentration_after_damage(
+            state,
+            combatant,
+            damage=amount,
+            session=session,
+        )
     return before
 
 
@@ -662,6 +677,7 @@ def resolve_attack(
                 strike_index=strike_index,
                 strike_count=len(strikes),
                 detail=data.detail,
+                session=session,
             )
             messages.extend(strike_messages)
             if strike_index == 0 and _helped_by_advantage(state, actor.id):
@@ -716,6 +732,7 @@ def resolve_attack(
                     strike_index=index,
                     strike_count=len(target_ids),
                     detail=data.detail,
+                    session=session,
                 )
             )
             if index == 0 and _helped_by_advantage(state, actor.id):
@@ -746,6 +763,7 @@ def resolve_attack(
             strike_index=strike_index,
             strike_count=strike_count,
             detail=data.detail,
+            session=session,
         )
         messages.extend(strike_messages)
         if strike_index == 0 and _helped_by_advantage(state, actor.id):
@@ -763,6 +781,7 @@ def _resolve_attack_strike(
     strike_index: int,
     strike_count: int,
     detail: str | None = None,
+    session=None,
 ) -> list[str]:
     messages: list[str] = []
     strike_label = (
@@ -922,7 +941,7 @@ def _resolve_attack_strike(
         total=applied.amount,
     )
 
-    hp_before = _apply_damage(target, applied.amount)
+    hp_before = _apply_damage(target, applied.amount, state=state, session=session)
     if hp_before is None:
         message = f"{target.name} takes {applied.amount} damage."
         messages.append(message)

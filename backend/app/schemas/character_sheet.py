@@ -21,6 +21,8 @@ TARGETING = frozenset(
         "one_ally",
         "one_creature",
         "one_ally_or_self",
+        "many_enemies",
+        "many_creatures",
     }
 )
 

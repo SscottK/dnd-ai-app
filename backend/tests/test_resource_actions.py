@@ -65,7 +65,8 @@ class ResourceActionTests(unittest.TestCase):
             targeting="self",
         )
         messages = spend_action_resource(session, 1, actor=actor, data=data)
-        self.assertEqual(len(messages), 1)
+        self.assertEqual(len(messages), 2)
+        self.assertTrue(actor.raging)
         sheet = json.loads(character.sheet_json)
         self.assertEqual(sheet["resources"][0]["current"], 1)
 

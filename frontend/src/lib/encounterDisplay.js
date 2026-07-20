@@ -120,6 +120,8 @@ export function formatCombatResources(sheet, { limit = 4 } = {}) {
 export function turnStatusLabels(economy, combatants = [], combatant = null) {
   if (!economy) return [];
   const labels = [];
+  if (combatant?.raging) labels.push("Raging");
+  if (combatant?.concentrating_on) labels.push(`Conc: ${combatant.concentrating_on}`);
   if (economy.dodging) labels.push("Dodging");
   if (economy.disengaged) labels.push("Disengaged");
   if (economy.hiding) labels.push("Hiding");

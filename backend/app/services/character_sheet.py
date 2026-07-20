@@ -356,6 +356,7 @@ def normalize_sheet(
                 "targeting": str(entry.get("targeting") or "one_enemy"),
                 "prepared": bool(entry.get("prepared", True)),
                 "description": str(entry.get("description") or ""),
+                "concentration": bool(entry.get("concentration", False)),
             }
             for index, entry in enumerate(sheet["spells"])
             if isinstance(entry, dict) and entry.get("name")

@@ -33,6 +33,8 @@ export const TARGETING = {
   one_ally: "one_ally",
   one_creature: "one_creature",
   one_ally_or_self: "one_ally_or_self",
+  many_enemies: "many_enemies",
+  many_creatures: "many_creatures",
 };
 
 /** Legacy import ids → 2024 canonical ids. */

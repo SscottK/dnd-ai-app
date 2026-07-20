@@ -1,4 +1,4 @@
-"""Save-based combat effects (breath weapons, etc.) for 5.5e."""
+"""Save-based combat effects (breath weapons, PC spells, etc.) for 5.5e."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 
 from app.api.schemas import EncounterCombatant, EncounterState, UseActionRequest
-from app.services.combat_damage import apply_damage_modifiers, parse_damage_type
+from app.services.combat_damage import apply_damage_modifiers, parse_damage_packets, parse_damage_type
 from app.services.combat_dice import format_roll_detail, roll_d20_check, roll_dice_expression
 from app.services.combat_log import append_log
 from app.services.conditions import get_exhaustion_level
@@ -17,11 +17,17 @@ _SAVE_RE = re.compile(
     r"\s+Saving Throw:\s*DC\s*(?P<dc>\d+)",
     re.IGNORECASE,
 )
+_SAVE_ABILITY_ONLY_RE = re.compile(
+    r"(?:make a |makes a |must (?:make|succeed on) (?:a )?)?"
+    r"(?P<ability>Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)"
+    r"\s+saving throw",
+    re.IGNORECASE,
+)
 _FAILURE_DICE_RE = re.compile(
     r"failure:\s*(?:\d+\s*)?\(\s*(?P<dice>\d+d\d+(?:\s*[+-]\s*\d+)?)\s*\)",
     re.IGNORECASE,
 )
-_SUCCESS_HALF_RE = re.compile(r"success:\s*half", re.IGNORECASE)
+_SUCCESS_HALF_RE = re.compile(r"success:\s*half|half as much|half damage", re.IGNORECASE)
 _ABILITY_KEYS = {
     "strength": "str",
     "dexterity": "dex",
@@ -29,6 +35,14 @@ _ABILITY_KEYS = {
     "intelligence": "int",
     "wisdom": "wis",
     "charisma": "cha",
+}
+_ABILITY_TITLE = {
+    "str": "Strength",
+    "dex": "Dexterity",
+    "con": "Constitution",
+    "int": "Intelligence",
+    "wis": "Wisdom",
+    "cha": "Charisma",
 }
 
 
@@ -39,6 +53,7 @@ class SaveEffect:
     damage_dice: str | None = None
     damage_type: str | None = None
     half_on_success: bool = False
+    damage_packets: list[dict] | None = None
 
 
 def looks_like_save_effect(*, action_name: str, detail: str | None, description: str | None = None) -> bool:
@@ -49,41 +64,85 @@ def looks_like_save_effect(*, action_name: str, detail: str | None, description:
         return False
     if re.search(r"\+\d+\s+to\s+hit", text, re.IGNORECASE):
         return False
-    return bool(_SAVE_RE.search(text))
+    if re.search(r"(?:melee|ranged)\s+spell\s+attack", text, re.IGNORECASE):
+        return False
+    if _SAVE_RE.search(text) or _SAVE_ABILITY_ONLY_RE.search(text):
+        return True
+    return bool(re.search(r"\bsaving throw\b", text, re.IGNORECASE))
 
 
-def parse_save_effect(text: str | None) -> SaveEffect | None:
+def parse_save_effect(text: str | None, *, fallback_dc: int | None = None) -> SaveEffect | None:
     if not text:
         return None
     match = _SAVE_RE.search(text)
-    if not match:
+    ability = None
+    dc = None
+    if match:
+        ability = match.group("ability").capitalize()
+        dc = int(match.group("dc"))
+    else:
+        ability_match = _SAVE_ABILITY_ONLY_RE.search(text)
+        if ability_match:
+            ability = ability_match.group("ability").capitalize()
+            dc = fallback_dc
+        elif re.search(r"\bsaving throw\b", text, re.IGNORECASE) and fallback_dc is not None:
+            ability = "Dexterity"
+            dc = fallback_dc
+    if ability is None or dc is None:
         return None
-    ability = match.group("ability").capitalize()
-    dc = int(match.group("dc"))
+
     damage_dice = None
+    packets = parse_damage_packets(text)
+    damage_packets = (
+        [{"dice": p.dice, "type": p.damage_type} for p in packets] if packets else None
+    )
     fail = _FAILURE_DICE_RE.search(text)
     if fail:
         damage_dice = re.sub(r"\s+", "", fail.group("dice"))
+    elif damage_packets:
+        damage_dice = damage_packets[0]["dice"]
     else:
-        # Fallback: first parenthetical dice after Failure
         parsed = parse_attack_stats_from_text(text)
-        # Prefer failure section
         fail_idx = text.casefold().find("failure:")
         if fail_idx >= 0:
-            from app.services.monster_action_parse import parse_attack_stats_from_text as _p
-
-            # reuse hit parser on failure chunk by rewriting
             chunk = "Hit: " + text[fail_idx + len("failure:") :]
-            damage_dice = _p(chunk).damage_dice
+            damage_dice = parse_attack_stats_from_text(chunk).damage_dice
         if not damage_dice:
             damage_dice = parsed.damage_dice
+
     return SaveEffect(
         ability=ability,
-        dc=dc,
+        dc=int(dc),
         damage_dice=damage_dice,
-        damage_type=parse_damage_type(text),
+        damage_type=(
+            damage_packets[0].get("type") if damage_packets else parse_damage_type(text)
+        ),
         half_on_success=bool(_SUCCESS_HALF_RE.search(text)),
+        damage_packets=damage_packets,
     )
+
+
+def _sheet_spell_save_dc(session, actor: EncounterCombatant) -> int | None:
+    if not session or not actor.character_id:
+        return None
+    from app.db.models import Character
+    from app.services.character_sheet import parse_sheet_json
+
+    character = session.get(Character, actor.character_id)
+    if character is None:
+        return None
+    sheet = parse_sheet_json(
+        character.sheet_json,
+        class_name=character.class_name,
+        level=character.level,
+    )
+    raw = sheet.get("spell_save_dc")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def _ability_mod_for_target(
@@ -109,7 +168,6 @@ def _ability_mod_for_target(
             )
             return computed_save_bonus(sheet, key)
 
-    # Prefer monster printed save if available
     from app.services.monster_catalog import lookup_monster
 
     monster = lookup_monster(target.srd_name or target.name) if not target.is_pc else None
@@ -139,10 +197,12 @@ def resolve_save_effect(
     session=None,
 ) -> list[str]:
     from app.services.combat_resolution import _apply_damage, _find_combatant
+    from app.services.concentration import looks_like_concentration, start_concentration
     from app.services.encounter_sync import apply_sheet_defenses_to_combatant
 
     text = " ".join(part for part in (data.detail, description, data.action_name) if part)
-    effect = parse_save_effect(text)
+    fallback_dc = _sheet_spell_save_dc(session, actor)
+    effect = parse_save_effect(text, fallback_dc=fallback_dc)
     if effect is None:
         return []
 
@@ -150,6 +210,20 @@ def resolve_save_effect(
         f"{actor.name} uses {data.action_name} — {effect.ability} save DC {effect.dc}."
     ]
     append_log(state, messages[0], kind="action", actor=actor.name)
+
+    if looks_like_concentration(
+        action_name=data.action_name,
+        detail=data.detail,
+        description=description,
+    ):
+        start_concentration(
+            actor,
+            spell_name=data.action_name,
+            spell_id=data.action_id,
+        )
+        conc_msg = f"{actor.name} concentrates on {data.action_name}."
+        messages.append(conc_msg)
+        append_log(state, conc_msg, kind="action", actor=actor.name)
 
     targets = [_find_combatant(state, tid) for tid in (data.target_ids or [])]
     targets = [t for t in targets if t is not None]
@@ -185,42 +259,48 @@ def resolve_save_effect(
             total=total,
         )
 
-        if not effect.damage_dice:
+        packets = list(effect.damage_packets or [])
+        if not packets and effect.damage_dice:
+            packets = [{"dice": effect.damage_dice, "type": effect.damage_type}]
+        if not packets:
             continue
         if success and not effect.half_on_success:
             continue
 
-        damage_total, damage_rolls, damage_mod, normalized = roll_dice_expression(effect.damage_dice)
-        if success and effect.half_on_success:
-            damage_total = damage_total // 2
+        from app.services.combat_damage import apply_damage_packets
 
-        applied = apply_damage_modifiers(
-            damage_total,
-            damage_type=effect.damage_type,
-            combatant=target,
-        )
-        detail = format_roll_detail(
-            dice_label=f"Damage vs {target.name}",
-            rolls=damage_rolls,
-            modifier=damage_mod,
-            total=damage_total,
-        )
+        rolled: list[tuple[int, str | None]] = []
+        for packet in packets:
+            damage_total, damage_rolls, damage_mod, normalized = roll_dice_expression(
+                str(packet.get("dice") or "")
+            )
+            if success and effect.half_on_success:
+                damage_total = damage_total // 2
+            rolled.append((damage_total, packet.get("type") or effect.damage_type))
+            detail = format_roll_detail(
+                dice_label=f"Damage vs {target.name}",
+                rolls=damage_rolls,
+                modifier=damage_mod,
+                total=damage_total,
+            )
+            messages.append(detail)
+            append_log(
+                state,
+                detail,
+                kind="roll",
+                actor=actor.name,
+                dice=normalized,
+                result=sum(damage_rolls),
+                bonus=damage_mod,
+                total=damage_total,
+            )
+
+        applied = apply_damage_packets(rolled, combatant=target)
         if applied.note:
-            detail += f" → {applied.amount} ({applied.note})"
-        elif success and effect.half_on_success:
-            detail += f" → {applied.amount} (half on success)"
-        messages.append(detail)
-        append_log(
-            state,
-            detail,
-            kind="roll",
-            actor=actor.name,
-            dice=normalized,
-            result=sum(damage_rolls),
-            bonus=damage_mod,
-            total=applied.amount,
-        )
-        before = _apply_damage(target, applied.amount)
+            note_msg = f"{target.name} damage adjusted → {applied.amount} ({applied.note})"
+            messages.append(note_msg)
+            append_log(state, note_msg, kind="action", actor=target.name)
+        before = _apply_damage(target, applied.amount, state=state, session=session)
         if before is not None:
             hp_msg = (
                 f"{target.name} takes {applied.amount} damage ({before} → {target.hp})"

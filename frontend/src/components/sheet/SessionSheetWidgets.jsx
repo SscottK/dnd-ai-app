@@ -1128,6 +1128,16 @@ function InitiativeCombatantStats({
               valueClassName="text-neon-magenta"
             />
           ) : null}
+          {combatant.concentrating_on ? (
+            <InitiativeLabeledStat
+              label="Conc"
+              value={combatant.concentrating_on}
+              valueClassName="text-neon-cyan"
+            />
+          ) : null}
+          {combatant.raging ? (
+            <InitiativeLabeledStat label="Rage" value="Active" valueClassName="text-danger" />
+          ) : null}
           {resourceSummary ? (
             <InitiativeLabeledStat
               label="Uses"

@@ -16,7 +16,15 @@ _INCAPACITATING = frozenset({"Paralyzed", "Stunned", "Unconscious", "Petrified"}
 
 VALID_ACTION_TYPES = frozenset({"action", "bonus_action", "reaction", "magic_action"})
 VALID_TARGETING = frozenset(
-    {"self", "one_enemy", "one_ally", "one_creature", "one_ally_or_self"}
+    {
+        "self",
+        "one_enemy",
+        "one_ally",
+        "one_creature",
+        "one_ally_or_self",
+        "many_enemies",
+        "many_creatures",
+    }
 )
 
 
@@ -150,6 +158,14 @@ def filter_valid_targets(
         ]
     if targeting == "one_creature":
         return [combatant for combatant in living if combatant.id != actor_id]
+    if targeting == "many_enemies":
+        return [
+            combatant
+            for combatant in living
+            if combatant.id != actor_id and _opposing_team(actor, combatant)
+        ]
+    if targeting == "many_creatures":
+        return [combatant for combatant in living if combatant.id != actor_id]
     return []
 
 
@@ -164,12 +180,17 @@ def validate_target_selection(
             raise ValueError("This action does not require a target.")
         return
 
-    if len(target_ids) != 1:
+    multi = targeting in {"many_enemies", "many_creatures"}
+    if multi:
+        if not target_ids:
+            raise ValueError("Select at least one target for this action.")
+    elif len(target_ids) != 1:
         raise ValueError("Select exactly one target for this action.")
 
     allowed_ids = {combatant.id for combatant in filter_valid_targets(state, actor_id, targeting)}
-    if target_ids[0] not in allowed_ids:
-        raise ValueError("That target is not valid for this action.")
+    for tid in target_ids:
+        if tid not in allowed_ids:
+            raise ValueError("That target is not valid for this action.")
 
 
 def _economy_field(action_type: str) -> str:
@@ -253,15 +274,17 @@ def use_combat_action(
     if parse_recharge_threshold(action_name, detail):
         mark_recharge_spent(state, actor.id, action_id)
 
-    target_name = None
-    if target_ids:
-        match = next((c for c in state.combatants if c.id == target_ids[0]), None)
-        target_name = match.name if match else "unknown target"
-
     if log_usage:
         parts = [f"{actor.name} uses {action_name}"]
         if detail:
             parts[0] = f"{actor.name} uses {action_name} ({detail})"
-        if target_name:
-            parts.append(f"targeting {target_name}")
+        if target_ids:
+            names = []
+            for tid in target_ids:
+                match = next((c for c in state.combatants if c.id == tid), None)
+                names.append(match.name if match else "unknown")
+            if len(names) == 1:
+                parts.append(f"targeting {names[0]}")
+            else:
+                parts.append(f"targeting {', '.join(names)}")
         append_log(state, " — ".join(parts), kind="action", actor=actor.name)

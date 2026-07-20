@@ -1039,8 +1039,8 @@ export function InitiativePage() {
               <p className="mt-1 text-[10px] font-mono text-zinc-500">
                 {combatantMoveText(activeCombatant, activeEconomy) &&
                   `Move ${combatantMoveText(activeCombatant, activeEconomy)}`}
-                {turnStatusLabels(activeEconomy, encounter.combatants).length
-                  ? ` · ${turnStatusLabels(activeEconomy, encounter.combatants).join(", ")}`
+                {turnStatusLabels(activeEconomy, encounter.combatants, activeCombatant).length
+                  ? ` · ${turnStatusLabels(activeEconomy, encounter.combatants, activeCombatant).join(", ")}`
                   : ""}
                 {formatCombatResources(activeResourceSheet)
                   ? ` · ${formatCombatResources(activeResourceSheet)}`
@@ -1106,7 +1106,7 @@ export function InitiativePage() {
                     ? combatantMoveText(combatant, economy)
                     : formatCombatantSpeed(combatant.speed).replace(/^ · /, "");
                   const turnStatuses = isActive
-                    ? turnStatusLabels(economy, encounter.combatants)
+                    ? turnStatusLabels(economy, encounter.combatants, combatant)
                     : [];
                   const resourceSummary =
                     isOwner && combatant.character_id

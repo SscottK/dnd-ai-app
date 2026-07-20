@@ -399,6 +399,10 @@ def get_member_character(
 
 
 def persist_encounter(session: Session, campaign: Campaign, state: EncounterState) -> EncounterState:
+    from app.services.concentration import drop_concentration_if_incapacitated
+
+    for combatant in state.combatants:
+        drop_concentration_if_incapacitated(state, combatant)
     campaign.encounter_json = state.model_dump_json()
     session.add(campaign)
     session.commit()

@@ -152,6 +152,8 @@ def infer_targeting(
         "one_ally",
         "one_creature",
         "one_ally_or_self",
+        "many_enemies",
+        "many_creatures",
     }
     text = f"{name} {description} {range_text}".strip()
     lowered = text.lower()
@@ -168,7 +170,7 @@ def infer_targeting(
     if _ALLY_HINTS.search(text):
         return "one_ally"
     if _AREA_HINTS.search(text):
-        return "one_creature"
+        return "many_creatures"
     if _ATTACK_HINTS.search(text):
         return "one_enemy"
     if re.search(r"\+\d+\s+to\s+hit|to hit", text, re.IGNORECASE):
@@ -321,7 +323,15 @@ def enrich_sheet_actions(sheet: dict) -> dict:
 
 
 _VALID_TARGETING = frozenset(
-    {"self", "one_enemy", "one_ally", "one_creature", "one_ally_or_self"}
+    {
+        "self",
+        "one_enemy",
+        "one_ally",
+        "one_creature",
+        "one_ally_or_self",
+        "many_enemies",
+        "many_creatures",
+    }
 )
 
 
