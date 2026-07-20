@@ -1,13 +1,16 @@
-"""Derive weapon attack bonus and damage dice from character sheets."""
+"""Derive weapon attack bonus and damage dice from character sheets + SRD equipment."""
 
 from __future__ import annotations
 
+import json
 import re
+from functools import lru_cache
+from pathlib import Path
 
 _FINESSE_HINT = re.compile(r"finesse|rapier|dagger|scimitar|shortsword|whip", re.IGNORECASE)
 _RANGED_HINT = re.compile(r"bow|crossbow|sling|dart|javelin|gun", re.IGNORECASE)
-_LIGHT_HINT = re.compile(r"dagger|dart|sickle|club|handaxe|light hammer", re.IGNORECASE)
-_DAMAGE_DICE_RE = re.compile(r"(\d+d\d+(?:[+-]\d+)?)", re.IGNORECASE)
+_DAMAGE_DICE_RE = re.compile(r"(\d+d\d+(?:\s*[+-]\s*\d+)?)", re.IGNORECASE)
+_EQUIPMENT_PATH = Path(__file__).resolve().parents[2] / "data" / "srd-5.2.1" / "equipment.json"
 
 
 def ability_modifier(score: int | None) -> int:
@@ -34,31 +37,71 @@ def extract_damage_dice(raw: str | None) -> str | None:
     return match.group(1).replace(" ", "") if match else None
 
 
-def _attack_ability_modifier(item_name: str, abilities: dict) -> int:
+@lru_cache(maxsize=1)
+def _weapon_catalog() -> dict[str, dict]:
+    if not _EQUIPMENT_PATH.is_file():
+        return {}
+    try:
+        payload = json.loads(_EQUIPMENT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    equipment = payload.get("equipment") or {}
+    by_name: dict[str, dict] = {}
+    for row in equipment.get("weapons") or []:
+        if not isinstance(row, dict) or not row.get("name"):
+            continue
+        by_name[str(row["name"]).casefold()] = row
+    return by_name
+
+
+def lookup_weapon(name: str | None) -> dict | None:
+    if not name:
+        return None
+    catalog = _weapon_catalog()
+    direct = catalog.get(str(name).casefold())
+    if direct:
+        return direct
+    needle = str(name).casefold()
+    for key, row in catalog.items():
+        if key in needle or needle in key:
+            return row
+    return None
+
+
+def _attack_ability_modifier(item_name: str, abilities: dict, *, finesse: bool | None = None) -> int:
     strength = ability_modifier(abilities.get("str"))
     dexterity = ability_modifier(abilities.get("dex"))
     name = item_name.lower()
-    if _RANGED_HINT.search(name):
+    if _RANGED_HINT.search(name) and "thrown" not in name:
         return dexterity
-    if _FINESSE_HINT.search(name):
+    is_finesse = finesse if finesse is not None else bool(_FINESSE_HINT.search(name))
+    if is_finesse:
         return max(strength, dexterity)
     return strength
 
 
 def default_damage_dice(item_name: str, ability_mod: int) -> str:
-    sides = 6 if _LIGHT_HINT.search(item_name) else 8
+    weapon = lookup_weapon(item_name)
+    base = None
+    if weapon and weapon.get("damage_dice"):
+        base = str(weapon["damage_dice"]).replace(" ", "")
+    if not base:
+        base = "1d6" if re.search(r"dagger|dart|sickle|club|handaxe|light hammer", item_name, re.I) else "1d8"
     if ability_mod > 0:
-        return f"1d{sides}+{ability_mod}"
+        return f"{base}+{ability_mod}"
     if ability_mod < 0:
-        return f"1d{sides}{ability_mod}"
-    return f"1d{sides}"
+        return f"{base}{ability_mod}"
+    return base
 
 
 def weapon_profile_from_item(sheet: dict, item: dict) -> tuple[int | None, str | None]:
     name = str(item.get("name") or "Weapon")
     abilities = sheet.get("abilities") or {}
     prof = sheet.get("proficiency_bonus")
-    ability_mod = _attack_ability_modifier(name, abilities)
+    catalog = lookup_weapon(name)
+    properties = [str(p).casefold() for p in (catalog.get("properties") if catalog else None) or []]
+    finesse = any("finesse" in p for p in properties) or bool(_FINESSE_HINT.search(name))
+    ability_mod = _attack_ability_modifier(name, abilities, finesse=finesse)
 
     attack_bonus = item.get("to_hit")
     if attack_bonus is None:
@@ -69,6 +112,14 @@ def weapon_profile_from_item(sheet: dict, item: dict) -> tuple[int | None, str |
         attack_bonus = int(attack_bonus)
 
     damage_dice = extract_damage_dice(item.get("damage"))
+    if not damage_dice and catalog and catalog.get("damage_dice"):
+        base = str(catalog["damage_dice"]).replace(" ", "")
+        if ability_mod > 0:
+            damage_dice = f"{base}+{ability_mod}"
+        elif ability_mod < 0:
+            damage_dice = f"{base}{ability_mod}"
+        else:
+            damage_dice = base
     if not damage_dice:
         damage_dice = default_damage_dice(name, ability_mod)
 

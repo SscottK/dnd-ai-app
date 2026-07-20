@@ -54,9 +54,17 @@ def get_active_combatant(state: EncounterState) -> EncounterCombatant | None:
 
 
 def _fresh_turn_economy(combatant: EncounterCombatant) -> TurnEconomySnapshot:
-    return TurnEconomySnapshot(
-        movement_remaining=combatant.speed if combatant.speed is not None else None,
+    from app.services.conditions import get_exhaustion_level
+
+    speed = combatant.speed
+    if speed is not None:
+        speed = max(0, int(speed) - 5 * get_exhaustion_level(combatant.conditions))
+    economy = TurnEconomySnapshot(
+        movement_remaining=speed if speed is not None else None,
     )
+    if combatant.legendary_actions_max is not None:
+        economy.legendary_uses_remaining = combatant.legendary_actions_max
+    return economy
 
 
 def ensure_turn_economy(state: EncounterState) -> None:
@@ -68,16 +76,35 @@ def ensure_turn_economy(state: EncounterState) -> None:
         state.turn_economy[active.id] = _fresh_turn_economy(active)
         return
     if economy.movement_remaining is None and active.speed is not None:
-        economy.movement_remaining = active.speed
+        from app.services.conditions import get_exhaustion_level
+
+        economy.movement_remaining = max(
+            0, int(active.speed) - 5 * get_exhaustion_level(active.conditions)
+        )
 
 
 def begin_turn(state: EncounterState, combatant_id: str) -> None:
     """Fresh action economy when a combatant's turn starts."""
+    from app.services.combat_recharge import (
+        refresh_legendary_on_turn_start,
+        roll_recharges_on_turn_start,
+    )
+
     combatant = _actor_combatant(state, combatant_id)
     if combatant is None:
         state.turn_economy[combatant_id] = TurnEconomySnapshot()
         return
+    prior = state.turn_economy.get(combatant_id)
+    spent = list(prior.spent_recharge_action_ids) if prior else []
     state.turn_economy[combatant_id] = _fresh_turn_economy(combatant)
+    state.turn_economy[combatant_id].spent_recharge_action_ids = spent
+    refresh_legendary_on_turn_start(state, combatant)
+    action_lookup = {
+        str(entry.id or ""): (entry.name, entry.description)
+        for entry in combatant.combat_actions
+        if entry.id
+    }
+    roll_recharges_on_turn_start(state, combatant, action_lookup)
 
 
 def _living_targets(state: EncounterState) -> list[EncounterCombatant]:
@@ -169,13 +196,27 @@ def use_combat_action(
     detail: str | None,
     log_usage: bool = True,
 ) -> None:
+    from app.services.combat_recharge import (
+        assert_recharge_available,
+        is_legendary_action,
+        mark_recharge_spent,
+        parse_recharge_threshold,
+        spend_legendary_use,
+    )
+
     if action_type not in VALID_ACTION_TYPES:
         raise ValueError("Invalid action type.")
     if targeting not in VALID_TARGETING:
         raise ValueError("Invalid targeting mode.")
 
+    legendary = is_legendary_action(action_id=action_id, action_name=action_name)
     active = get_active_combatant(state)
-    if action_type != "reaction":
+    if legendary:
+        if active is not None and active.id == actor.id:
+            raise ValueError(
+                "Legendary actions are taken after another creature's turn, not during your own."
+            )
+    elif action_type != "reaction":
         if active is None or active.id != actor.id:
             raise ValueError("It is not your turn.")
 
@@ -186,17 +227,31 @@ def use_combat_action(
 
     ensure_turn_economy(state)
     economy = state.turn_economy.setdefault(actor.id, TurnEconomySnapshot())
-    field = _economy_field(action_type)
-    if action_type == "action" and economy.action_used:
-        if economy.extra_action_available:
-            economy.extra_action_available = False
-        else:
-            raise ValueError("You have already used your action this turn.")
-    elif getattr(economy, field):
-        label = action_type.replace("_", " ")
-        raise ValueError(f"You have already used your {label} this turn.")
+    assert_recharge_available(
+        state,
+        actor,
+        action_id=action_id,
+        action_name=action_name,
+        description=detail,
+    )
+
+    if legendary:
+        spend_legendary_use(state, actor)
     else:
-        setattr(economy, field, True)
+        field = _economy_field(action_type)
+        if action_type == "action" and economy.action_used:
+            if economy.extra_action_available:
+                economy.extra_action_available = False
+            else:
+                raise ValueError("You have already used your action this turn.")
+        elif getattr(economy, field):
+            label = action_type.replace("_", " ")
+            raise ValueError(f"You have already used your {label} this turn.")
+        else:
+            setattr(economy, field, True)
+
+    if parse_recharge_threshold(action_name, detail):
+        mark_recharge_spent(state, actor.id, action_id)
 
     target_name = None
     if target_ids:

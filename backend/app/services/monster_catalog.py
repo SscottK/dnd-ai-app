@@ -287,6 +287,8 @@ def _trait_bonus_actions(traits: list | None) -> list[CombatActionEntry]:
 
 
 def monster_to_combat_actions(monster: dict) -> list[CombatActionEntry]:
+    from app.services.combat_recharge import is_legendary_uses_header, parse_legendary_uses
+
     stat_block = monster.get("stat_block_json") or {}
     if not isinstance(stat_block, dict):
         return []
@@ -307,12 +309,20 @@ def monster_to_combat_actions(monster: dict) -> list[CombatActionEntry]:
         prefix="legendary",
     )
     for entry in legendary:
+        if is_legendary_uses_header(entry.name):
+            continue
         name = entry.name
         if not name.lower().startswith("legendary"):
             name = f"{name} (Legendary)"
         entries.append(entry.model_copy(update={"name": name}))
 
     return entries
+
+
+def monster_legendary_actions_max(monster: dict) -> int | None:
+    from app.services.combat_recharge import parse_legendary_uses
+
+    return parse_legendary_uses(monster)
 
 
 def monster_walk_speed(monster: dict) -> int | None:
@@ -385,5 +395,9 @@ def apply_monster_catalog_to_combatant(combatant: EncounterCombatant) -> Encount
         walk = monster_walk_speed(monster)
         if walk is not None:
             updated.speed = walk
+
+    legendary_max = monster_legendary_actions_max(monster)
+    if legendary_max is not None:
+        updated.legendary_actions_max = legendary_max
 
     return updated

@@ -275,15 +275,22 @@ function isWeaponItem(item) {
 }
 
 const WEAPON_PROFILES = [
+  { pattern: /^dagger$/i, dice: "1d4", range: "5 ft Reach", notes: "Simple, Finesse, Light, Thrown", finesse: true },
   { pattern: /rapier/i, dice: "1d8", range: "5 ft Reach", notes: "Martial, Finesse", finesse: true },
-  { pattern: /shortsword|longsword|scimitar|war pick|morningstar/i, dice: "1d8", range: "5 ft Reach", notes: "Martial", finesse: true },
-  { pattern: /greatsword|maul|greataxe|halberd|glaive|pike/i, dice: "1d12", range: "5 ft Reach", notes: "Martial, Heavy" },
-  { pattern: /handaxe|light hammer|sickle|club|dagger|mace|spear/i, dice: "1d6", range: "5 ft Reach", notes: "Simple" },
+  { pattern: /shortsword/i, dice: "1d6", range: "5 ft Reach", notes: "Martial, Finesse, Light", finesse: true },
+  { pattern: /scimitar/i, dice: "1d6", range: "5 ft Reach", notes: "Martial, Finesse, Light", finesse: true },
+  { pattern: /longsword/i, dice: "1d8", range: "5 ft Reach", notes: "Martial, Versatile (1d10)", finesse: false },
+  { pattern: /war pick|morningstar/i, dice: "1d8", range: "5 ft Reach", notes: "Martial", finesse: false },
+  { pattern: /greatsword|maul/i, dice: "2d6", range: "5 ft Reach", notes: "Martial, Heavy, Two-Handed" },
+  { pattern: /greataxe/i, dice: "1d12", range: "5 ft Reach", notes: "Martial, Heavy, Two-Handed" },
+  { pattern: /halberd|glaive|pike/i, dice: "1d10", range: "10 ft Reach", notes: "Martial, Heavy, Reach, Two-Handed" },
+  { pattern: /handaxe|light hammer|sickle|club|mace/i, dice: "1d6", range: "5 ft Reach", notes: "Simple" },
+  { pattern: /spear/i, dice: "1d6", range: "5 ft Reach", notes: "Simple, Thrown, Versatile (1d8)" },
   { pattern: /javelin/i, dice: "1d6", range: "30/120 ft", notes: "Simple, Thrown" },
   { pattern: /shortbow/i, dice: "1d6", range: "80/320 ft", notes: "Simple, Two-Handed" },
   { pattern: /longbow/i, dice: "1d8", range: "150/600 ft", notes: "Martial, Two-Handed, Heavy" },
   { pattern: /light crossbow/i, dice: "1d8", range: "80/320 ft", notes: "Simple, Two-Handed, Loading" },
-  { pattern: /crossbow/i, dice: "1d10", range: "100/400 ft", notes: "Martial, Two-Handed, Loading" },
+  { pattern: /heavy crossbow|crossbow/i, dice: "1d10", range: "100/400 ft", notes: "Martial, Two-Handed, Loading" },
 ];
 
 function weaponProfile(name) {

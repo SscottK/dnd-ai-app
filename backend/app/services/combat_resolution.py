@@ -57,11 +57,18 @@ _MELEE_ATTACK_HINTS = ("unarmed", "talon", "fist", "claw", "bite", "slam", "kick
 class AttackProfile:
     attack_bonus: int | None = None
     damage_dice: str | None = None
+    damage_type: str | None = None
 
 
 def _parse_detail_stats(detail: str | None) -> AttackProfile:
+    from app.services.combat_damage import parse_damage_type
+
     parsed = parse_attack_stats_from_text(detail)
-    return AttackProfile(attack_bonus=parsed.attack_bonus, damage_dice=parsed.damage_dice)
+    return AttackProfile(
+        attack_bonus=parsed.attack_bonus,
+        damage_dice=parsed.damage_dice,
+        damage_type=parse_damage_type(detail),
+    )
 
 
 def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
@@ -85,9 +92,12 @@ def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
                 if isinstance(first, dict) and first.get("dice"):
                     damage_dice = str(first["dice"]).replace(" ", "")
             description = str(row.get("description") or row.get("desc") or "")
+            from app.services.combat_damage import parse_damage_type
+
             profile = AttackProfile(
                 attack_bonus=row.get("attack_bonus"),
                 damage_dice=damage_dice,
+                damage_type=parse_damage_type(description),
             )
             if profile.attack_bonus is None or profile.damage_dice is None:
                 parsed = _parse_detail_stats(description)
@@ -95,6 +105,8 @@ def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
                     profile.attack_bonus = parsed.attack_bonus
                 if profile.damage_dice is None:
                     profile.damage_dice = parsed.damage_dice
+                if profile.damage_type is None:
+                    profile.damage_type = parsed.damage_type
             return profile
     return AttackProfile()
 
@@ -717,7 +729,11 @@ def _resolve_attack_strike(
         advantage=advantage,
         disadvantage=disadvantage,
     )
-    attack_total = attack_roll + int(profile.attack_bonus)
+    from app.services.conditions import get_exhaustion_level
+
+    exhaustion_penalty = 2 * get_exhaustion_level(actor.conditions)
+    attack_bonus = int(profile.attack_bonus) - exhaustion_penalty
+    attack_total = attack_roll + attack_bonus
     target_ac = target.ac
 
     roll_tags = []
@@ -725,6 +741,8 @@ def _resolve_attack_strike(
         roll_tags.append("advantage")
     elif disadvantage and not advantage:
         roll_tags.append("disadvantage")
+    if exhaustion_penalty:
+        roll_tags.append(f"exhaustion -{exhaustion_penalty}")
     tag_text = f" ({', '.join(roll_tags)})" if roll_tags else ""
     dice_label = (
         f"{actor.name} attacks {target.name} with {strike_label} — d20{tag_text}"
@@ -735,7 +753,7 @@ def _resolve_attack_strike(
         format_roll_detail(
             dice_label=dice_label,
             rolls=[attack_roll],
-            modifier=int(profile.attack_bonus),
+            modifier=attack_bonus,
             total=attack_total,
         )
         + (f" vs AC {target_ac}" if target_ac is not None else "")
@@ -749,7 +767,7 @@ def _resolve_attack_strike(
         roller_name=actor.name,
         dice="d20",
         result=attack_roll,
-        bonus=int(profile.attack_bonus),
+        bonus=attack_bonus,
         total=attack_total,
     )
 
@@ -794,6 +812,13 @@ def _resolve_attack_strike(
         profile.damage_dice,
         double_dice=critical,
     )
+    from app.services.combat_damage import apply_damage_modifiers
+
+    applied = apply_damage_modifiers(
+        damage_total,
+        damage_type=profile.damage_type,
+        combatant=target,
+    )
     damage_detail = format_roll_detail(
         dice_label="Damage",
         rolls=damage_rolls,
@@ -802,6 +827,8 @@ def _resolve_attack_strike(
     )
     if critical:
         damage_detail = f"Critical hit! {damage_detail}"
+    if applied.note:
+        damage_detail = f"{damage_detail} → {applied.amount} ({applied.note})"
     messages.append(damage_detail)
     append_log(
         state,
@@ -812,12 +839,12 @@ def _resolve_attack_strike(
         dice=normalized,
         result=sum(damage_rolls),
         bonus=damage_mod,
-        total=damage_total,
+        total=applied.amount,
     )
 
-    hp_before = _apply_damage(target, damage_total)
+    hp_before = _apply_damage(target, applied.amount)
     if hp_before is None:
-        message = f"{target.name} takes {damage_total} damage."
+        message = f"{target.name} takes {applied.amount} damage."
         messages.append(message)
         append_log(
             state,
@@ -828,7 +855,7 @@ def _resolve_attack_strike(
         return messages
 
     message = (
-        f"{target.name} takes {damage_total} damage ({hp_before} → {target.hp} HP)"
+        f"{target.name} takes {applied.amount} damage ({hp_before} → {target.hp} HP)"
         + (" — defeated!" if target.hp == 0 else "")
     )
     messages.append(message)

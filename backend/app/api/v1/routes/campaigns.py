@@ -1002,6 +1002,34 @@ def use_encounter_action(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     try:
+        from app.services.combat_save_effects import looks_like_save_effect, resolve_save_effect
+
+        actor_action = next(
+            (
+                entry
+                for entry in actor.combat_actions
+                if entry.id == resolved_data.action_id
+                or entry.name.casefold() == resolved_data.action_name.casefold()
+            ),
+            None,
+        )
+        save_text = " ".join(
+            part
+            for part in (
+                resolved_data.detail,
+                actor_action.description if actor_action else None,
+                resolved_data.action_name,
+            )
+            if part
+        )
+        will_resolve_save = bool(
+            resolved_data.target_ids
+            and looks_like_save_effect(
+                action_name=resolved_data.action_name,
+                detail=save_text,
+            )
+        )
+
         profile = resolve_attack_profile(
             session,
             campaign_id,
@@ -1012,6 +1040,7 @@ def use_encounter_action(
         )
         will_resolve_attack = bool(
             resolved_data.target_ids
+            and not will_resolve_save
             and is_resolved_attack(
                 action_id=resolved_data.action_id,
                 action_name=resolved_data.action_name,
@@ -1057,7 +1086,20 @@ def use_encounter_action(
                     detail=resolved_data.detail,
                     log_usage=not standard_effect and not self_heal_effect,
                 )
-        if will_resolve_attack:
+        if will_resolve_save:
+            try:
+                action_messages = resolve_save_effect(
+                    state,
+                    actor=actor,
+                    data=resolved_data,
+                    description=actor_action.description if actor_action else None,
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
+        elif will_resolve_attack:
             try:
                 action_messages = resolve_attack(
                     session,

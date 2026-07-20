@@ -440,6 +440,7 @@ class EncounterCombatant(BaseModel):
     death_save_failures: int = Field(default=0, ge=0, le=3)
     death_save_successes: int = Field(default=0, ge=0, le=3)
     death_save_stable: bool = False
+    legendary_actions_max: int | None = Field(default=None, ge=0, le=10)
     hidden_from_players: bool = False
 
     @field_validator("conditions", mode="before")
@@ -468,6 +469,8 @@ class TurnEconomySnapshot(BaseModel):
     readied_action: str | None = None
     readied_trigger: str | None = None
     death_save_rolled: bool = False
+    legendary_uses_remaining: int | None = None
+    spent_recharge_action_ids: list[str] = Field(default_factory=list)
 
 
 class EncounterState(BaseModel):
@@ -488,7 +491,7 @@ class UseActionRequest(BaseModel):
     action_type: str = Field(min_length=1, max_length=32)
     targeting: str = Field(min_length=1, max_length=32)
     target_ids: list[str] = Field(default_factory=list)
-    detail: str | None = Field(default=None, max_length=500)
+    detail: str | None = Field(default=None, max_length=2000)
     trigger: str | None = Field(default=None, max_length=200)
 
 
