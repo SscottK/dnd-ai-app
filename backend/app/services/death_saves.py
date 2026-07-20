@@ -1,4 +1,4 @@
-"""Death saving throws for player characters at 0 HP."""
+"""Death saving throws for player characters at 0 HP (5.5e / 2024)."""
 
 from __future__ import annotations
 
@@ -12,13 +12,25 @@ DEATH_SAVE_ACTION_NAME = "Death Saving Throw"
 
 
 def is_dying_pc(combatant: EncounterCombatant) -> bool:
-    return bool(combatant.is_pc and combatant.hp is not None and combatant.hp <= 0)
+    """True when a PC is at 0 HP and not yet stable (still making death saves)."""
+    if not combatant.is_pc or combatant.hp is None or combatant.hp > 0:
+        return False
+    if getattr(combatant, "death_save_stable", False):
+        return False
+    return True
 
 
 def reset_death_saves_on_revive(combatant: EncounterCombatant) -> None:
     if combatant.hp is not None and combatant.hp > 0:
         combatant.death_save_failures = 0
         combatant.death_save_successes = 0
+        combatant.death_save_stable = False
+
+
+def mark_unstable_on_damage_at_zero(combatant: EncounterCombatant) -> None:
+    """Taking damage at 0 HP while stable makes the creature start dying again."""
+    if combatant.hp is not None and combatant.hp <= 0 and combatant.death_save_stable:
+        combatant.death_save_stable = False
 
 
 def roll_death_save(state: EncounterState, combatant: EncounterCombatant) -> list[str]:
@@ -38,6 +50,7 @@ def roll_death_save(state: EncounterState, combatant: EncounterCombatant) -> lis
         combatant.hp = 1
         combatant.death_save_failures = 0
         combatant.death_save_successes = 0
+        combatant.death_save_stable = False
         message = f"{combatant.name} rolls a 20 on a death save — regains 1 HP!"
     elif roll >= 10:
         combatant.death_save_successes += 1
@@ -69,6 +82,7 @@ def roll_death_save(state: EncounterState, combatant: EncounterCombatant) -> lis
     elif combatant.death_save_successes >= 3:
         combatant.death_save_successes = 0
         combatant.death_save_failures = 0
+        combatant.death_save_stable = True
         stable = f"{combatant.name} stabilizes (3 successes) but remains at 0 HP."
         append_log(state, stable, kind="event", actor=combatant.name)
         messages.append(stable)

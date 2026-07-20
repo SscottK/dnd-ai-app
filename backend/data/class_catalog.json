@@ -340,6 +340,13 @@
             "20": 20
           },
           "recharge": "long_rest"
+        },
+        {
+          "id": "innate-sorcery",
+          "name": "Innate Sorcery",
+          "min_level": 1,
+          "max": 2,
+          "recharge": "long_rest"
         }
       ],
       "actions_by_level": {

@@ -12,6 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.api.schemas import CombatActionEntry, EncounterCombatant
+from app.services.monster_action_parse import deep_merge_monster, enrich_action_row, parse_attack_stats_from_text
 
 _DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "srd-5.2.1" / "monsters.json"
 _DEFAULT_PRIVATE_PATH = (
@@ -121,7 +122,11 @@ def _load_catalog() -> tuple[dict[str, dict], dict[str, dict]]:
                 continue
             key = monster["name"].casefold()
             existing = by_name.get(key) or {}
-            merged = {**existing, **monster}
+            merged = deep_merge_monster(existing, monster) if existing else dict(monster)
+            # Always enrich action prose → structured fields for combat.
+            sb = merged.get("stat_block_json")
+            if isinstance(sb, dict):
+                merged["stat_block_json"] = _enrich_stat_block_actions(sb)
             by_name[key] = merged
             monster_id = str(merged.get("id") or "")
             if monster_id.startswith("srd:"):
@@ -170,6 +175,18 @@ def search_monsters(query: str, *, limit: int = 12) -> list[dict]:
     return matches[: max(1, min(limit, 50))]
 
 
+def _enrich_stat_block_actions(stat_block: dict) -> dict:
+    next_sb = dict(stat_block)
+    for bucket in ("actions", "bonus_actions", "reactions", "legendary_actions"):
+        rows = next_sb.get(bucket)
+        if not isinstance(rows, list):
+            continue
+        next_sb[bucket] = [
+            enrich_action_row(row) if isinstance(row, dict) else row for row in rows
+        ]
+    return next_sb
+
+
 def _infer_targeting(description: str, name: str) -> str:
     from app.services.action_rules import infer_targeting
 
@@ -203,9 +220,13 @@ def _action_entries(
     for index, row in enumerate(rows or []):
         if not isinstance(row, dict) or not row.get("name"):
             continue
+        row = enrich_action_row(row)
         name = str(row["name"]).strip()
         description = str(row.get("description") or row.get("desc") or "").strip()
         attack_bonus = row.get("attack_bonus")
+        if attack_bonus is None:
+            parsed = parse_attack_stats_from_text(description)
+            attack_bonus = parsed.attack_bonus
         damage = _format_damage(row)
         detail_parts = []
         if attack_bonus is not None:
@@ -223,6 +244,12 @@ def _action_entries(
             first = damage_rows[0]
             if isinstance(first, dict) and first.get("dice"):
                 damage_dice = str(first["dice"]).replace(" ", "")
+        if not damage_dice:
+            parsed = parse_attack_stats_from_text(description)
+            damage_dice = parsed.damage_dice
+
+        # Schema caps description length; keep full text for parsing above.
+        stored_description = description[:500] if description else None
 
         entries.append(
             CombatActionEntry(
@@ -230,7 +257,7 @@ def _action_entries(
                 name=name,
                 action_type=action_type,
                 targeting=_infer_targeting(description, name),
-                description=description or None,
+                description=stored_description,
                 attack_bonus=int(attack_bonus) if attack_bonus is not None else None,
                 damage_dice=damage_dice,
             )
@@ -318,7 +345,33 @@ def apply_monster_catalog_to_combatant(combatant: EncounterCombatant) -> Encount
         updated.srd_name = str(monster["name"])
     srd_actions = monster_to_combat_actions(monster)
     if srd_actions:
-        updated.combat_actions = srd_actions
+        existing = updated.combat_actions or []
+        existing_names = {str(entry.name).casefold() for entry in existing}
+        fallback_only = (not existing) or existing_names <= {
+            "attack",
+            "dodge",
+            "dash",
+            "disengage",
+        }
+        if fallback_only:
+            updated.combat_actions = srd_actions
+        else:
+            by_name = {
+                str(entry.name).casefold(): entry for entry in srd_actions if entry.name
+            }
+            patched: list[CombatActionEntry] = []
+            for entry in existing:
+                catalog = by_name.get(str(entry.name).casefold())
+                if catalog is None:
+                    patched.append(entry)
+                    continue
+                updates = {}
+                if entry.attack_bonus is None and catalog.attack_bonus is not None:
+                    updates["attack_bonus"] = catalog.attack_bonus
+                if not entry.damage_dice and catalog.damage_dice:
+                    updates["damage_dice"] = catalog.damage_dice
+                patched.append(entry.model_copy(update=updates) if updates else entry)
+            updated.combat_actions = patched
 
     if updated.hp is None and monster.get("hp_max") is not None:
         updated.hp = int(monster["hp_max"])

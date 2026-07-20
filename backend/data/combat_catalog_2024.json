@@ -79,7 +79,11 @@
       "category": "class_feature",
       "source_class": "Barbarian",
       "description": "You can imbue yourself with a primal power called Rage, a force that grants you extraordinary might and resilience. You can enter it as a Bonus Action if you aren’t wearing Heavy armor. You can enter your Rage the number of times shown for your Barbarian level in the Rages column of the Barbarian Features table. You regain one expended use when you finish a Short Rest , and you regain all expended uses when you finish a Long Rest . While active, your Rage follows the rules below. Damage Resistan",
-      "min_level": 1
+      "min_level": 1,
+      "resource_cost": {
+        "resource_id": "rage",
+        "amount": 1
+      }
     },
     {
       "name": "Instinctive Pounce",
@@ -93,11 +97,15 @@
     {
       "name": "Bardic Inspiration",
       "action_type": "bonus_action",
-      "targeting": "self",
+      "targeting": "one_ally",
       "category": "class_feature",
       "source_class": "Bard",
       "description": "You can supernaturally inspire others through words, music, or dance. This inspiration is represented by your Bardic Inspiration die, which is a d6. Using Bardic Inspiration. As a Bonus Action, you can inspire another creature within 60 feet of yourself who can see or hear you. That creature gains one of your Bardic Inspiration dice. A creature can have only one Bardic Inspiration die at a time. Once within the next hour when the creature fails a D20 Test , the creature can roll the Bardic Inspi",
-      "min_level": 1
+      "min_level": 1,
+      "resource_cost": {
+        "resource_id": "bardic-inspiration",
+        "amount": 1
+      }
     },
     {
       "name": "Countercharm",
@@ -115,7 +123,11 @@
       "category": "class_feature",
       "source_class": "Cleric",
       "description": "You can channel divine energy directly from the Outer Planes to fuel magical effects. You start with two such effects: Divine Spark and Turn Undead, each of which is described below. Each time you use this class’s Channel Divinity, choose which Channel Divinity effect from this class to create. You gain additional effect options at higher Cleric levels. You can use this class’s Channel Divinity twice. You regain one of its expended uses when you finish a Short Rest , and you regain all expended ",
-      "min_level": 2
+      "min_level": 2,
+      "resource_cost": {
+        "resource_id": "channel-divinity",
+        "amount": 1
+      }
     },
     {
       "name": "Divine Intervention",
@@ -263,7 +275,7 @@
       "min_level": 10
     },
     {
-      "name": "Nature’s Veil",
+      "name": "Nature's Veil",
       "action_type": "bonus_action",
       "targeting": "self",
       "category": "class_feature",
@@ -292,7 +304,7 @@
     {
       "name": "Uncanny Dodge",
       "action_type": "reaction",
-      "targeting": "one_enemy",
+      "targeting": "self",
       "category": "class_feature",
       "source_class": "Rogue",
       "description": "When an attacker that you can see hits you with an attack roll, you can take a Reaction to halve the attack’s damage against you (round down).",
@@ -310,11 +322,15 @@
     {
       "name": "Innate Sorcery",
       "action_type": "bonus_action",
-      "targeting": "one_enemy",
+      "targeting": "self",
       "category": "class_feature",
       "source_class": "Sorcerer",
       "description": "An event in your past left an indelible mark on you, infusing you with simmering magic. As a Bonus Action, you can unleash that magic for 1 minute, during which you gain the following benefits: The spell save DC of your Sorcerer spells increases by 1. You have Advantage on the attack rolls of Sorcerer spells you cast. You can use this feature twice, and you regain all expended uses of it when you finish a Long Rest .",
-      "min_level": 1
+      "min_level": 1,
+      "resource_cost": {
+        "resource_id": "innate-sorcery",
+        "amount": 1
+      }
     },
     {
       "name": "Font of Magic",

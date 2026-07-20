@@ -74,7 +74,8 @@ const PASSIVE_TURN_ACTIONS = new Set([
   "ki-empowered-strikes",
   "open-hand-technique",
   "slow-fall",
-  "deflect-missiles",
+  "deflect-attacks",
+  "deflect-missiles", // 2014 alias
   "stillness-of-mind",
   "purity-of-body",
 ]);

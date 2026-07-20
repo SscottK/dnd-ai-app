@@ -15,6 +15,11 @@ from app.services.combat_dice import format_roll_detail, roll_d20_check, roll_di
 from app.services.combat_log import append_log
 from app.services.action_rules import lookup_combat_action, lookup_spell, parse_healing_dice
 from app.services.attack_economy import attack_budget_for_actor, use_weapon_attack
+from app.services.monster_action_parse import (
+    normalize_action_key,
+    parse_attack_stats_from_text,
+    parse_multiattack_plan,
+)
 from app.services.monster_catalog import lookup_monster
 from app.services.weapon_attacks import (
     clean_action_label,
@@ -26,10 +31,6 @@ from app.services.weapon_attacks import (
 _DIRECT_ATTACK_PREFIXES = ("weapon-", "attack-", "std-attack", "npc-attack")
 _SPELL_ATTACK_PREFIX = "spell-"
 _MULTI_ATTACK_ACTIONS = {"flurry of blows": 2}
-_MULTIATTACK_REF_RE = re.compile(
-    r"(\d+)\s+([\w][\w\s-]*?)\s+attacks?",
-    re.IGNORECASE,
-)
 
 
 def _helped_by_advantage(state: EncounterState, actor_id: str) -> bool:
@@ -50,8 +51,6 @@ def _target_is_dodging(state: EncounterState, target_id: str) -> bool:
     return bool(economy and economy.dodging)
 _ON_HIT_RIDERS = frozenset({"stunning strike"})
 _MELEE_ATTACK_HINTS = ("unarmed", "talon", "fist", "claw", "bite", "slam", "kick")
-_TO_HIT_RE = re.compile(r"\+(\d+)\s+to\s+hit", re.IGNORECASE)
-_DAMAGE_DICE_RE = re.compile(r"(\d+d\d+(?:[+-]\d+)?)", re.IGNORECASE)
 
 
 @dataclass
@@ -61,28 +60,23 @@ class AttackProfile:
 
 
 def _parse_detail_stats(detail: str | None) -> AttackProfile:
-    if not detail:
-        return AttackProfile()
-    attack_bonus = None
-    damage_dice = None
-    hit_match = _TO_HIT_RE.search(detail)
-    if hit_match:
-        attack_bonus = int(hit_match.group(1))
-    dice_match = _DAMAGE_DICE_RE.search(detail)
-    if dice_match:
-        damage_dice = dice_match.group(1).replace(" ", "")
-    return AttackProfile(attack_bonus=attack_bonus, damage_dice=damage_dice)
+    parsed = parse_attack_stats_from_text(detail)
+    return AttackProfile(attack_bonus=parsed.attack_bonus, damage_dice=parsed.damage_dice)
 
 
 def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
+    from app.services.monster_action_parse import enrich_action_row
+
     clean_name = clean_action_label(action_name)
+    clean_key = normalize_action_key(clean_name)
     stat_block = monster.get("stat_block_json") or {}
     for bucket in ("actions", "bonus_actions", "reactions"):
         for row in stat_block.get(bucket) or []:
             if not isinstance(row, dict) or not row.get("name"):
                 continue
+            row = enrich_action_row(row)
             row_name = str(row["name"])
-            if row_name != clean_name and row_name.casefold() != clean_name.casefold():
+            if normalize_action_key(row_name) != clean_key:
                 continue
             damage_dice = None
             damage_rows = row.get("damage") or []
@@ -95,10 +89,12 @@ def _srd_action_profile(monster: dict, action_name: str) -> AttackProfile:
                 attack_bonus=row.get("attack_bonus"),
                 damage_dice=damage_dice,
             )
-            if profile.attack_bonus is None:
-                profile = _parse_detail_stats(description)
+            if profile.attack_bonus is None or profile.damage_dice is None:
+                parsed = _parse_detail_stats(description)
+                if profile.attack_bonus is None:
+                    profile.attack_bonus = parsed.attack_bonus
                 if profile.damage_dice is None:
-                    profile.damage_dice = damage_dice
+                    profile.damage_dice = parsed.damage_dice
             return profile
     return AttackProfile()
 
@@ -266,17 +262,43 @@ def _multiattack_strikes(
 ) -> list[tuple[str, AttackProfile]]:
     description = _multiattack_description(monster, detail)
     strikes: list[tuple[str, AttackProfile]] = []
+    plan = parse_multiattack_plan(description)
 
-    if monster is not None:
-        for match in _MULTIATTACK_REF_RE.finditer(description):
-            count = max(1, int(match.group(1)))
-            attack_name = match.group(2).strip()
+    def _profile_for(attack_name: str) -> AttackProfile:
+        if attack_name == "*":
+            return AttackProfile()
+        if monster is not None:
             profile = _srd_action_profile(monster, attack_name)
-            if profile.attack_bonus is None and profile.damage_dice is None:
+            if profile.attack_bonus is not None or profile.damage_dice:
+                return profile
+        for entry in actor.combat_actions:
+            if normalize_action_key(entry.name) != normalize_action_key(attack_name):
                 continue
-            strikes.extend((attack_name, profile) for _ in range(count))
+            profile = AttackProfile(
+                attack_bonus=entry.attack_bonus,
+                damage_dice=entry.damage_dice,
+            )
+            if profile.attack_bonus is None and not profile.damage_dice and entry.description:
+                profile = _parse_detail_stats(entry.description)
+            return profile
+        return AttackProfile()
+
+    for attack_name, count in plan:
+        if attack_name == "*":
+            # Unspecified attacks — fall through to first usable action × count.
+            continue
+        profile = _profile_for(attack_name)
+        if profile.attack_bonus is None and profile.damage_dice is None:
+            continue
+        strikes.extend((attack_name, profile) for _ in range(max(1, count)))
 
     if not strikes:
+        # "makes N attacks" without names, or named parse failed — use first real attack.
+        total = 2
+        for attack_name, count in plan:
+            if attack_name == "*":
+                total = max(1, count)
+                break
         for entry in actor.combat_actions:
             if "multiattack" in entry.name.casefold():
                 continue
@@ -285,11 +307,10 @@ def _multiattack_strikes(
                 damage_dice=entry.damage_dice,
             )
             if profile.attack_bonus is None and not profile.damage_dice and entry.description:
-                parsed = _parse_detail_stats(entry.description)
-                profile = parsed
+                profile = _parse_detail_stats(entry.description)
             if profile.attack_bonus is None and profile.damage_dice is None:
                 continue
-            strikes.extend((entry.name, profile) for _ in range(2))
+            strikes.extend((entry.name, profile) for _ in range(total))
             break
 
     return strikes
@@ -310,7 +331,7 @@ def resolve_attack_profile(
         profile = _parse_detail_stats(detail)
 
     if profile.attack_bonus is None and profile.damage_dice is None:
-        monster = lookup_monster(actor.name)
+        monster = lookup_monster(actor.srd_name or actor.name)
         if monster is not None:
             profile = _srd_action_profile(monster, clean_name)
 
@@ -380,11 +401,22 @@ def _ensure_hp_initialized(combatant: EncounterCombatant) -> None:
 
 
 def _apply_damage(combatant: EncounterCombatant, amount: int) -> int | None:
+    from app.services.death_saves import mark_unstable_on_damage_at_zero, reset_death_saves_on_revive
+
     _ensure_hp_initialized(combatant)
     if combatant.hp is None:
         return None
     before = combatant.hp
+    was_at_zero = before <= 0
     combatant.hp = max(0, combatant.hp - amount)
+    if was_at_zero and amount > 0:
+        mark_unstable_on_damage_at_zero(combatant)
+        # Damage at 0 HP while dying also causes death save failures (1, or 2 on crit —
+        # auto combat doesn't distinguish crits here; apply 1 failure).
+        if not combatant.death_save_stable and combatant.is_pc:
+            combatant.death_save_failures = min(3, combatant.death_save_failures + 1)
+    if combatant.hp > 0:
+        reset_death_saves_on_revive(combatant)
     return before
 
 

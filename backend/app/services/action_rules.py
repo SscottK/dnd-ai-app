@@ -42,7 +42,8 @@ _PASSIVE_TURN_ACTION_NAMES = frozenset(
         "ki-empowered strikes",
         "open hand technique",
         "slow fall",
-        "deflect missiles",
+        "deflect attacks",
+        "deflect missiles",  # 2014 name kept as alias
         "stillness of mind",
         "purity of body",
     }

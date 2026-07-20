@@ -439,6 +439,7 @@ class EncounterCombatant(BaseModel):
     combat_actions: list[CombatActionEntry] = Field(default_factory=list)
     death_save_failures: int = Field(default=0, ge=0, le=3)
     death_save_successes: int = Field(default=0, ge=0, le=3)
+    death_save_stable: bool = False
     hidden_from_players: bool = False
 
     @field_validator("conditions", mode="before")
