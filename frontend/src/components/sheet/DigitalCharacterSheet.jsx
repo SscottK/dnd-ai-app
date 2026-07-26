@@ -1192,7 +1192,7 @@ export function DigitalCharacterSheet({
                   key={tab.id}
                   type="button"
                   onClick={() => setMainTab(tab.id)}
-                    className={`px-2.5 py-2 text-[10px] font-black uppercase tracking-wide sheet:px-3 sheet:py-2.5 sheet:text-sm ${
+                    className={`px-2.5 py-2 text-[10px] font-black uppercase tracking-wide sheet:text-xs ${
                       mainTab === tab.id
                         ? "border-b-2 border-starlight text-starlight"
                         : "text-zinc-500 hover:text-neon-cyan"
