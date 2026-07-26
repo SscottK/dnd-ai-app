@@ -1040,9 +1040,9 @@ export function DigitalCharacterSheet({
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2">
+      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2 lg:h-full lg:min-h-0 lg:max-w-none lg:gap-2 lg:pb-0 xl:max-w-[1400px] 2xl:max-w-[1600px]">
         {/* Identity */}
-        <div className="flex flex-wrap items-end justify-between gap-2 border-b border-neon-cyan/25 pb-2">
+        <div className="flex shrink-0 flex-wrap items-end justify-between gap-2 border-b border-neon-cyan/25 pb-2">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-black uppercase tracking-wide text-starlight">
               {character?.name || "Character"}
@@ -1057,12 +1057,13 @@ export function DigitalCharacterSheet({
               >
                 Level Up
               </Link>
-            )}            <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · tap skills/saves to roll</p>
+            )}
+            <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · tap skills/saves to roll</p>
           </div>
         </div>
 
         {/* Top dashboard: abilities across top, combat across bottom */}
-        <div className="space-y-3 border border-neon-cyan/30 bg-void-panel/40 p-2.5 sm:p-3">
+        <div className="shrink-0 space-y-3 border border-neon-cyan/30 bg-void-panel/40 p-2.5 sm:p-3">
           <div>
             <div className="mb-2 flex items-center gap-1">
               <p className="text-[9px] font-black uppercase tracking-[0.14em] text-neon-cyan">
@@ -1100,114 +1101,116 @@ export function DigitalCharacterSheet({
         </div>
 
         {/* Three-column body */}
-        <div className="space-y-2">
-          <CheckRollControls
-            advantage={advantage}
-            disadvantage={disadvantage}
-            rollBusy={rollBusy}
-            lastRollMessage={lastRollMessage}
-            onChange={({ advantage: nextAdv, disadvantage: nextDis }) => {
-              setAdvantage(nextAdv);
-              setDisadvantage(nextDis);
-            }}
-          />
-          <div className="grid min-h-[24rem] gap-2 lg:grid-cols-12 lg:items-stretch">
-          <div className="flex flex-col gap-2 lg:col-span-3">
-            <ColumnPanel title="Saving Throws" hint={SHEET_SECTION_HINTS.saves}>
-              <SavesList
-                sheet={sheet}
-                onShowDetail={setDetail}
-                onRoll={handleCheckRoll}
-                rollBusy={rollBusy}
-              />
-            </ColumnPanel>
-            <ColumnPanel title="Senses" hint={SHEET_SECTION_HINTS.senses}>
-              <SensesList
-                sheet={sheet}
-                onOpenSenseTypes={() => setSensesPaneOpen(true)}
-              />
-            </ColumnPanel>
-            <ColumnPanel
-              title="Proficiencies & Languages"
-              hint={SHEET_SECTION_HINTS.proficiencies}
-              className="min-h-[6rem] flex-1"
-            >
-              <ProficienciesBlock sheet={sheet} />
-            </ColumnPanel>
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="shrink-0">
+            <CheckRollControls
+              advantage={advantage}
+              disadvantage={disadvantage}
+              rollBusy={rollBusy}
+              lastRollMessage={lastRollMessage}
+              onChange={({ advantage: nextAdv, disadvantage: nextDis }) => {
+                setAdvantage(nextAdv);
+                setDisadvantage(nextDis);
+              }}
+            />
           </div>
-
-          <div className="lg:col-span-3">
-            <ColumnPanel
-              title="Skills"
-              hint={SHEET_SECTION_HINTS.skills}
-              className="h-full min-h-[18rem]"
-            >
-              <SkillsList
-                sheet={sheet}
-                onShowDetail={setDetail}
-                onRoll={handleCheckRoll}
-                rollBusy={rollBusy}
-              />
-            </ColumnPanel>
-          </div>
-
-          <div className="flex min-h-[18rem] flex-col border border-neon-cyan/30 bg-void-panel/50 lg:col-span-6">
-            <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-neon-cyan/25 px-1">
-              {mainTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setMainTab(tab.id)}
-                  className={`px-2.5 py-2 text-[10px] font-black uppercase tracking-wide ${
-                    mainTab === tab.id
-                      ? "border-b-2 border-starlight text-starlight"
-                      : "text-zinc-500 hover:text-neon-cyan"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-              <div className="ml-auto px-1">
-                <InfoTooltip text={activeTab.hint} label={`About ${activeTab.label}`} />
-              </div>
+          <div className="grid min-h-[24rem] flex-1 gap-2 lg:min-h-0 lg:grid-cols-12 lg:items-stretch">
+            <div className="flex min-h-0 flex-col gap-2 lg:col-span-3 lg:h-full">
+              <ColumnPanel title="Saving Throws" hint={SHEET_SECTION_HINTS.saves}>
+                <SavesList
+                  sheet={sheet}
+                  onShowDetail={setDetail}
+                  onRoll={handleCheckRoll}
+                  rollBusy={rollBusy}
+                />
+              </ColumnPanel>
+              <ColumnPanel title="Senses" hint={SHEET_SECTION_HINTS.senses}>
+                <SensesList
+                  sheet={sheet}
+                  onOpenSenseTypes={() => setSensesPaneOpen(true)}
+                />
+              </ColumnPanel>
+              <ColumnPanel
+                title="Proficiencies & Languages"
+                hint={SHEET_SECTION_HINTS.proficiencies}
+                className="min-h-[6rem] flex-1"
+              >
+                <ProficienciesBlock sheet={sheet} />
+              </ColumnPanel>
             </div>
 
-            {mainTab === "actions" && (
-              <div className="flex shrink-0 flex-wrap gap-1 border-b border-zinc-900 px-2 py-1.5">
-                {ACTION_FILTERS.map((filter) => (
+            <div className="min-h-[18rem] lg:col-span-3 lg:h-full lg:min-h-0">
+              <ColumnPanel
+                title="Skills"
+                hint={SHEET_SECTION_HINTS.skills}
+                className="h-full min-h-[18rem] lg:min-h-0"
+              >
+                <SkillsList
+                  sheet={sheet}
+                  onShowDetail={setDetail}
+                  onRoll={handleCheckRoll}
+                  rollBusy={rollBusy}
+                />
+              </ColumnPanel>
+            </div>
+
+            <div className="flex min-h-[18rem] flex-col border border-neon-cyan/30 bg-void-panel/50 lg:col-span-6 lg:h-full lg:min-h-0">
+              <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-neon-cyan/25 px-1">
+                {mainTabs.map((tab) => (
                   <button
-                    key={filter.id}
+                    key={tab.id}
                     type="button"
-                    onClick={() => setActionFilter(filter.id)}
-                    className={`rounded-sm px-2 py-0.5 text-[9px] font-black uppercase ${
-                      actionFilter === filter.id
-                        ? "bg-neon-cyan/15 text-neon-cyan"
-                        : "text-zinc-600 hover:text-starlight"
+                    onClick={() => setMainTab(tab.id)}
+                    className={`px-2.5 py-2 text-[10px] font-black uppercase tracking-wide ${
+                      mainTab === tab.id
+                        ? "border-b-2 border-starlight text-starlight"
+                        : "text-zinc-500 hover:text-neon-cyan"
                     }`}
                   >
-                    {filter.label}
+                    {tab.label}
                   </button>
                 ))}
+                <div className="ml-auto px-1">
+                  <InfoTooltip text={activeTab.hint} label={`About ${activeTab.label}`} />
+                </div>
               </div>
-            )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
               {mainTab === "actions" && (
-                <ActionsPanel sheet={sheet} filter={actionFilter} onShowDetail={setDetail} />
+                <div className="flex shrink-0 flex-wrap gap-1 border-b border-zinc-900 px-2 py-1.5">
+                  {ACTION_FILTERS.map((filter) => (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      onClick={() => setActionFilter(filter.id)}
+                      className={`rounded-sm px-2 py-0.5 text-[9px] font-black uppercase ${
+                        actionFilter === filter.id
+                          ? "bg-neon-cyan/15 text-neon-cyan"
+                          : "text-zinc-600 hover:text-starlight"
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
               )}
-              {mainTab === "spells" && <SpellsBlock sheet={sheet} onShowDetail={setDetail} />}
-              {mainTab === "inventory" && (
-                <InventoryBlock
-                  sheet={sheet}
-                  onSheetChange={onSheetChange}
-                  readOnly={readOnly}
-                />
-              )}
-              {mainTab === "features" && (
-                <FeaturesBlock sheet={sheet} onShowDetail={setDetail} />
-              )}
+
+              <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
+                {mainTab === "actions" && (
+                  <ActionsPanel sheet={sheet} filter={actionFilter} onShowDetail={setDetail} />
+                )}
+                {mainTab === "spells" && <SpellsBlock sheet={sheet} onShowDetail={setDetail} />}
+                {mainTab === "inventory" && (
+                  <InventoryBlock
+                    sheet={sheet}
+                    onSheetChange={onSheetChange}
+                    readOnly={readOnly}
+                  />
+                )}
+                {mainTab === "features" && (
+                  <FeaturesBlock sheet={sheet} onShowDetail={setDetail} />
+                )}
+              </div>
             </div>
-          </div>
           </div>
         </div>
       </div>

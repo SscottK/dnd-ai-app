@@ -64,7 +64,7 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-3 lg:p-6"
+      className="fixed inset-0 z-[300] flex items-stretch justify-center p-0 sm:p-2 lg:p-3"
       role="dialog"
       aria-modal="true"
       aria-labelledby="party-sheet-modal-title"
@@ -76,7 +76,7 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
         onPointerDown={(event) => event.stopPropagation()}
       />
       <div
-        className="relative z-[1] flex h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-sm border-2 border-neon-cyan bg-void shadow-2xl xl:max-w-[1400px]"
+        className="relative z-[1] flex h-full max-h-[100dvh] w-full max-w-[1600px] flex-col overflow-hidden rounded-none border-0 border-neon-cyan bg-void shadow-2xl sm:rounded-sm sm:border-2 lg:max-h-none"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
@@ -120,7 +120,7 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-void px-4 py-4 lg:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-void px-2 py-2 sm:px-4 lg:overflow-hidden lg:px-6 lg:py-3">
           {loading && !character && (
             <p className="text-sm font-mono text-zinc-500">Loading character sheet…</p>
           )}
