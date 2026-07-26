@@ -18,6 +18,7 @@ export function FullSheetModal({
   onUploadPdf,
   onSheetChange,
   onCombatChange,
+  onRollCheck,
 }) {
   const uploadInputRef = useRef(null);
   if (!open || !character) return null;
@@ -171,6 +172,7 @@ export function FullSheetModal({
               onSheetChange={onSheetChange}
               onCombatChange={onCombatChange}
               onLongRest={handleLongRest}
+              onRollCheck={onRollCheck}
             />
           </div>
         </div>

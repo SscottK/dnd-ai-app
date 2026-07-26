@@ -498,7 +498,7 @@ export function SessionPlayPage() {
 
   const rollActionLogCheck = useCallback(
     async (body) => {
-      if (!token || !campaignId || combatActive) return;
+      if (!token || !campaignId || combatActive) return "";
       setCheckRollBusy(true);
       setCheckRollMessage("");
       try {
@@ -506,9 +506,13 @@ export function SessionPlayPage() {
           character_id: characterRef.current?.id,
           ...body,
         });
-        setCheckRollMessage(formatRollEntry(data.entry));
+        const message = formatRollEntry(data.entry);
+        setCheckRollMessage(message);
+        return message;
       } catch (err) {
-        setCheckRollMessage(err.message || "Roll failed.");
+        const message = err.message || "Roll failed.";
+        setCheckRollMessage(message);
+        return message;
       } finally {
         setCheckRollBusy(false);
       }
@@ -1789,6 +1793,7 @@ export function SessionPlayPage() {
           onUploadPdf={handleUploadPdf}
           onSheetChange={onSheetChange}
           onCombatChange={onCombatChange}
+          onRollCheck={combatActive ? undefined : rollActionLogCheck}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Heart, Moon, Shield, X } from "lucide-react";
+import { Heart, Info, Moon, Shield, X } from "lucide-react";
 import {
   collectSheetActionCatalog,
   resolveStandardActions,
@@ -19,6 +19,7 @@ import {
   setProficiencyBonus,
   setSheetSpeed,
 } from "../../lib/characterSheet";
+import { formatRollMessage, rollExpression } from "../../lib/diceRoll";
 import {
   resourceHint,
   SENSE_HINTS,
@@ -125,38 +126,104 @@ function ColumnPanel({ title, hint, children, className = "" }) {
   );
 }
 
-function ListRow({ proficient, expertise, label, value, onClick, meta }) {
+function ListRow({ proficient, expertise, label, value, onClick, onRoll, meta, rollBusy }) {
+  const canRoll = typeof onRoll === "function";
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-2 border-b border-zinc-900/80 py-1 text-left last:border-0 hover:bg-zinc-900/60"
-    >
-      <span
-        className={`h-2.5 w-2.5 shrink-0 rounded-full border ${
-          expertise
-            ? "border-neon-magenta bg-neon-magenta"
-            : proficient
-              ? "border-neon-cyan bg-neon-cyan"
-              : "border-zinc-600"
-        }`}
-      />
-      {meta ? (
-        <span className="w-7 shrink-0 text-[9px] font-mono uppercase text-zinc-600">{meta}</span>
-      ) : null}
-      <span className="min-w-0 flex-1 truncate text-xs text-zinc-300">{label}</span>
-      <span
-        className={`shrink-0 text-xs font-black tabular-nums ${
-          proficient || expertise ? "text-starlight" : "text-zinc-500"
+    <div className="flex items-center gap-0.5 border-b border-zinc-900/80 last:border-0">
+      <button
+        type="button"
+        disabled={rollBusy && canRoll}
+        onClick={() => {
+          if (canRoll) onRoll();
+          else onClick?.();
+        }}
+        title={canRoll ? `Roll ${label}` : undefined}
+        className={`flex min-w-0 flex-1 items-center gap-2 py-1 text-left hover:bg-zinc-900/60 disabled:opacity-50 ${
+          canRoll ? "cursor-pointer" : ""
         }`}
       >
-        {value}
-      </span>
-    </button>
+        <span
+          className={`h-2.5 w-2.5 shrink-0 rounded-full border ${
+            expertise
+              ? "border-neon-magenta bg-neon-magenta"
+              : proficient
+                ? "border-neon-cyan bg-neon-cyan"
+                : "border-zinc-600"
+          }`}
+        />
+        {meta ? (
+          <span className="w-7 shrink-0 text-[9px] font-mono uppercase text-zinc-600">{meta}</span>
+        ) : null}
+        <span className="min-w-0 flex-1 truncate text-xs text-zinc-300">{label}</span>
+        <span
+          className={`shrink-0 text-xs font-black tabular-nums ${
+            proficient || expertise ? "text-starlight" : "text-zinc-500"
+          }`}
+        >
+          {value}
+        </span>
+      </button>
+      {canRoll && onClick && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onClick();
+          }}
+          className="shrink-0 rounded p-1 text-zinc-600 hover:bg-zinc-900 hover:text-neon-cyan"
+          title={`About ${label}`}
+          aria-label={`About ${label}`}
+        >
+          <Info className="h-3 w-3" />
+        </button>
+      )}
+    </div>
   );
 }
 
-function SavesList({ sheet, onShowDetail }) {
+function CheckRollControls({ advantage, disadvantage, rollBusy, lastRollMessage, onChange }) {
+  return (
+    <div className="space-y-1 rounded-sm border border-zinc-800 bg-void-panel/40 px-2.5 py-1.5">
+      <div className="flex flex-wrap items-center gap-3 text-[9px] font-mono text-zinc-500">
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={advantage}
+            disabled={rollBusy}
+            onChange={(event) =>
+              onChange({
+                advantage: event.target.checked,
+                disadvantage: event.target.checked ? false : disadvantage,
+              })
+            }
+          />
+          Adv
+        </label>
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={disadvantage}
+            disabled={rollBusy}
+            onChange={(event) =>
+              onChange({
+                disadvantage: event.target.checked,
+                advantage: event.target.checked ? false : advantage,
+              })
+            }
+          />
+          Dis
+        </label>
+        <span className="text-zinc-600">Tap a skill or save to roll d20 + modifier</span>
+      </div>
+      {lastRollMessage && (
+        <p className="text-[10px] font-mono leading-snug text-neon-cyan">{lastRollMessage}</p>
+      )}
+    </div>
+  );
+}
+
+function SavesList({ sheet, onShowDetail, onRoll, rollBusy }) {
   return (
     <div>
       {(sheet.saving_throws || []).map((save) => {
@@ -167,6 +234,8 @@ function SavesList({ sheet, onShowDetail }) {
             proficient={save.proficient}
             label={ABILITY_LABELS[save.ability]}
             value={formatModifier(bonus)}
+            rollBusy={rollBusy}
+            onRoll={onRoll ? () => onRoll({ roll_kind: "save", label: save.ability }) : undefined}
             onClick={() =>
               onShowDetail({
                 title: `${ABILITY_LABELS[save.ability]} save`,
@@ -272,7 +341,7 @@ function SensesSidePaneBody({ sheet }) {
   );
 }
 
-function SkillsList({ sheet, onShowDetail }) {
+function SkillsList({ sheet, onShowDetail, onRoll, rollBusy }) {
   return (
     <div>
       {(sheet.skills || []).map((skill) => {
@@ -285,6 +354,8 @@ function SkillsList({ sheet, onShowDetail }) {
             meta={ABILITY_LABELS[skill.ability]}
             label={skill.name}
             value={formatModifier(bonus)}
+            rollBusy={rollBusy}
+            onRoll={onRoll ? () => onRoll({ roll_kind: "skill", label: skill.name }) : undefined}
             onClick={() =>
               onShowDetail({
                 title: skill.name,
@@ -885,13 +956,69 @@ export function DigitalCharacterSheet({
   onSheetChange,
   onCombatChange,
   onLongRest,
+  onRollCheck,
   readOnly = false,
 }) {
   const [detail, setDetail] = useState(null);
   const [sensesPaneOpen, setSensesPaneOpen] = useState(false);
   const [mainTab, setMainTab] = useState("actions");
   const [actionFilter, setActionFilter] = useState("all");
+  const [advantage, setAdvantage] = useState(false);
+  const [disadvantage, setDisadvantage] = useState(false);
+  const [lastRollMessage, setLastRollMessage] = useState("");
+  const [rollBusy, setRollBusy] = useState(false);
   const combat = resolveCombatStats(character, sheet);
+
+  const handleCheckRoll = async ({ roll_kind, label }) => {
+    setRollBusy(true);
+    setLastRollMessage("");
+    try {
+      if (onRollCheck) {
+        const message = await onRollCheck({
+          roll_kind,
+          label,
+          advantage,
+          disadvantage,
+        });
+        if (message) setLastRollMessage(message);
+        return;
+      }
+
+      const rollResult = rollExpression("d20", { advantage, disadvantage });
+      let bonus = 0;
+      let rollLabel = label;
+      if (roll_kind === "skill") {
+        const skill = (sheet.skills || []).find(
+          (entry) => entry.name.toLowerCase() === String(label).toLowerCase()
+        );
+        bonus = resolveSkillBonus(skill || { name: label }, sheet);
+        rollLabel = `${label} check`;
+      } else if (roll_kind === "save") {
+        const ability = String(label).toLowerCase();
+        const save =
+          (sheet.saving_throws || []).find((entry) => entry.ability === ability) || {
+            ability,
+            proficient: false,
+          };
+        bonus = resolveSaveBonus(save, sheet);
+        rollLabel = `${ABILITY_LABELS[ability] || ability.toUpperCase()} save`;
+      }
+      const total = rollResult.total + bonus;
+      setLastRollMessage(
+        formatRollMessage({
+          label: rollLabel,
+          kept: rollResult.kept,
+          dropped: rollResult.dropped,
+          bonus,
+          total,
+        })
+      );
+    } catch (err) {
+      setLastRollMessage(err.message || "Roll failed.");
+    } finally {
+      setRollBusy(false);
+    }
+  };
 
   const subtitle = [
     character?.race,
@@ -930,7 +1057,7 @@ export function DigitalCharacterSheet({
               >
                 Level Up
               </Link>
-            )}            <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · click rows for full text</p>
+            )}            <p className="text-[9px] font-mono text-zinc-600">ⓘ tips · tap skills/saves to roll</p>
           </div>
         </div>
 
@@ -973,10 +1100,26 @@ export function DigitalCharacterSheet({
         </div>
 
         {/* Three-column body */}
-        <div className="grid min-h-[24rem] gap-2 lg:grid-cols-12 lg:items-stretch">
+        <div className="space-y-2">
+          <CheckRollControls
+            advantage={advantage}
+            disadvantage={disadvantage}
+            rollBusy={rollBusy}
+            lastRollMessage={lastRollMessage}
+            onChange={({ advantage: nextAdv, disadvantage: nextDis }) => {
+              setAdvantage(nextAdv);
+              setDisadvantage(nextDis);
+            }}
+          />
+          <div className="grid min-h-[24rem] gap-2 lg:grid-cols-12 lg:items-stretch">
           <div className="flex flex-col gap-2 lg:col-span-3">
             <ColumnPanel title="Saving Throws" hint={SHEET_SECTION_HINTS.saves}>
-              <SavesList sheet={sheet} onShowDetail={setDetail} />
+              <SavesList
+                sheet={sheet}
+                onShowDetail={setDetail}
+                onRoll={handleCheckRoll}
+                rollBusy={rollBusy}
+              />
             </ColumnPanel>
             <ColumnPanel title="Senses" hint={SHEET_SECTION_HINTS.senses}>
               <SensesList
@@ -999,7 +1142,12 @@ export function DigitalCharacterSheet({
               hint={SHEET_SECTION_HINTS.skills}
               className="h-full min-h-[18rem]"
             >
-              <SkillsList sheet={sheet} onShowDetail={setDetail} />
+              <SkillsList
+                sheet={sheet}
+                onShowDetail={setDetail}
+                onRoll={handleCheckRoll}
+                rollBusy={rollBusy}
+              />
             </ColumnPanel>
           </div>
 
@@ -1059,6 +1207,7 @@ export function DigitalCharacterSheet({
                 <FeaturesBlock sheet={sheet} onShowDetail={setDetail} />
               )}
             </div>
+          </div>
           </div>
         </div>
       </div>
