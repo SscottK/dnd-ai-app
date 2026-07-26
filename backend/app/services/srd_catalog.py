@@ -334,19 +334,43 @@ def lookup_entry(category: str, name: str) -> dict | None:
     return None
 
 
-def _tokenize(text: str) -> set[str]:
-    return {token for token in re.findall(r"[a-z0-9']+", text.lower()) if len(token) > 2}
+def _tokenize(text: str, *, min_len: int = 1) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9']+", text.casefold())
+        if len(token) >= min_len
+    }
 
 
 def _score_entry(query_tokens: set[str], query_lower: str, entry: dict, *, category: str) -> int:
+    """Rank catalog hits for typeahead / prefix search as well as full-word matches."""
     name = str(entry.get("name") or "")
     name_lower = name.casefold()
+    if not name_lower or not query_lower:
+        return 0
+
+    name_words = list(_tokenize(name_lower, min_len=1))
     score = 0
 
-    if name_lower and name_lower in query_lower:
+    # Full-string matches (strongest)
+    if name_lower == query_lower:
+        score += 200
+    elif name_lower.startswith(query_lower):
+        score += 140
+    elif query_lower in name_lower:
+        score += 90
+    elif name_lower in query_lower:
+        # Query contains the full entry name ("fire bolt details")
         score += 100
-    if name_lower and any(token in name_lower.split() for token in query_tokens):
-        score += 40
+
+    # Token matches: exact word, then prefix (typeahead), then substring
+    for token in query_tokens:
+        if any(word == token for word in name_words):
+            score += 50
+        elif any(word.startswith(token) for word in name_words):
+            score += 40 + min(len(token), 8)
+        elif token in name_lower:
+            score += 12
 
     description = str(entry.get("description") or entry.get("desc") or entry.get("content") or "")
     if category == "monsters":
@@ -362,9 +386,17 @@ def _score_entry(query_tokens: set[str], query_lower: str, entry: dict, *, categ
             )
         )
 
-    desc_tokens = _tokenize(description)
-    overlap = len(query_tokens & desc_tokens)
-    score += min(overlap * 3, 30)
+    # Description: prefer longer query tokens so short prefixes stay name-focused
+    desc_tokens = _tokenize(description, min_len=3)
+    desc_hits = 0
+    for token in query_tokens:
+        if len(token) < 3:
+            continue
+        if token in desc_tokens:
+            desc_hits += 1
+        elif any(dt.startswith(token) for dt in desc_tokens):
+            desc_hits += 1
+    score += min(desc_hits * 3, 30)
 
     tag = str(entry.get("tag") or "")
     if tag and tag.casefold() in query_lower:

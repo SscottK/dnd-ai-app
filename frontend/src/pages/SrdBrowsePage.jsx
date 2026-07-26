@@ -381,7 +381,7 @@ export function SrdBrowsePage() {
     }
     const timer = window.setTimeout(() => {
       void runSearch(trimmedSearch);
-    }, 300);
+    }, 180);
     return () => window.clearTimeout(timer);
   }, [trimmedSearch, runSearch]);
 
