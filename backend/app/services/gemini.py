@@ -96,12 +96,16 @@ async def generate_from_pdf(pdf_bytes: bytes, prompt: str) -> str:
     fallback = _fallback_model()
     try:
         return await generate_content(parts, model=primary)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code not in _RETRYABLE_STATUS or fallback == primary:
+    except Exception as exc:
+        # PDF vision is critical for image-based D&D Beyond sheets — try the
+        # fallback model on any primary failure (not only 429/5xx).
+        if fallback == primary:
             raise
+        status = getattr(getattr(exc, "response", None), "status_code", None)
         logger.warning(
-            "Primary PDF model %s unavailable, trying fallback %s",
+            "Primary PDF model %s failed (%s), trying fallback %s",
             primary,
+            status or type(exc).__name__,
             fallback,
         )
         return await generate_content(parts, model=fallback)

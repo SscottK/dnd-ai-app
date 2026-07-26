@@ -146,31 +146,68 @@ def _is_image_heavy_pdf(raw_text: str) -> bool:
     return _looks_like_empty_template(stripped)
 
 
+def _sanitize_vision_error(vision_error: Exception | None) -> str:
+    """Short, safe cause string for user-facing errors (no API key material)."""
+    if vision_error is None:
+        return ""
+    response = getattr(vision_error, "response", None)
+    status = getattr(response, "status_code", None)
+    body = ""
+    if response is not None:
+        try:
+            body = (response.text or "")[:400].lower()
+        except Exception:
+            body = ""
+    detail = f"{vision_error} {body}".lower()
+    if status == 400 and ("api key" in detail or "api_key" in detail or "invalid" in detail):
+        return "Gemini rejected the API key (HTTP 400)"
+    if status == 403:
+        return "Gemini denied access (HTTP 403 — check API key / billing)"
+    if status == 404:
+        return f"Gemini model not found (HTTP 404 — check GEMINI_MODEL)"
+    if status in {429, 503} or "unavailable" in detail or "resource_exhausted" in detail:
+        return f"Gemini temporarily unavailable (HTTP {status or 'retry'})"
+    if status:
+        return f"Gemini HTTP {status}"
+    name = type(vision_error).__name__
+    if "timeout" in detail or "Timeout" in name:
+        return "Gemini request timed out (PDF vision often takes 45–90s)"
+    if "json" in detail or name in {"JSONDecodeError", "ValueError", "KeyError"}:
+        return f"Gemini response could not be parsed ({name})"
+    return name
+
+
 def _vision_failure_message(*, raw_text: str, vision_error: Exception | None) -> str:
+    cause = _sanitize_vision_error(vision_error)
+    if vision_error is not None:
+        logger.warning("Vision parse failure detail: %s", vision_error)
+
     if not settings.gemini_api_key.strip():
         return (
-            "PDF vision parsing is not configured (GEMINI_API_KEY missing in backend .env). "
-            "Add your API key and restart the backend, or enter character details manually."
+            "PDF vision parsing is not configured (GEMINI_API_KEY missing). "
+            "Set GEMINI_API_KEY on the backend host (local backend/.env or Render env vars) "
+            "and restart, or enter character details manually."
         )
     if _is_image_heavy_pdf(raw_text):
         detail = str(vision_error or "").lower()
-        if "503" in detail or "unavailable" in detail or "429" in detail:
+        if "503" in detail or "unavailable" in detail or "429" in detail or "resource_exhausted" in detail:
             return (
                 "This D&D Beyond PDF is image-based and must be read with Gemini vision. "
                 "Google's API was temporarily unavailable — wait a minute and try Re-sync again. "
                 "Your existing character data was not changed."
             )
+        cause_bit = f" Cause: {cause}." if cause else ""
         return (
             "This D&D Beyond PDF is image-based — the text layer has no character stats "
-            "(only blank sheet labels). The app must read it with Gemini vision, and that step failed. "
-            "Confirm GEMINI_API_KEY is set in backend/.env and restart the backend, then try Re-sync again. "
+            "(only blank sheet labels), so the app must read it with Gemini vision, and that step failed."
+            f"{cause_bit} "
+            "If you are on the live site, confirm GEMINI_API_KEY is set in the Render service env "
+            "(not only local backend/.env). Locally, set backend/.env and restart uvicorn. "
             "Your existing character data was not changed."
         )
-    detail = str(vision_error).strip() if vision_error else ""
-    if detail:
-        logger.warning("Vision parse failure detail: %s", detail)
+    cause_bit = f" ({cause})" if cause else ""
     return (
-        "Could not parse this PDF with vision AI. "
+        f"Could not parse this PDF with vision AI{cause_bit}. "
         "Try re-exporting from D&D Beyond or enter details manually."
     )
 

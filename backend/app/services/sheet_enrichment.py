@@ -249,6 +249,14 @@ def normalize_classes(
             cls_level = 1
         classes.append({"name": class_name.strip(), "level": cls_level, "subclass": None})
 
+    # Single-class sheets: authoritative top-level level wins over a stale
+    # classes[].level left over from a prior level-up or a bad PDF parse.
+    if level is not None and len(classes) == 1:
+        try:
+            classes[0]["level"] = int(level)
+        except (TypeError, ValueError):
+            pass
+
     return classes
 
 
@@ -618,6 +626,110 @@ def attach_action_options(sheet: dict) -> dict:
     return next_sheet
 
 
+def _unlocked_action_names(classes: list[dict]) -> set[str]:
+    """Action names granted by the class catalog at the character's levels."""
+    catalog = _load_class_catalog()
+    unlocked: set[str] = set()
+    for cls in classes:
+        class_spec = catalog.get(cls.get("name") or "") or {}
+        level = int(cls.get("level") or 0)
+        by_level = class_spec.get("actions_by_level") or {}
+        for threshold, names in by_level.items():
+            if level < int(threshold):
+                continue
+            for action_name in names:
+                unlocked.add(_casefold_name(action_name))
+    return unlocked
+
+
+def _gated_action_names() -> set[str]:
+    """All class-catalog action names that unlock at a specific level."""
+    catalog = _load_class_catalog()
+    gated: set[str] = set()
+    for class_spec in catalog.values():
+        by_level = class_spec.get("actions_by_level") or {}
+        for names in by_level.values():
+            for action_name in names:
+                gated.add(_casefold_name(action_name))
+    return gated
+
+
+def _unlocked_resource_ids(classes: list[dict]) -> set[str]:
+    catalog = _load_class_catalog()
+    unlocked: set[str] = set()
+    for cls in classes:
+        class_spec = catalog.get(cls.get("name") or "") or {}
+        level = int(cls.get("level") or 0)
+        for spec in list(class_spec.get("resources") or []) + list(class_spec.get("limited_uses") or []):
+            if level < int(spec.get("min_level") or 1):
+                continue
+            rid = canonical_resource_id(str(spec.get("id") or _slugify(spec.get("name") or "")))
+            if rid:
+                unlocked.add(rid)
+    return unlocked
+
+
+def _gated_resource_ids() -> set[str]:
+    catalog = _load_class_catalog()
+    gated: set[str] = set()
+    for class_spec in catalog.values():
+        for spec in list(class_spec.get("resources") or []) + list(class_spec.get("limited_uses") or []):
+            rid = canonical_resource_id(str(spec.get("id") or _slugify(spec.get("name") or "")))
+            if rid:
+                gated.add(rid)
+    return gated
+
+
+def prune_sheet_to_class_levels(sheet: dict, classes: list[dict]) -> dict:
+    """Drop class features/actions/resources the character has not unlocked yet.
+
+    Stops Action Surge (etc.) from sticking around after a PDF re-sync back to
+    a lower level, whether they came from an old merge or a Gemini hallucination.
+    """
+    if not classes:
+        return sheet
+
+    next_sheet = dict(sheet)
+    unlocked_actions = _unlocked_action_names(classes)
+    gated_actions = _gated_action_names()
+    unlocked_resources = _unlocked_resource_ids(classes)
+    gated_resources = _gated_resource_ids()
+
+    actions = []
+    for entry in next_sheet.get("combat_actions") or []:
+        if not isinstance(entry, dict):
+            continue
+        key = _casefold_name(entry.get("name"))
+        if key in gated_actions and key not in unlocked_actions:
+            continue
+        actions.append(entry)
+    next_sheet["combat_actions"] = actions
+
+    features = []
+    for entry in next_sheet.get("features") or []:
+        if not isinstance(entry, dict):
+            continue
+        key = _casefold_name(entry.get("name"))
+        # Strip parenthetical uses: "Action Surge (one use)"
+        base = key.split("(")[0].strip()
+        if (base in gated_actions or key in gated_actions) and base not in unlocked_actions and key not in unlocked_actions:
+            continue
+        features.append(entry)
+    next_sheet["features"] = features
+
+    resources = []
+    for entry in next_sheet.get("resources") or []:
+        if not isinstance(entry, dict):
+            continue
+        rid = canonical_resource_id(str(entry.get("id") or entry.get("name") or ""))
+        if rid in gated_resources and rid not in unlocked_resources:
+            continue
+        resources.append(entry)
+    next_sheet["resources"] = resources
+
+    return next_sheet
+
+
 def enrich_sheet_pipeline(
     sheet: dict,
     *,
@@ -636,6 +748,7 @@ def enrich_sheet_pipeline(
     next_sheet = attach_action_options(next_sheet)
     enriched = enrich_sheet_actions(next_sheet)
     enriched = _apply_catalog_options(enriched)
+    enriched = prune_sheet_to_class_levels(enriched, classes)
     from app.services.character_sheet import computed_initiative_bonus
 
     enriched["initiative_bonus"] = computed_initiative_bonus(enriched)

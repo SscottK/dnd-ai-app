@@ -118,6 +118,13 @@ def _resource_merge_key(entry: dict[str, Any]) -> str:
 
 
 def merge_sheet_on_resync(old_sheet: dict[str, Any], new_sheet: dict[str, Any]) -> dict[str, Any]:
+    """Merge player runtime state onto a freshly parsed PDF sheet.
+
+    Preserves equipped toggles, notes, conditions, and *current* resource
+    counters for pools the new parse still has. Does **not** keep old
+    class resources/actions that the new parse omitted — those are rebuilt
+    by enrichment at the correct level (so leveling down drops Action Surge).
+    """
     merged = dict(new_sheet)
     old_overrides = dict(old_sheet.get("equipped_overrides") or {})
     new_overrides = dict(new_sheet.get("equipped_overrides") or {})
@@ -139,19 +146,21 @@ def merge_sheet_on_resync(old_sheet: dict[str, Any], new_sheet: dict[str, Any]) 
         if _resource_merge_key(entry)
     }
     resources: list[dict[str, Any]] = []
-    seen_resource_keys: set[str] = set()
     for entry in new_sheet.get("resources") or []:
         merged_entry = dict(entry)
         key = _resource_merge_key(entry)
-        seen_resource_keys.add(key)
         old_entry = old_resources.get(key)
         if old_entry is not None and old_entry.get("current") is not None:
-            merged_entry["current"] = old_entry["current"]
+            # Keep spent uses, but never above the new max.
+            try:
+                new_max = merged_entry.get("max")
+                current = int(old_entry["current"])
+                if new_max is not None:
+                    current = min(current, int(new_max))
+                merged_entry["current"] = current
+            except (TypeError, ValueError):
+                merged_entry["current"] = old_entry["current"]
         resources.append(merged_entry)
-    for key, old_entry in old_resources.items():
-        if key in seen_resource_keys:
-            continue
-        resources.append(dict(old_entry))
     if resources:
         merged["resources"] = resources
 
