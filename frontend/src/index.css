@@ -66,8 +66,18 @@
     touch-action: manipulation;
   }
 
-  /* Keep digital sheet readable without forcing a page scroll on 1080p or 2K. */
+  /* Digital sheet zoom: stronger shrink on 1080p, milder on 2K+. */
   .digital-sheet-root {
-    zoom: 0.8;
+    zoom: 0.7;
+  }
+
+  .digital-sheet-root.sheet-scale {
+    zoom: 0.75;
+  }
+
+  @media (min-width: 1600px) and (min-resolution: 1.15dppx) {
+    .digital-sheet-root {
+      zoom: 0.75;
+    }
   }
 }
