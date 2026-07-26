@@ -5,6 +5,7 @@ import { DigitalCharacterSheet } from "./DigitalCharacterSheet";
 import { resolveCombatStats } from "../../lib/characterSheet";
 import { applyLongRest } from "../../lib/longRest";
 import { confirmPdfReplace } from "../../lib/pdfReplace";
+import { useSheetScale } from "../../hooks/useSheetScale";
 
 export function FullSheetModal({
   open,
@@ -21,6 +22,7 @@ export function FullSheetModal({
   onRollCheck,
 }) {
   const uploadInputRef = useRef(null);
+  const sheetScale = useSheetScale();
   if (!open || !character) return null;
 
   const hasPdf = !!character.pdf_url;
@@ -58,7 +60,11 @@ export function FullSheetModal({
         aria-label="Close digital sheet"
         onClick={onClose}
       />
-      <div className="relative flex h-[92vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black sheet:max-w-[1600px]">
+      <div
+        className={`relative flex h-[92vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black sheet:max-w-[min(96vw,1900px)] ${
+          sheetScale ? "sheet-scale" : ""
+        }`}
+      >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-neon-magenta bg-zinc-950 px-4 py-3">
           <div className="min-w-0">
             <h2 className="text-sm font-black uppercase text-starlight">{character.name}</h2>

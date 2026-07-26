@@ -32,14 +32,14 @@ export function AbilityScoresGrid({
 
   if (isDashboard) {
     const scoreBadge =
-      "mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-neon-cyan/45 bg-zinc-950 p-0 text-center text-[10px] font-black leading-none tabular-nums text-starlight sheet:h-10 sheet:w-10 sheet:text-sm";
+      "mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full border border-neon-cyan/45 bg-zinc-950 p-0 text-center text-[10px] font-black leading-none tabular-nums text-starlight sheet:h-12 sheet:w-12 sheet:text-base";
     const scoreInput =
       `${scoreBadge} appearance-none border-neon-cyan/50 focus:border-neon-cyan focus:outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
     const shell =
-      "flex w-full flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1 py-1.5 sheet:min-h-[6rem] sheet:px-2 sheet:py-3";
+      "flex w-full flex-col items-center justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1 py-1.5 sheet:min-h-[7.5rem] sheet:px-3 sheet:py-4";
 
     return (
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-2 sheet:gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-2 sheet:gap-4">
         {ABILITIES.map((key) => {
           const score = sheet.abilities?.[key];
           const mod = abilityModifier(score);
@@ -47,10 +47,10 @@ export function AbilityScoresGrid({
           if (editable) {
             return (
               <label key={key} className={`${shell} focus-within:border-neon-cyan`}>
-                <span className="text-[9px] font-black uppercase tracking-wide text-zinc-500 sheet:text-xs">
+                <span className="text-[9px] font-black uppercase tracking-wide text-zinc-500 sheet:text-sm">
                   {ABILITY_LABELS[key]}
                 </span>
-                <span className="my-1 text-xl font-black leading-none text-starlight sheet:my-1.5 sheet:text-4xl">
+                <span className="my-1 text-xl font-black leading-none text-starlight sheet:my-2 sheet:text-5xl">
                   {formatModifier(mod)}
                 </span>
                 <input
@@ -78,10 +78,10 @@ export function AbilityScoresGrid({
               }
               className={`${shell} hover:border-neon-cyan hover:bg-neon-cyan/5`}
             >
-              <span className="text-[9px] font-black uppercase tracking-wide text-zinc-500 sheet:text-xs">
+              <span className="text-[9px] font-black uppercase tracking-wide text-zinc-500 sheet:text-sm">
                 {ABILITY_LABELS[key]}
               </span>
-              <span className="my-1 text-xl font-black leading-none text-starlight sheet:my-1.5 sheet:text-4xl">
+              <span className="my-1 text-xl font-black leading-none text-starlight sheet:my-2 sheet:text-5xl">
                 {formatModifier(mod)}
               </span>
               <span className={scoreBadge}>{score ?? "—"}</span>

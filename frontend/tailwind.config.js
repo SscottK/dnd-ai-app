@@ -1,17 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+// Tailwind v4 reads theme/variants from CSS (@theme, @custom-variant in index.css).
+// This file is unused by the PostCSS pipeline; kept only for tooling that still looks for it.
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,jsx}",
-  ],
-  theme: {
-    extend: {
-      screens: {
-        // Fires on ~2K (2560) even with common 125% OS scaling (~2048 CSS px).
-        // Stays off for 1080p (1920 CSS px at 100%).
-        sheet: "2000px",
-      },
-    },
-  },
-  plugins: [],
+  content: ["./index.html", "./src/**/*.{js,jsx}"],
 }

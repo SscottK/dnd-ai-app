@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/*
+  Large-display sheet scaling. JS adds `.sheet-scale` when the physical
+  display is ~2K+ (see useSheetScale). Tailwind v4 ignores JS theme.screens,
+  so this variant must live in CSS.
+*/
+@custom-variant sheet (&:where(.sheet-scale, .sheet-scale *));
+
 /* Neon Odyssey — readable void-space UI; neon reserved for accents, not body copy */
 @theme {
   --color-void: #0c0a14;

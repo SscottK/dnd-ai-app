@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { RefreshCw, X } from "lucide-react";
 import { apiFetch } from "../../lib/api";
 import { parseSheetJson } from "../../lib/characterSheet";
+import { useSheetScale } from "../../hooks/useSheetScale";
 import { DigitalCharacterSheet } from "./DigitalCharacterSheet";
 
 export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
@@ -10,6 +11,7 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
   const [sheet, setSheet] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const sheetScale = useSheetScale();
 
   const loadCharacter = useCallback(async () => {
     if (!token || !characterId) return;
@@ -76,7 +78,9 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
         onPointerDown={(event) => event.stopPropagation()}
       />
       <div
-        className="relative z-[1] flex h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-sm border-2 border-neon-cyan bg-void shadow-2xl sheet:max-w-[1600px]"
+        className={`relative z-[1] flex h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-sm border-2 border-neon-cyan bg-void shadow-2xl sheet:max-w-[min(96vw,1900px)] ${
+          sheetScale ? "sheet-scale" : ""
+        }`}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
