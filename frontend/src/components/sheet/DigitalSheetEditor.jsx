@@ -154,7 +154,7 @@ export function DigitalSheetEditor({ character, token, onSaved }) {
           </div>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 xl:px-5 xl:py-4">
         <DigitalCharacterSheet
           character={localCharacter}
           sheet={sheet}

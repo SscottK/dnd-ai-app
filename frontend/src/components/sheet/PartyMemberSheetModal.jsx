@@ -76,7 +76,7 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
         onPointerDown={(event) => event.stopPropagation()}
       />
       <div
-        className="relative z-[1] flex h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-sm border-2 border-neon-cyan bg-void shadow-2xl xl:max-w-[1400px]"
+        className="relative z-[1] flex h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-sm border-2 border-neon-cyan bg-void shadow-2xl xl:max-w-[1400px] 2xl:max-w-[1600px]"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >

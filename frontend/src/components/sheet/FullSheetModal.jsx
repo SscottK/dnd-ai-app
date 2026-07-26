@@ -58,7 +58,7 @@ export function FullSheetModal({
         aria-label="Close digital sheet"
         onClick={onClose}
       />
-      <div className="relative flex h-[90vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black">
+      <div className="relative flex h-[92vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black xl:max-w-[1400px] 2xl:max-w-[1600px]">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-neon-magenta bg-zinc-950 px-4 py-3">
           <div className="min-w-0">
             <h2 className="text-sm font-black uppercase text-starlight">{character.name}</h2>
