@@ -7,8 +7,9 @@ export default {
   theme: {
     extend: {
       screens: {
-        // True ultrawide / 1440p+ desktop — not 1080p (1920px), which matches xl/2xl.
-        sheet: "2400px",
+        // Fires on ~2K (2560) even with common 125% OS scaling (~2048 CSS px).
+        // Stays off for 1080p (1920 CSS px at 100%).
+        sheet: "2000px",
       },
     },
   },
