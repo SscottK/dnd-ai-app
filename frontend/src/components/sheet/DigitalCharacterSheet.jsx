@@ -113,7 +113,7 @@ function SheetSidePane({ open, title, onClose, children }) {
 function ColumnPanel({ title, hint, children, className = "" }) {
   return (
     <section
-      className={`flex min-h-0 flex-col border border-neon-cyan/30 bg-void-panel/50 ${className}`}
+      className={`flex flex-col border border-neon-cyan/30 bg-void-panel/50 ${className}`}
     >
       <header className="flex shrink-0 items-center gap-1 border-b border-neon-cyan/25 px-2.5 py-1.5 xl:px-3 xl:py-2">
         <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-neon-cyan xl:text-xs 2xl:text-sm">
@@ -121,7 +121,7 @@ function ColumnPanel({ title, hint, children, className = "" }) {
         </h3>
         <InfoTooltip text={hint} label={`About ${title}`} />
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1.5 xl:px-2.5 xl:py-2">{children}</div>
+      <div className="px-2 py-1.5 xl:px-2.5 xl:py-2">{children}</div>
     </section>
   );
 }
@@ -740,29 +740,35 @@ function ActionsPanel({ sheet, filter, onShowDetail }) {
   const showEmptyMessage = !hasContent;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 xl:space-y-3">
       {showAttacks && attacks.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[420px] text-left text-[11px] xl:text-sm">
+          <table className="w-full min-w-[420px] text-left text-[11px] xl:text-sm 2xl:text-base">
             <thead>
-              <tr className="border-b border-neon-cyan/25 text-[9px] uppercase text-zinc-500">
-                <th className="px-1.5 py-1 font-black">Attack</th>
-                <th className="px-1.5 py-1 font-black">Range</th>
-                <th className="px-1.5 py-1 font-black">Hit / DC</th>
-                <th className="px-1.5 py-1 font-black">Damage</th>
-                <th className="px-1.5 py-1 font-black">Notes</th>
+              <tr className="border-b border-neon-cyan/25 text-[9px] uppercase text-zinc-500 xl:text-[11px] 2xl:text-xs">
+                <th className="px-1.5 py-1 font-black xl:px-2 xl:py-1.5">Attack</th>
+                <th className="px-1.5 py-1 font-black xl:px-2 xl:py-1.5">Range</th>
+                <th className="px-1.5 py-1 font-black xl:px-2 xl:py-1.5">Hit / DC</th>
+                <th className="px-1.5 py-1 font-black xl:px-2 xl:py-1.5">Damage</th>
+                <th className="px-1.5 py-1 font-black xl:px-2 xl:py-1.5">Notes</th>
               </tr>
             </thead>
             <tbody>
               {attacks.map((attack) => (
                 <tr key={attack.id} className="border-b border-zinc-900/80">
-                  <td className="px-1.5 py-1.5 font-semibold text-neon-cyan">{attack.name}</td>
-                  <td className="px-1.5 py-1.5 text-zinc-500">{attack.range}</td>
-                  <td className="px-1.5 py-1.5 font-black tabular-nums text-starlight">
+                  <td className="px-1.5 py-1.5 font-semibold text-neon-cyan xl:px-2 xl:py-2">
+                    {attack.name}
+                  </td>
+                  <td className="px-1.5 py-1.5 text-zinc-500 xl:px-2 xl:py-2">{attack.range}</td>
+                  <td className="px-1.5 py-1.5 font-black tabular-nums text-starlight xl:px-2 xl:py-2">
                     {attack.toHit != null ? formatModifier(attack.toHit) : "—"}
                   </td>
-                  <td className="px-1.5 py-1.5 text-zinc-300">{attack.damage || "—"}</td>
-                  <td className="px-1.5 py-1.5 text-zinc-600">{attack.notes || "—"}</td>
+                  <td className="px-1.5 py-1.5 text-zinc-300 xl:px-2 xl:py-2">
+                    {attack.damage || "—"}
+                  </td>
+                  <td className="px-1.5 py-1.5 text-zinc-600 xl:px-2 xl:py-2">
+                    {attack.notes || "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -771,7 +777,7 @@ function ActionsPanel({ sheet, filter, onShowDetail }) {
       )}
 
       {showStandards && (
-        <p className="text-[11px] leading-snug text-zinc-600">
+        <p className="text-[11px] leading-snug text-zinc-600 xl:text-sm 2xl:text-base">
           <span className="font-black uppercase text-zinc-500">Actions in Combat: </span>
           {standardActions.map((action) => action.name).join(", ")}
         </p>
@@ -790,17 +796,19 @@ function ActionsPanel({ sheet, filter, onShowDetail }) {
                   body: action.description || action.detail || "No description.",
                 })
               }
-              className="flex w-full items-start justify-between gap-2 py-1.5 text-left hover:bg-zinc-900/60"
+              className="flex w-full items-start justify-between gap-2 py-1.5 text-left hover:bg-zinc-900/60 xl:gap-3 xl:py-2.5"
             >
               <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold text-starlight">{action.name}</p>
+                <p className="truncate text-[11px] font-semibold text-starlight xl:text-sm 2xl:text-base">
+                  {action.name}
+                </p>
                 {(action.description || action.detail) && (
-                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500 xl:text-xs 2xl:text-sm">
                     {action.description || action.detail}
                   </p>
                 )}
               </div>
-              <span className="shrink-0 text-[9px] font-black uppercase text-zinc-600">
+              <span className="shrink-0 text-[9px] font-black uppercase text-zinc-600 xl:text-[10px] 2xl:text-xs">
                 {ACTION_TYPE_LABELS[action.actionType] || "Action"}
               </span>
             </button>
@@ -809,7 +817,9 @@ function ActionsPanel({ sheet, filter, onShowDetail }) {
       )}
 
       {showEmptyMessage && EMPTY_FILTER_MESSAGES[filter] && (
-        <p className="text-[11px] leading-snug text-zinc-600">{EMPTY_FILTER_MESSAGES[filter]}</p>
+        <p className="text-[11px] leading-snug text-zinc-600 xl:text-sm">
+          {EMPTY_FILTER_MESSAGES[filter]}
+        </p>
       )}
     </div>
   );
@@ -828,20 +838,20 @@ function InventoryBlock({ sheet, onSheetChange, readOnly = false }) {
   return (
     <div className="space-y-1">
       {!sheet.inventory?.length && (
-        <p className="text-[11px] text-zinc-600">No gear on sheet yet.</p>
+        <p className="text-[11px] text-zinc-600 xl:text-sm">No gear on sheet yet.</p>
       )}
       {sheet.inventory?.map((item, index) => {
         const equipped = !!item.equipped;
         return (
           <div
             key={item.id || index}
-            className={`flex items-center gap-2 border-b border-zinc-900/80 py-1.5 last:border-0 ${
+            className={`flex items-center gap-2 border-b border-zinc-900/80 py-1.5 last:border-0 xl:gap-3 xl:py-2.5 ${
               equipped ? "bg-starlight/5" : ""
             }`}
           >
             {readOnly ? (
               <span
-                className={`shrink-0 text-[9px] font-black uppercase ${
+                className={`shrink-0 text-[9px] font-black uppercase xl:text-[10px] 2xl:text-xs ${
                   equipped ? "text-starlight" : "text-zinc-600"
                 }`}
               >
@@ -851,7 +861,7 @@ function InventoryBlock({ sheet, onSheetChange, readOnly = false }) {
               <button
                 type="button"
                 onClick={() => updateItem(index, { equipped: !equipped })}
-                className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-black uppercase xl:px-2 xl:py-1 xl:text-[10px] 2xl:text-xs ${
                   equipped
                     ? "bg-starlight text-black"
                     : "border border-zinc-700 text-zinc-500"
@@ -860,11 +870,17 @@ function InventoryBlock({ sheet, onSheetChange, readOnly = false }) {
                 {equipped ? "Eq" : "Stow"}
               </button>
             )}
-            <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-300">{item.name}</span>
+            <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-300 xl:text-sm 2xl:text-base">
+              {item.name}
+            </span>
             {itemAffectsAc(item) && (
-              <span className="text-[9px] font-black text-neon-cyan">AC</span>
+              <span className="text-[9px] font-black text-neon-cyan xl:text-[10px] 2xl:text-xs">
+                AC
+              </span>
             )}
-            <span className="text-[11px] tabular-nums text-zinc-600">×{item.qty ?? 1}</span>
+            <span className="text-[11px] tabular-nums text-zinc-600 xl:text-sm 2xl:text-base">
+              ×{item.qty ?? 1}
+            </span>
           </div>
         );
       })}
@@ -875,7 +891,7 @@ function InventoryBlock({ sheet, onSheetChange, readOnly = false }) {
 function SpellsBlock({ sheet, onShowDetail }) {
   const spells = sheet.spells || [];
   if (!spells.length) {
-    return <p className="text-[11px] text-zinc-600">No spells parsed yet.</p>;
+    return <p className="text-[11px] text-zinc-600 xl:text-sm">No spells parsed yet.</p>;
   }
 
   const byLevel = spells.reduce((groups, spell) => {
@@ -889,10 +905,10 @@ function SpellsBlock({ sheet, onShowDetail }) {
   const levels = Object.keys(byLevel).sort((left, right) => Number(left) - Number(right));
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 xl:space-y-3">
       {levels.map((level) => (
         <div key={level}>
-          <p className="border-b border-neon-cyan/20 pb-1 text-[9px] font-black uppercase text-zinc-500">
+          <p className="border-b border-neon-cyan/20 pb-1 text-[9px] font-black uppercase text-zinc-500 xl:text-[11px] 2xl:text-xs">
             {Number(level) === 0 ? "Cantrips" : `Level ${level}`}
           </p>
           <div>
@@ -913,13 +929,13 @@ function SpellsBlock({ sheet, onShowDetail }) {
                     body: spell.description || "No description.",
                   })
                 }
-                className="flex w-full items-center justify-between gap-2 border-b border-zinc-900/80 py-1.5 text-left last:border-0 hover:bg-zinc-900/60"
+                className="flex w-full items-center justify-between gap-2 border-b border-zinc-900/80 py-1.5 text-left last:border-0 hover:bg-zinc-900/60 xl:py-2.5"
               >
-                <span className="truncate text-[11px] font-semibold text-starlight">
+                <span className="truncate text-[11px] font-semibold text-starlight xl:text-sm 2xl:text-base">
                   {spell.name}
                 </span>
                 {spell.concentration && (
-                  <span className="shrink-0 text-[9px] font-black uppercase text-neon-magenta">
+                  <span className="shrink-0 text-[9px] font-black uppercase text-neon-magenta xl:text-[10px] 2xl:text-xs">
                     C
                   </span>
                 )}
@@ -936,7 +952,7 @@ function FeaturesBlock({ sheet, onShowDetail }) {
   return (
     <div>
       {!sheet.features?.length && (
-        <p className="py-1 text-[11px] text-zinc-600">No features parsed yet.</p>
+        <p className="py-1 text-[11px] text-zinc-600 xl:text-sm">No features parsed yet.</p>
       )}
       {sheet.features?.map((feat, index) => (
         <button
@@ -949,18 +965,22 @@ function FeaturesBlock({ sheet, onShowDetail }) {
               body: feat.description || "No description.",
             })
           }
-          className="flex w-full items-start justify-between gap-2 border-b border-zinc-900/80 py-1.5 text-left last:border-0 hover:bg-zinc-900/60"
+          className="flex w-full items-start justify-between gap-2 border-b border-zinc-900/80 py-1.5 text-left last:border-0 hover:bg-zinc-900/60 xl:gap-3 xl:py-2.5"
         >
           <div className="min-w-0">
-            <p className="truncate text-[11px] font-semibold text-starlight">{feat.name}</p>
+            <p className="truncate text-[11px] font-semibold text-starlight xl:text-sm 2xl:text-base">
+              {feat.name}
+            </p>
             {feat.description && (
-              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500">
+              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-zinc-500 xl:text-xs 2xl:text-sm">
                 {feat.description}
               </p>
             )}
           </div>
           {feat.source && (
-            <span className="shrink-0 text-[9px] uppercase text-zinc-600">{feat.source}</span>
+            <span className="shrink-0 text-[9px] uppercase text-zinc-600 xl:text-[10px] 2xl:text-xs">
+              {feat.source}
+            </span>
           )}
         </button>
       ))}
@@ -1058,7 +1078,7 @@ export function DigitalCharacterSheet({
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2 lg:h-full lg:min-h-0 lg:max-w-none lg:gap-2 lg:pb-0 xl:max-w-[1400px] 2xl:max-w-[1600px]">
+      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-4 xl:max-w-[1400px] xl:gap-4 2xl:max-w-[1600px]">
         {/* Identity */}
         <div className="flex shrink-0 flex-wrap items-end justify-between gap-2 border-b border-neon-cyan/25 pb-2">
           <div className="min-w-0">
@@ -1123,21 +1143,19 @@ export function DigitalCharacterSheet({
         </div>
 
         {/* Three-column body */}
-        <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <div className="shrink-0">
-            <CheckRollControls
-              advantage={advantage}
-              disadvantage={disadvantage}
-              rollBusy={rollBusy}
-              lastRollMessage={lastRollMessage}
-              onChange={({ advantage: nextAdv, disadvantage: nextDis }) => {
-                setAdvantage(nextAdv);
-                setDisadvantage(nextDis);
-              }}
-            />
-          </div>
-          <div className="grid min-h-[24rem] flex-1 gap-2 lg:min-h-0 lg:grid-cols-12 lg:items-stretch">
-            <div className="flex min-h-0 flex-col gap-2 lg:col-span-3 lg:h-full">
+        <div className="flex flex-col gap-2 xl:gap-3">
+          <CheckRollControls
+            advantage={advantage}
+            disadvantage={disadvantage}
+            rollBusy={rollBusy}
+            lastRollMessage={lastRollMessage}
+            onChange={({ advantage: nextAdv, disadvantage: nextDis }) => {
+              setAdvantage(nextAdv);
+              setDisadvantage(nextDis);
+            }}
+          />
+          <div className="grid gap-2 lg:grid-cols-12 lg:items-start xl:gap-3">
+            <div className="flex flex-col gap-2 lg:col-span-3 xl:gap-3">
               <ColumnPanel title="Saving Throws" hint={SHEET_SECTION_HINTS.saves}>
                 <SavesList
                   sheet={sheet}
@@ -1155,18 +1173,13 @@ export function DigitalCharacterSheet({
               <ColumnPanel
                 title="Proficiencies & Languages"
                 hint={SHEET_SECTION_HINTS.proficiencies}
-                className="min-h-[6rem] flex-1"
               >
                 <ProficienciesBlock sheet={sheet} />
               </ColumnPanel>
             </div>
 
-            <div className="min-h-[18rem] lg:col-span-3 lg:h-full lg:min-h-0">
-              <ColumnPanel
-                title="Skills"
-                hint={SHEET_SECTION_HINTS.skills}
-                className="h-full min-h-[18rem] lg:min-h-0"
-              >
+            <div className="lg:col-span-3">
+              <ColumnPanel title="Skills" hint={SHEET_SECTION_HINTS.skills}>
                 <SkillsList
                   sheet={sheet}
                   onShowDetail={setDetail}
@@ -1176,7 +1189,7 @@ export function DigitalCharacterSheet({
               </ColumnPanel>
             </div>
 
-            <div className="flex min-h-[18rem] flex-col border border-neon-cyan/30 bg-void-panel/50 lg:col-span-6 lg:h-full lg:min-h-0">
+            <div className="flex flex-col border border-neon-cyan/30 bg-void-panel/50 lg:col-span-6">
               <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-neon-cyan/25 px-1">
                 {mainTabs.map((tab) => (
                   <button
@@ -1198,13 +1211,13 @@ export function DigitalCharacterSheet({
               </div>
 
               {mainTab === "actions" && (
-                <div className="flex shrink-0 flex-wrap gap-1 border-b border-zinc-900 px-2 py-1.5">
+                <div className="flex shrink-0 flex-wrap gap-1 border-b border-zinc-900 px-2 py-1.5 xl:gap-1.5 xl:px-3 xl:py-2">
                   {ACTION_FILTERS.map((filter) => (
                     <button
                       key={filter.id}
                       type="button"
                       onClick={() => setActionFilter(filter.id)}
-                      className={`rounded-sm px-2 py-0.5 text-[9px] font-black uppercase ${
+                      className={`rounded-sm px-2 py-0.5 text-[9px] font-black uppercase xl:px-2.5 xl:py-1 xl:text-[10px] 2xl:text-xs ${
                         actionFilter === filter.id
                           ? "bg-neon-cyan/15 text-neon-cyan"
                           : "text-zinc-600 hover:text-starlight"
@@ -1216,7 +1229,7 @@ export function DigitalCharacterSheet({
                 </div>
               )}
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
+              <div className="p-2.5 xl:p-3 2xl:p-4">
                 {mainTab === "actions" && (
                   <ActionsPanel sheet={sheet} filter={actionFilter} onShowDetail={setDetail} />
                 )}
