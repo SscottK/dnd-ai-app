@@ -61,10 +61,9 @@ export function FullSheetModal({
         onClick={onClose}
       />
       <div
-        className={`relative flex h-[92vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black sheet:max-w-[min(98vw,2200px)] ${
+        className={`relative flex h-[92vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black sheet:max-w-[min(94vw,1680px)] ${
           sheetScale ? "sheet-scale" : ""
         }`}
-        style={sheetScale ? { zoom: 1.12 } : undefined}
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-neon-magenta bg-zinc-950 px-4 py-3">
           <div className="min-w-0">
