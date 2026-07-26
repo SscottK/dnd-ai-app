@@ -51,15 +51,15 @@ export function FullSheetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center p-0 sm:p-2 lg:p-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/80"
         aria-label="Close digital sheet"
         onClick={onClose}
       />
-      <div className="relative flex h-full max-h-[100dvh] w-full max-w-[1600px] flex-col border-neon-cyan bg-black sm:border-4 lg:max-h-none">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-neon-magenta bg-zinc-950 px-3 py-2 sm:px-4 sm:py-3">
+      <div className="relative flex h-[90vh] w-full max-w-6xl flex-col border-4 border-neon-cyan bg-black">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-neon-magenta bg-zinc-950 px-4 py-3">
           <div className="min-w-0">
             <h2 className="text-sm font-black uppercase text-starlight">{character.name}</h2>
             <p className="text-[10px] font-mono text-zinc-500">
@@ -165,7 +165,7 @@ export function FullSheetModal({
               </div>
             </div>
           )}
-          <div className="h-full min-h-0 overflow-hidden px-2 py-2 sm:px-3">
+          <div className="h-full overflow-y-auto px-3 py-3">
             <DigitalCharacterSheet
               character={character}
               sheet={sheet}
