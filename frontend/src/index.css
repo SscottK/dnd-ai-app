@@ -68,7 +68,7 @@
 
   /* Digital sheet zoom: stronger shrink on 1080p, milder on 2K+. */
   .digital-sheet-root {
-    zoom: 0.7;
+    zoom: 0.67;
   }
 
   .digital-sheet-root.sheet-scale {
