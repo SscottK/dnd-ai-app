@@ -78,9 +78,10 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
         onPointerDown={(event) => event.stopPropagation()}
       />
       <div
-        className={`relative z-[1] flex h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-sm border-2 border-neon-cyan bg-void shadow-2xl sheet:max-w-[min(96vw,1900px)] ${
+        className={`relative z-[1] flex h-[92vh] w-full max-w-[96vw] flex-col overflow-hidden rounded-sm border-2 border-neon-cyan bg-void shadow-2xl sheet:max-w-[min(98vw,2200px)] ${
           sheetScale ? "sheet-scale" : ""
         }`}
+        style={sheetScale ? { zoom: 1.12 } : undefined}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
