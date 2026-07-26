@@ -1,14 +1,18 @@
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.deps import AdminUser, SessionDep
+from app.core.security import hash_password
 from app.db.models import User
 from app.api.schemas import (
     AccessRequestActionResponse,
     AccessRequestRead,
     AccessRequestSummaryResponse,
+    AdminPasswordResetRequest,
+    AdminPasswordResetResponse,
     FeedbackActionResponse,
     FeedbackRead,
+    UserRead,
 )
 from app.services.access_requests import (
     approve_access_request,
@@ -19,6 +23,15 @@ from app.services.access_requests import (
 from app.services.feedback import count_feedback, list_feedback, mark_feedback_reviewed
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def to_user_read(user: User) -> UserRead:
+    return UserRead(
+        id=user.id,
+        username=user.username,
+        is_admin=user.is_admin,
+        created_at=user.created_at,
+    )
 
 
 def to_access_request_read(request, session: Session) -> AccessRequestRead:
@@ -117,4 +130,31 @@ def reject_request(request_id: int, session: SessionDep, admin: AdminUser):
     return AccessRequestActionResponse(
         request=to_access_request_read(request, session),
         message=f"Rejected access request for {request.username}",
+    )
+
+
+@router.get("/users", response_model=list[UserRead])
+def get_users(session: SessionDep, _admin: AdminUser):
+    users = session.exec(select(User).order_by(User.username)).all()
+    return [to_user_read(user) for user in users]
+
+
+@router.post("/users/{user_id}/reset-password", response_model=AdminPasswordResetResponse)
+def reset_user_password(
+    user_id: int,
+    data: AdminPasswordResetRequest,
+    session: SessionDep,
+    _admin: AdminUser,
+):
+    user = session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.password_hash = hash_password(data.new_password)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return AdminPasswordResetResponse(
+        message=f"Password reset for {user.username}",
+        user=to_user_read(user),
     )

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Check, MessageSquarePlus, ShieldAlert, UserPlus, X } from "lucide-react";
+import { Check, KeyRound, MessageSquarePlus, ShieldAlert, UserPlus, X } from "lucide-react";
 import { PageScroll } from "../components/PageScroll";
 import { useAuth } from "../hooks/useAuth";
 import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
@@ -9,6 +9,7 @@ import { apiFetch } from "../lib/api";
 const SECTIONS = [
   { id: "access", label: "Access" },
   { id: "feedback", label: "Feedback" },
+  { id: "users", label: "Users" },
 ];
 
 const STATUS_TABS = [
@@ -42,10 +43,14 @@ export function AdminAccessPage() {
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [feedbackItems, setFeedbackItems] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [resetUserId, setResetUserId] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const loadAccessRequests = useCallback(async () => {
     if (!token) return;
@@ -89,22 +94,44 @@ export function AdminAccessPage() {
     }
   }, [token, activeTab]);
 
+  const loadUsers = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await apiFetch("/admin/users", { token });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "Could not load users");
+      }
+      setUsers(await response.json());
+    } catch (err) {
+      setError(err.message || "Could not load users");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (activeSection === "access") {
       void loadAccessRequests();
-    } else {
+    } else if (activeSection === "feedback") {
       void loadFeedback();
+    } else {
+      void loadUsers();
     }
-  }, [activeSection, loadAccessRequests, loadFeedback]);
+  }, [activeSection, loadAccessRequests, loadFeedback, loadUsers]);
 
   const refreshPage = useCallback(async () => {
     await refreshPendingCount();
     if (activeSection === "access") {
       await loadAccessRequests();
-    } else {
+    } else if (activeSection === "feedback") {
       await loadFeedback();
+    } else {
+      await loadUsers();
     }
-  }, [activeSection, loadAccessRequests, loadFeedback, refreshPendingCount]);
+  }, [activeSection, loadAccessRequests, loadFeedback, loadUsers, refreshPendingCount]);
 
   if (!isValidating && !user?.is_admin) {
     return <Navigate to="/dashboard" replace />;
@@ -154,6 +181,52 @@ export function AdminAccessPage() {
     }
   };
 
+  const openResetForm = (userId) => {
+    setResetUserId(userId);
+    setNewPassword("");
+    setConfirmPassword("");
+    setError("");
+    setActionMessage("");
+  };
+
+  const cancelResetForm = () => {
+    setResetUserId(null);
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const handleResetPassword = async (userId) => {
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setBusyId(userId);
+    setActionMessage("");
+    setError("");
+    try {
+      const response = await apiFetch(`/admin/users/${userId}/reset-password`, {
+        method: "POST",
+        token,
+        body: { new_password: newPassword },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || "Could not reset password");
+      }
+      setActionMessage(data.message || "Password reset");
+      cancelResetForm();
+    } catch (err) {
+      setError(err.message || "Could not reset password");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const sectionPendingCount = activeSection === "access" ? accessPendingCount : feedbackPendingCount;
   const emptyMessage =
     activeTab === "pending"
@@ -170,10 +243,10 @@ export function AdminAccessPage() {
         <div>
           <h1 className="flex items-center gap-2 text-xl font-black uppercase italic tracking-tight text-starlight sm:text-2xl">
             <UserPlus className="h-6 w-6 text-neon-cyan" />
-            Requests
+            Admin
           </h1>
           <p className="mt-2 font-mono text-xs uppercase tracking-widest text-zinc-500">
-            Review access requests and beta feedback
+            Access requests, feedback, and password resets
           </p>
         </div>
 
@@ -204,6 +277,7 @@ export function AdminAccessPage() {
               onClick={() => {
                 setActiveSection(section.id);
                 setActiveTab("pending");
+                cancelResetForm();
               }}
               className={`-mb-0.5 border-b-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest transition ${
                 activeSection === section.id
@@ -222,25 +296,27 @@ export function AdminAccessPage() {
           ))}
         </div>
 
-        <div className="flex gap-2 border-b border-border/60">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`-mb-px border-b px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${
-                activeTab === tab.id
-                  ? "border-neon-magenta text-starlight"
-                  : "border-transparent text-zinc-500 hover:text-ink"
-              }`}
-            >
-              {tab.label}
-              {tab.id === "pending" && sectionPendingCount > 0 && activeTab === tab.id && (
-                <span className="ml-1.5 text-neon-magenta">({sectionPendingCount})</span>
-              )}
-            </button>
-          ))}
-        </div>
+        {activeSection !== "users" && (
+          <div className="flex gap-2 border-b border-border/60">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`-mb-px border-b px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${
+                  activeTab === tab.id
+                    ? "border-neon-magenta text-starlight"
+                    : "border-transparent text-zinc-500 hover:text-ink"
+                }`}
+              >
+                {tab.label}
+                {tab.id === "pending" && sectionPendingCount > 0 && activeTab === tab.id && (
+                  <span className="ml-1.5 text-neon-magenta">({sectionPendingCount})</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {actionMessage && (
           <div className="border-l-2 border-neon-cyan pl-3 text-xs font-bold text-neon-cyan">
@@ -257,6 +333,105 @@ export function AdminAccessPage() {
 
         {loading ? (
           <p className="font-mono text-xs uppercase tracking-widest text-zinc-500">Loading…</p>
+        ) : activeSection === "users" ? (
+          users.length === 0 ? (
+            <p className="font-mono text-sm text-zinc-500">No users yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {users.map((account) => (
+                <li
+                  key={account.id}
+                  className="border-2 border-border-bright bg-void-panel p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-black uppercase tracking-wide text-starlight">
+                          {account.username}
+                        </p>
+                        {account.is_admin && (
+                          <span className="border border-neon-cyan px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-neon-cyan">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 font-mono text-[10px] text-zinc-500">
+                        Joined {new Date(account.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    {resetUserId !== account.id && (
+                      <button
+                        type="button"
+                        onClick={() => openResetForm(account.id)}
+                        className="flex shrink-0 items-center gap-1.5 border-2 border-neon-cyan px-3 py-2 text-[10px] font-black uppercase tracking-widest text-neon-cyan hover:bg-neon-cyan hover:text-black"
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                        Reset password
+                      </button>
+                    )}
+                  </div>
+
+                  {resetUserId === account.id && (
+                    <form
+                      className="mt-4 space-y-3 border-t border-border/60 pt-4"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void handleResetPassword(account.id);
+                      }}
+                    >
+                      <label className="block">
+                        <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+                          New password
+                        </span>
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          value={newPassword}
+                          onChange={(event) => setNewPassword(event.target.value)}
+                          minLength={8}
+                          required
+                          className="mt-1 w-full border-2 border-border-bright bg-void px-3 py-2 font-mono text-sm text-starlight outline-none focus:border-neon-cyan"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+                          Confirm password
+                        </span>
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          value={confirmPassword}
+                          onChange={(event) => setConfirmPassword(event.target.value)}
+                          minLength={8}
+                          required
+                          className="mt-1 w-full border-2 border-border-bright bg-void px-3 py-2 font-mono text-sm text-starlight outline-none focus:border-neon-cyan"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="submit"
+                          disabled={busyId === account.id}
+                          className="flex items-center gap-1.5 bg-neon-cyan px-3 py-2 text-[10px] font-black uppercase tracking-widest text-black hover:bg-starlight disabled:opacity-50"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          Save password
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId === account.id}
+                          onClick={cancelResetForm}
+                          className="flex items-center gap-1.5 border-2 border-zinc-600 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:border-zinc-400 hover:text-ink disabled:opacity-50"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )
         ) : activeSection === "access" ? (
           requests.length === 0 ? (
             <p className="font-mono text-sm text-zinc-500">{emptyMessage}</p>

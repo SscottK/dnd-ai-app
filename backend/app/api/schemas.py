@@ -53,6 +53,15 @@ class UserRead(BaseModel):
     created_at: datetime
 
 
+class AdminPasswordResetRequest(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class AdminPasswordResetResponse(BaseModel):
+    message: str
+    user: UserRead
+
+
 class RegistrationStatusResponse(BaseModel):
     registration_open: bool
 
