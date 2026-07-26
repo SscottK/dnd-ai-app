@@ -120,7 +120,7 @@ export function PartyMemberSheetModal({ open, characterId, token, onClose }) {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-void px-2 py-2 sm:px-4 lg:px-6 lg:py-3">
+        <div className="min-h-0 flex-1 overflow-hidden bg-void px-2 py-2 sm:px-4 lg:px-4">
           {loading && !character && (
             <p className="text-sm font-mono text-zinc-500">Loading character sheet…</p>
           )}
