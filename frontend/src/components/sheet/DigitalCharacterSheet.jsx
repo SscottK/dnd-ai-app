@@ -398,10 +398,10 @@ function ProficienciesBlock({ sheet }) {
 function MetricTile({ label, hint, children, className = "" }) {
   return (
     <div
-      className={`flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1 ${className}`}
+      className={`flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1 sheet:h-[5.75rem] sheet:w-[6.25rem] sheet:gap-1 sheet:px-2 ${className}`}
     >
       <div className="flex max-w-full items-center justify-center gap-0.5">
-        <span className="truncate text-[8px] font-black uppercase tracking-wider text-zinc-500">
+        <span className="truncate text-[8px] font-black uppercase tracking-wider text-zinc-500 sheet:text-[10px]">
           {label}
         </span>
         <InfoTooltip text={hint} label={`About ${label}`} />
@@ -443,19 +443,21 @@ function CombatDashboard({
     onSheetChange({ ...sheet, resources: next }, { immediate: true });
   };
 
-  const tileValue = "text-lg font-black tabular-nums leading-none text-starlight";
+  const tileValue = "text-lg font-black tabular-nums leading-none text-starlight sheet:text-2xl";
 
   return (
-    <div className="flex w-full flex-wrap items-stretch gap-1.5">
+    <div className="flex w-full flex-wrap items-stretch gap-1.5 sheet:gap-2">
       {!readOnly && onLongRest && (
         <button
           type="button"
           onClick={() => void onLongRest()}
-          className="flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-1 rounded-sm border border-neon-magenta/50 bg-void-panel/80 px-1.5 py-1 text-neon-magenta hover:border-neon-magenta hover:bg-neon-magenta/10"
+          className="flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-1 rounded-sm border border-neon-magenta/50 bg-void-panel/80 px-1.5 py-1 text-neon-magenta hover:border-neon-magenta hover:bg-neon-magenta/10 sheet:h-[5.75rem] sheet:w-[6.25rem]"
           title="Long Rest: restore HP, refresh resources, reduce Exhaustion"
         >
-          <Moon className="h-4 w-4" />
-          <span className="text-[8px] font-black uppercase tracking-wider">Long Rest</span>
+          <Moon className="h-4 w-4 sheet:h-5 sheet:w-5" />
+          <span className="text-[8px] font-black uppercase tracking-wider sheet:text-[10px]">
+            Long Rest
+          </span>
         </button>
       )}
 
@@ -501,15 +503,17 @@ function CombatDashboard({
         onClick={() =>
           onShowDetail({ title: "Initiative", body: `Bonus ${formatModifier(init)}` })
         }
-        className="flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1 hover:border-neon-cyan"
+        className="flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1 hover:border-neon-cyan sheet:h-[5.75rem] sheet:w-[6.25rem]"
         title="Open initiative details"
       >
         <div className="flex items-center gap-0.5">
-          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">Init</span>
+          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500 sheet:text-[10px]">
+            Init
+          </span>
           <InfoTooltip text={SHEET_STAT_HINTS.init} label="About Initiative" />
         </div>
         <span
-          className="flex h-9 w-9 items-center justify-center bg-zinc-950 text-base font-black tabular-nums text-starlight"
+          className="flex h-9 w-9 items-center justify-center bg-zinc-950 text-base font-black tabular-nums text-starlight sheet:h-11 sheet:w-11 sheet:text-xl"
           style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" }}
         >
           {formatModifier(init)}
@@ -531,35 +535,37 @@ function CombatDashboard({
             ),
           })
         }
-        className="flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1 hover:border-neon-cyan"
+        className="flex h-[4.75rem] w-[5.25rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-1.5 py-1 hover:border-neon-cyan sheet:h-[5.75rem] sheet:w-[6.25rem]"
         title="Open AC breakdown"
       >
         <div className="flex items-center gap-0.5">
-          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">AC</span>
+          <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500 sheet:text-[10px]">
+            AC
+          </span>
           <InfoTooltip text={SHEET_STAT_HINTS.ac} label="About Armor Class" />
         </div>
-        <span className="relative flex h-9 w-8 items-center justify-center">
+        <span className="relative flex h-9 w-8 items-center justify-center sheet:h-11 sheet:w-9">
           <Shield
             className="absolute inset-0 h-full w-full text-neon-magenta/80"
             strokeWidth={1.25}
           />
-          <span className="relative z-10 text-base font-black tabular-nums text-starlight">
+          <span className="relative z-10 text-base font-black tabular-nums text-starlight sheet:text-xl">
             {combat.ac ?? "—"}
           </span>
         </span>
       </button>
 
-      <div className="flex h-[4.75rem] min-w-[15rem] flex-1 flex-col justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5 sm:max-w-md">
+      <div className="flex h-[4.75rem] min-w-[15rem] flex-1 flex-col justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5 sm:max-w-md sheet:h-[5.75rem] sheet:max-w-lg sheet:px-3">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            <Heart className="h-3 w-3 text-danger" />
-            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
+            <Heart className="h-3 w-3 text-danger sheet:h-3.5 sheet:w-3.5" />
+            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500 sheet:text-[10px]">
               Hit Points
             </span>
             <InfoTooltip text={SHEET_STAT_HINTS.hp} label="About Hit Points" />
           </div>
           {sheet.hit_dice && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-zinc-500">
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-zinc-500 sheet:text-xs">
               HD {sheet.hit_dice}
               <InfoTooltip text={SHEET_STAT_HINTS.hitDice} label="About Hit Dice" />
             </span>
@@ -571,7 +577,7 @@ function CombatDashboard({
               <button
                 type="button"
                 onClick={() => bumpHp(-1)}
-                className="shrink-0 border border-danger/50 px-2 py-0.5 text-[9px] font-black uppercase text-danger hover:bg-danger/10"
+                className="shrink-0 border border-danger/50 px-2 py-0.5 text-[9px] font-black uppercase text-danger hover:bg-danger/10 sheet:text-[10px]"
               >
                 Damage
               </button>
@@ -584,7 +590,7 @@ function CombatDashboard({
                     hp: e.target.value === "" ? null : parseInt(e.target.value, 10),
                   })
                 }
-                className="w-12 shrink-0 border border-zinc-700 bg-black text-center text-base font-black text-starlight"
+                className="w-12 shrink-0 border border-zinc-700 bg-black text-center text-base font-black text-starlight sheet:w-14 sheet:text-xl"
                 aria-label="Current hit points"
               />
               <span className="shrink-0 text-zinc-600">/</span>
@@ -597,19 +603,19 @@ function CombatDashboard({
                     max_hp: e.target.value === "" ? null : parseInt(e.target.value, 10),
                   })
                 }
-                className="w-12 shrink-0 border border-zinc-700 bg-black text-center text-base font-black text-zinc-400"
+                className="w-12 shrink-0 border border-zinc-700 bg-black text-center text-base font-black text-zinc-400 sheet:w-14 sheet:text-xl"
                 aria-label="Maximum hit points"
               />
               <button
                 type="button"
                 onClick={() => bumpHp(1)}
-                className="shrink-0 border border-neon-cyan/50 px-2 py-0.5 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10"
+                className="shrink-0 border border-neon-cyan/50 px-2 py-0.5 text-[9px] font-black uppercase text-neon-cyan hover:bg-neon-cyan/10 sheet:text-[10px]"
               >
                 Heal
               </button>
             </>
           ) : (
-            <p className="text-base font-black tabular-nums text-starlight">
+            <p className="text-base font-black tabular-nums text-starlight sheet:text-xl">
               {character.hp ?? "—"}
               <span className="text-zinc-600"> / </span>
               <span className="text-zinc-400">{character.max_hp ?? "—"}</span>
@@ -619,9 +625,9 @@ function CombatDashboard({
       </div>
 
       {resources.length > 0 ? (
-        <div className="flex h-[4.75rem] min-w-[11rem] flex-1 flex-col justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5 sm:max-w-sm">
+        <div className="flex h-[4.75rem] min-w-[11rem] flex-1 flex-col justify-center rounded-sm border border-neon-cyan/35 bg-void-panel/80 px-2.5 py-1.5 sm:max-w-sm sheet:h-[5.75rem] sheet:max-w-md sheet:px-3">
           <div className="mb-1 flex items-center gap-0.5">
-            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500">
+            <span className="text-[8px] font-black uppercase tracking-wider text-zinc-500 sheet:text-[10px]">
               Resources
             </span>
             <InfoTooltip text={SHEET_STAT_HINTS.resources} label="About resources" />
@@ -630,7 +636,7 @@ function CombatDashboard({
             {resources.map((resource, index) => (
               <div
                 key={resource.id || index}
-                className="inline-flex items-center gap-1 rounded-sm border border-zinc-800 px-1.5 py-0.5 text-[11px]"
+                className="inline-flex items-center gap-1 rounded-sm border border-zinc-800 px-1.5 py-0.5 text-[11px] sheet:px-2 sheet:text-sm"
               >
                 <span className="inline-flex max-w-[7rem] items-center gap-0.5 truncate text-zinc-400">
                   <span className="truncate">{resource.name}</span>
@@ -1055,7 +1061,7 @@ export function DigitalCharacterSheet({
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2 xl:max-w-[1200px] sheet:max-w-[1600px] sheet:gap-4">
+      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2 xl:max-w-[1200px] sheet:max-w-[1680px] sheet:gap-4">
         {/* Identity */}
         <div className="flex flex-wrap items-end justify-between gap-2 border-b border-neon-cyan/25 pb-2">
           <div className="min-w-0">
