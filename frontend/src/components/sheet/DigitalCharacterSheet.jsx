@@ -1066,7 +1066,7 @@ export function DigitalCharacterSheet({
   return (
     <>
       <div
-        className={`mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2 xl:max-w-[min(92vw,1320px)] sheet:max-w-[min(94vw,1680px)] sheet:gap-4 ${
+        className={`digital-sheet-root mx-auto flex w-full max-w-[1080px] flex-col gap-3 pb-2 xl:max-w-[min(92vw,1320px)] sheet:max-w-[min(94vw,1680px)] sheet:gap-4 ${
           sheetScale ? "sheet-scale" : ""
         }`}
       >
