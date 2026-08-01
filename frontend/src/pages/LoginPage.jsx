@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Scroll, ShieldAlert } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { APP_NAME } from "../constants/branding";
+import { FanContentNotice, SiteAboutBlurb } from "../components/FanContentNotice";
 
 export function LoginPage() {
   const { login, isAuthenticated, isValidating } = useAuth();
@@ -27,71 +28,79 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-void-deep px-4 py-6">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md rounded-sm border border-border-bright bg-void-panel p-6 shadow-xl shadow-black/50 sm:p-8"
-      >
-        <div className="text-center mb-6">
-          <Scroll className="w-14 h-14 text-accent mx-auto mb-2" />
-          <h1 className="text-3xl font-black uppercase italic tracking-tighter text-starlight sm:text-4xl">
-            {APP_NAME}
-          </h1>
-          <p className="text-[10px] text-ink-muted uppercase tracking-[0.2em] font-extrabold mt-1">
-            Sign in to your account
-          </p>
-        </div>
-
-        <div className="space-y-4 font-mono">
-          <div>
-            <label className="block text-xs font-black uppercase tracking-wider text-neon-magenta mb-2 font-sans">
-              Username
-            </label>
-            <input
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Your username..."
-              className="w-full px-4 py-3 border-2 border-neon-cyan bg-black text-neon-cyan placeholder-[#004e4e] focus:outline-none focus:border-starlight text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black uppercase tracking-wider text-neon-magenta mb-2 font-sans">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your secret passphrase..."
-              className="w-full px-4 py-3 border-2 border-neon-cyan bg-black text-neon-cyan placeholder-[#004e4e] focus:outline-none focus:border-starlight text-sm"
-            />
+    <div className="flex min-h-[100dvh] items-center justify-center bg-void-deep px-4 py-8">
+      <div className="w-full max-w-lg space-y-4">
+        <div className="rounded-sm border border-border-bright bg-void-panel p-6 shadow-xl shadow-black/50 sm:p-8">
+          <div className="mb-6 text-center">
+            <Scroll className="mx-auto mb-2 h-14 w-14 text-accent" />
+            <h1 className="text-3xl font-black uppercase italic tracking-tighter text-starlight sm:text-4xl">
+              {APP_NAME}
+            </h1>
+            <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.2em] text-ink-muted">
+              Private campaign companion
+            </p>
           </div>
 
-          {loginError && (
-            <div className="flex items-center gap-2 text-danger text-xs border-l-2 border-danger pl-2">
-              <ShieldAlert className="w-4 h-4 flex-shrink-0" />
-              <span className="font-bold tracking-tight">{loginError}</span>
+          <SiteAboutBlurb />
+
+          <div className="my-6 border-t border-border/60" />
+
+          <form onSubmit={handleSubmit} className="space-y-4 font-mono">
+            <p className="text-center text-[10px] font-extrabold uppercase tracking-[0.2em] text-neon-cyan">
+              Sign in
+            </p>
+            <div>
+              <label className="mb-2 block font-sans text-xs font-black uppercase tracking-wider text-neon-magenta">
+                Username
+              </label>
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Your username..."
+                className="w-full border-2 border-neon-cyan bg-black px-4 py-3 text-sm text-neon-cyan placeholder-[#004e4e] focus:border-starlight focus:outline-none"
+              />
             </div>
-          )}
+            <div>
+              <label className="mb-2 block font-sans text-xs font-black uppercase tracking-wider text-neon-magenta">
+                Password
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your secret passphrase..."
+                className="w-full border-2 border-neon-cyan bg-black px-4 py-3 text-sm text-neon-cyan placeholder-[#004e4e] focus:border-starlight focus:outline-none"
+              />
+            </div>
 
-          <button
-            type="submit"
-            className="w-full py-3.5 bg-neon-magenta hover:bg-starlight text-black font-black transition-colors uppercase text-xs tracking-[0.15em] border-2 border-black"
-          >
-            Sign In
-          </button>
+            {loginError && (
+              <div className="flex items-center gap-2 border-l-2 border-danger pl-2 text-xs text-danger">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <span className="font-bold tracking-tight">{loginError}</span>
+              </div>
+            )}
 
-          <p className="text-center text-[10px] text-zinc-500 uppercase tracking-widest">
-            Need access?{" "}
-            <Link to="/register" className="text-neon-cyan hover:text-starlight">
-              Request to join
-            </Link>
-          </p>
+            <button
+              type="submit"
+              className="w-full border-2 border-black bg-neon-magenta py-3.5 text-xs font-black uppercase tracking-[0.15em] text-black transition-colors hover:bg-starlight"
+            >
+              Sign In
+            </button>
+
+            <p className="text-center text-[10px] uppercase tracking-widest text-zinc-500">
+              Friend of the table?{" "}
+              <Link to="/register" className="text-neon-cyan hover:text-starlight">
+                Request access
+              </Link>
+            </p>
+          </form>
         </div>
-      </form>
+
+        <FanContentNotice className="px-1 text-center sm:text-left" />
+      </div>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { useLiveCampaigns } from "../hooks/useLiveCampaigns";
 import { usePendingAccessCount } from "../hooks/usePendingAccessCount";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { APP_NAME, APP_TAGLINE, APP_VERSION, RULE_WIZARD_LABEL } from "../constants/branding";
+import { FanContentNotice } from "../components/FanContentNotice";
 import { PageRefreshProvider, usePageRefreshContext } from "../contexts/PageRefreshContext";
 import { ShellPullToRefresh } from "../components/ShellPullToRefresh";
 import { APP_MOBILE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
@@ -123,7 +124,8 @@ function AppHeader({ user, pendingCount, liveCampaigns, onLogout }) {
 
 function AppFooter({ onOpenFeedback }) {
   return (
-      <footer className="shrink-0 border-t border-border/50 bg-void-deep/80 px-3 py-2">
+    <footer className="shrink-0 border-t border-border/50 bg-void-deep/80 px-3 py-2">
+      <div className="mx-auto flex max-w-5xl flex-col items-center gap-1.5">
         <div className="flex items-center justify-center gap-3 text-[10px] font-mono uppercase tracking-widest text-ink-faint">
           <span>Beta {APP_VERSION}</span>
           <span className="text-border" aria-hidden>
@@ -137,7 +139,9 @@ function AppFooter({ onOpenFeedback }) {
             Send feedback
           </button>
         </div>
-      </footer>
+        <FanContentNotice className="max-w-3xl text-center text-[9px] leading-snug" />
+      </div>
+    </footer>
   );
 }
 
